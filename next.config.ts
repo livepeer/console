@@ -70,7 +70,7 @@ const nextConfig: NextConfig = {
       {
         source: "/primer-new-design",
         destination: "/primer",
-        permanent: false,
+        permanent: true,
       },
       // Legal pages — not yet implemented, redirect to home for now
       {
@@ -104,7 +104,7 @@ const nextConfig: NextConfig = {
       ].map((source) => ({
         source,
         destination: "/",
-        permanent: false,
+        permanent: true,
       })),
     ];
   },
