@@ -3,13 +3,18 @@
  * Exits with code 1 if any URL is broken.
  */
 
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import matter from "gray-matter";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dataPath = resolve(__dirname, "../data/ecosystem.json");
-const apps = JSON.parse(readFileSync(dataPath, "utf-8"));
+const ecosystemDir = resolve(__dirname, "../content/ecosystem");
+
+const apps = readdirSync(ecosystemDir)
+  .filter((f) => f.endsWith(".md"))
+  .map((f) => matter(readFileSync(join(ecosystemDir, f), "utf-8")).data)
+  .filter((app) => app.url);
 
 const TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;

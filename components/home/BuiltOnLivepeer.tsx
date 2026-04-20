@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import Container from "@/components/ui/Container";
 import SectionHeader from "@/components/ui/SectionHeader";
@@ -627,37 +628,24 @@ function EmbodyVisual() {
 }
 
 const projects = [
-  {
-    Visual: DaydreamVisual,
-    Logo: DaydreamLogo,
-    description:
-      "Turn a live camera feed into AI-generated video, in real time.",
-    domain: "daydream.live",
-  },
-  {
-    Visual: StudioVisual,
-    Logo: FrameworksLogo,
-    description:
-      "Stream to any device, any format, any scale, from a single source.",
-    domain: "frameworks.network",
-  },
-  {
-    Visual: StreamplaceVisual,
-    Logo: StreamplaceLogo,
-    description:
-      "Open-source video infrastructure powering AT Protocol social apps.",
-    domain: "stream.place",
-  },
-  {
-    Visual: EmbodyVisual,
-    Logo: EmbodyLogo,
-    description: "Deploy AI avatars that see, speak, and respond in real time.",
-    domain: "embody.zone",
-  },
+  { slug: "daydream", Visual: DaydreamVisual, Logo: DaydreamLogo },
+  { slug: "frameworks", Visual: StudioVisual, Logo: FrameworksLogo },
+  { slug: "streamplace", Visual: StreamplaceVisual, Logo: StreamplaceLogo },
+  { slug: "embody", Visual: EmbodyVisual, Logo: EmbodyLogo },
 ];
 
-export default function BuiltOnLivepeer() {
+export type BuiltOnLivepeerMeta = Record<
+  string,
+  { description: string; domain: string }
+>;
+
+export default function BuiltOnLivepeer({
+  meta,
+}: {
+  meta: BuiltOnLivepeerMeta;
+}) {
   const [featured, ...rest] = projects;
+  const featuredMeta = meta[featured.slug];
 
   return (
     <section className="relative py-24 lg:py-32">
@@ -673,7 +661,7 @@ export default function BuiltOnLivepeer() {
           <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
             <SectionHeader
               label="Ecosystem"
-              title="Built with Livepeer"
+              title="Discover applications built on Livepeer"
               description="Explore applications and emerging capabilities on Livepeer, from real-time AI video and AI avatars to transcoding and streaming."
               align="split"
             />
@@ -687,43 +675,52 @@ export default function BuiltOnLivepeer() {
               transition={{ duration: 0.4 }}
               className="lg:row-span-3"
             >
-              <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#1a1a1a]">
+              <Link
+                href={`/ecosystem/${featured.slug}`}
+                className="group flex h-full flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#1a1a1a] transition-colors hover:border-white/[0.14]"
+              >
                 <div className="relative flex-1 min-h-[220px]">
                   <div className="absolute inset-0">
                     <featured.Visual />
                   </div>
                 </div>
                 <div className="px-6 py-5">
-                  <p className="text-sm leading-relaxed text-white/50">
-                    {featured.description}
+                  <p className="text-sm leading-relaxed text-white/50 transition-colors group-hover:text-white/70">
+                    {featuredMeta.description}
                   </p>
                   <span className="mt-3 inline-block text-[13px] text-white/25">
-                    {featured.domain}
+                    {featuredMeta.domain}
                   </span>
                 </div>
-              </div>
+              </Link>
             </motion.div>
 
             {/* 3 smaller cards stacked on the right */}
-            {rest.map((project, i) => (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                transition={{ duration: 0.4 }}
-              >
-                <div className="flex h-full flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#1a1a1a]">
-                  <div className="px-5 pt-5 pb-4">
-                    <project.Logo />
-                    <p className="mt-3 text-[13px] leading-relaxed text-white/50">
-                      {project.description}
-                    </p>
-                    <span className="mt-3 inline-block text-[13px] text-white/25">
-                      {project.domain}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+            {rest.map((project) => {
+              const projectMeta = meta[project.slug];
+              return (
+                <motion.div
+                  key={project.slug}
+                  variants={fadeUp}
+                  transition={{ duration: 0.4 }}
+                >
+                  <Link
+                    href={`/ecosystem/${project.slug}`}
+                    className="group flex h-full flex-col overflow-hidden rounded-xl border border-white/[0.07] bg-[#1a1a1a] transition-colors hover:border-white/[0.14]"
+                  >
+                    <div className="px-5 pt-5 pb-4">
+                      <project.Logo />
+                      <p className="mt-3 text-[13px] leading-relaxed text-white/50 transition-colors group-hover:text-white/70">
+                        {projectMeta.description}
+                      </p>
+                      <span className="mt-3 inline-block text-[13px] text-white/25">
+                        {projectMeta.domain}
+                      </span>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
 
           <motion.div
@@ -731,7 +728,7 @@ export default function BuiltOnLivepeer() {
             transition={{ duration: 0.4 }}
             className="mt-12 text-center"
           >
-            <a
+            <Link
               href="/ecosystem"
               className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:brightness-110 active:brightness-95"
               style={{
@@ -740,7 +737,7 @@ export default function BuiltOnLivepeer() {
               }}
             >
               Explore the ecosystem <span aria-hidden="true">→</span>
-            </a>
+            </Link>
           </motion.div>
         </motion.div>
       </Container>
