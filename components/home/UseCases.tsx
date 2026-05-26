@@ -18,10 +18,10 @@ function WorldsVisual() {
   return (
     <div
       ref={ref}
-      className="relative h-full overflow-hidden rounded-lg bg-[#070b0a]"
+      className="relative h-full overflow-hidden bg-surface"
     >
       {/* Sky gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#080f0c] via-[#060d0a] to-[#0a0a0a]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#080f0c] via-[#060d0a] to-[#0a0a0a] light:from-[#eef8f1] light:via-[#e5f2e9] light:to-[#daede1]" />
 
       {/* Stars */}
       {[
@@ -38,7 +38,7 @@ function WorldsVisual() {
       ].map(([x, y], i) => (
         <div
           key={i}
-          className="absolute h-px w-px rounded-full bg-white/50"
+          className="absolute h-px w-px rounded-full bg-foreground/50"
           style={{
             left: `${x}%`,
             top: `${y}%`,
@@ -65,17 +65,17 @@ function WorldsVisual() {
           {/* Far mountains */}
           <path
             d="M0 80 L40 45 L80 65 L130 30 L180 55 L220 25 L270 50 L320 35 L360 55 L400 40 V120 H0Z"
-            fill="rgba(24,121,78,0.18)"
+            fill="var(--vis-green-soft)"
           />
           {/* Mid hills */}
           <path
             d="M0 95 L50 70 L100 85 L160 60 L210 78 L260 65 L320 80 L370 70 L400 82 V120 H0Z"
-            fill="rgba(24,121,78,0.25)"
+            fill="var(--vis-green-mid)"
           />
           {/* Foreground */}
           <path
             d="M0 105 L60 92 L120 100 L180 88 L240 98 L300 90 L360 96 L400 92 V120 H0Z"
-            fill="rgba(24,121,78,0.35)"
+            fill="var(--vis-green-strong)"
           />
           {/* Grid lines overlaying terrain */}
           {[0, 50, 100, 150, 200, 250, 300, 350, 400].map((x) => (
@@ -85,7 +85,7 @@ function WorldsVisual() {
               y1="0"
               x2={x}
               y2="120"
-              stroke="rgba(255,255,255,0.07)"
+              stroke="color-mix(in srgb, currentColor 7%, transparent)"
               strokeWidth="0.5"
             />
           ))}
@@ -96,7 +96,7 @@ function WorldsVisual() {
               y1={y}
               x2="400"
               y2={y}
-              stroke="rgba(255,255,255,0.07)"
+              stroke="color-mix(in srgb, currentColor 7%, transparent)"
               strokeWidth="0.5"
             />
           ))}
@@ -109,9 +109,9 @@ function WorldsVisual() {
         style={{
           left: 0,
           background:
-            "linear-gradient(to bottom, transparent, rgba(64,191,134,0.5) 30%, rgba(64,191,134,0.8) 50%, rgba(64,191,134,0.5) 70%, transparent)",
+            "linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vis-accent-green) 60%, transparent) 30%, var(--vis-accent-green) 50%, color-mix(in srgb, var(--vis-accent-green) 60%, transparent) 70%, transparent)",
           boxShadow:
-            "0 0 8px rgba(64,191,134,0.4), 0 0 20px rgba(64,191,134,0.2)",
+            "0 0 8px color-mix(in srgb, var(--vis-accent-green) 50%, transparent), 0 0 20px color-mix(in srgb, var(--vis-accent-green) 25%, transparent)",
           opacity: inView ? 1 : 0,
           animation: inView ? "generateSweep 4.5s linear forwards" : "none",
         }}
@@ -124,10 +124,10 @@ function WorldsVisual() {
       >
         GENERATING
       </div>
-      <div className="absolute right-3 top-2.5 font-mono text-[9px] text-white/35">
+      <div className="absolute right-3 top-2.5 font-mono text-[9px] text-foreground/35">
         60 FPS
       </div>
-      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-white/35">
+      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-foreground/35">
         Frame 1,847 &middot; 12ms
       </div>
     </div>
@@ -175,12 +175,13 @@ function AvatarsVisual() {
     [11, 15],
   ];
   return (
-    <div className="relative h-full overflow-hidden rounded-lg bg-[#0a0a0a]">
-      <div className="flex h-full items-center justify-center gap-4 px-4 py-5">
+    <div className="relative h-full overflow-hidden bg-surface">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#0a0a0a] to-[#0d0d0d] light:from-[#f0f3f8] light:via-[#e7ecf3] light:to-[#f0f3f8]" />
+      <div className="relative flex h-full items-center justify-center gap-4 px-4 py-5">
         {/* Input */}
-        <div className="relative h-[110px] w-[80px] flex-shrink-0 overflow-hidden rounded-md border border-white/[0.1] bg-[#131313]">
+        <div className="relative h-[110px] w-[80px] flex-shrink-0 overflow-hidden rounded-md border border-foreground/[0.1] bg-card">
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-[55%] w-[45%] rounded-[50%] bg-white/[0.05]" />
+            <div className="h-[55%] w-[45%] rounded-[50%] bg-foreground/[0.05]" />
           </div>
           <svg
             className="absolute inset-0 h-full w-full"
@@ -194,7 +195,7 @@ function AvatarsVisual() {
                 y1={pts[a][1]}
                 x2={pts[b][0]}
                 y2={pts[b][1]}
-                stroke="rgba(96,165,250,0.35)"
+                stroke="var(--vis-blue-soft)"
                 strokeWidth="0.5"
               />
             ))}
@@ -204,7 +205,7 @@ function AvatarsVisual() {
                 cx={x}
                 cy={y}
                 r="1"
-                fill="rgba(96,165,250,0.7)"
+                fill="var(--vis-blue-mid)"
                 style={{
                   animation: "breathe 4s ease-in-out infinite",
                   animationDelay: `${i * 0.15}s`,
@@ -219,7 +220,7 @@ function AvatarsVisual() {
 
         {/* Arrow */}
         <svg
-          className="h-3 w-4 flex-shrink-0 text-white/25"
+          className="h-3 w-4 flex-shrink-0 text-foreground/25"
           viewBox="0 0 16 12"
           fill="none"
           style={{ animation: "arrowFlow 2.5s ease-in-out infinite" }}
@@ -234,7 +235,7 @@ function AvatarsVisual() {
         </svg>
 
         {/* Output */}
-        <div className="relative h-[110px] w-[80px] flex-shrink-0 overflow-hidden rounded-md border border-white/[0.1] bg-[#131313]">
+        <div className="relative h-[110px] w-[80px] flex-shrink-0 overflow-hidden rounded-md border border-foreground/[0.1] bg-card">
           <div className="absolute inset-0 flex items-center justify-center">
             <div
               className="relative h-[55%] w-[45%] rounded-[50%] bg-gradient-to-b from-purple-500/[0.12] to-emerald-500/[0.08]"
@@ -252,7 +253,7 @@ function AvatarsVisual() {
       </div>
 
       {/* Bottom label */}
-      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-white/35">
+      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-foreground/35">
         Style: Anime &middot; 22ms
       </div>
     </div>
@@ -346,14 +347,17 @@ function TrackingBox({
           <div
             className="absolute inset-0 rounded-sm"
             style={{
-              border: `1.5px solid ${d.color}66`,
-              boxShadow: `0 0 6px ${d.color}25, 0 0 14px ${d.color}10`,
+              border: `1.5px solid color-mix(in srgb, ${d.color} 60%, transparent)`,
+              boxShadow: `0 0 6px color-mix(in srgb, ${d.color} 25%, transparent), 0 0 14px color-mix(in srgb, ${d.color} 12%, transparent)`,
             }}
           />
           {/* Label + confidence */}
           <div
             className="absolute -top-3.5 left-0 flex items-center gap-1 rounded-sm px-1 py-px font-mono text-[7px]"
-            style={{ background: `${d.color}25`, color: `${d.color}cc` }}
+            style={{
+              background: `color-mix(in srgb, ${d.color} 18%, transparent)`,
+              color: `color-mix(in srgb, ${d.color} 90%, transparent)`,
+            }}
           >
             <span>{d.label}</span>
             <span style={{ opacity: 0.6 }}>{conf.toFixed(2)}</span>
@@ -372,7 +376,7 @@ const analysisDetections: Detection[] = [
     w: 20,
     h: 40,
     label: "person",
-    color: "#34d399",
+    color: "var(--vis-accent-green)",
     conf: 0.94,
     drift: { freqX: 0.3, freqY: 0.18, amtX: 8, amtY: 12 },
     sil: { left: "15%", top: "7.5%", w: "35%", h: "95%", opacity: 0.06 },
@@ -383,7 +387,7 @@ const analysisDetections: Detection[] = [
     w: 16,
     h: 32,
     label: "person",
-    color: "#34d399",
+    color: "var(--vis-accent-green)",
     conf: 0.87,
     drift: { freqX: 0.22, freqY: 0.28, amtX: 6, amtY: 10 },
     sil: { left: "12.5%", top: "9.4%", w: "37.5%", h: "87.5%", opacity: 0.045 },
@@ -394,7 +398,7 @@ const analysisDetections: Detection[] = [
     w: 30,
     h: 18,
     label: "vehicle",
-    color: "#60a5fa",
+    color: "var(--vis-accent-blue)",
     conf: 0.91,
     drift: { freqX: 0.15, freqY: 0.35, amtX: 14, amtY: 3 },
     sil: { left: "6.7%", top: "11.1%", w: "86.7%", h: "66.7%", opacity: 0.03 },
@@ -454,16 +458,16 @@ function AnalysisVisual() {
   ).length;
 
   return (
-    <div className="relative h-full overflow-hidden rounded-lg bg-[#0a0a0a]">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0d1117] via-[#0a0a0a] to-[#0d1117]" />
+    <div className="relative h-full overflow-hidden bg-surface">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d1117] via-[#0a0a0a] to-[#0d1117] light:from-[#f3f5f8] light:via-[#eceff2] light:to-[#f3f5f8]" />
       {analysisDetections.map((d, i) => (
         <TrackingBox key={i} d={d} active={active[i]} entered={entered[i]} />
       ))}
       <div className="absolute left-3 top-2.5 flex items-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
-        <span className="font-mono text-[9px] text-white/40">LIVE</span>
+        <span className="font-mono text-[9px] text-foreground/40">LIVE</span>
       </div>
-      <div className="absolute right-3 top-2.5 font-mono text-[9px] text-white/35">
+      <div className="absolute right-3 top-2.5 font-mono text-[9px] text-foreground/35">
         YOLOv8 &middot; 8ms
       </div>
       <div className="absolute bottom-2.5 left-3 flex gap-3 font-mono text-[9px]">
@@ -493,8 +497,8 @@ function PipelinesVisual() {
   const nodeH = 26;
   const nodeY = 14;
   return (
-    <div className="relative h-full overflow-hidden rounded-lg bg-[#0a0a0a]">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#0a0a0a] to-[#0d0d0d]" />
+    <div className="relative h-full overflow-hidden bg-surface">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#0a0a0a] to-[#0d0d0d] light:from-[#eef6f0] light:via-[#e5efe8] light:to-[#eef6f0]" />
 
       {/* Pipeline node graph */}
       <div className="absolute inset-x-3 top-3 bottom-10 flex items-center justify-center">
@@ -516,13 +520,13 @@ function PipelinesVisual() {
                   y1={cy}
                   x2={x2}
                   y2={cy}
-                  stroke="rgba(255,255,255,0.15)"
+                  stroke="color-mix(in srgb, currentColor 15%, transparent)"
                   strokeWidth="1"
                   strokeDasharray="4 4"
                   style={{ animation: "dashFlow 1.5s linear infinite" }}
                 />
                 {/* Data packet */}
-                <circle r="2.5" cy={cy} fill="#40bf86">
+                <circle r="2.5" cy={cy} fill="var(--vis-accent-green)">
                   <animate
                     attributeName="cx"
                     from={x1}
@@ -541,7 +545,7 @@ function PipelinesVisual() {
                   />
                 </circle>
                 {/* Second staggered packet */}
-                <circle r="2" cy={cy} fill="#40bf86">
+                <circle r="2" cy={cy} fill="var(--vis-accent-green)">
                   <animate
                     attributeName="cx"
                     from={x1}
@@ -574,11 +578,11 @@ function PipelinesVisual() {
                 rx="5"
                 fill={
                   node.active
-                    ? "rgba(24,121,78,0.25)"
-                    : "rgba(255,255,255,0.05)"
+                    ? "var(--vis-green-mid)"
+                    : "color-mix(in srgb, currentColor 5%, transparent)"
                 }
                 stroke={
-                  node.active ? "rgba(24,121,78,0.7)" : "rgba(255,255,255,0.12)"
+                  node.active ? "var(--vis-green-strong)" : "color-mix(in srgb, currentColor 12%, transparent)"
                 }
                 strokeWidth="1"
                 style={
@@ -595,7 +599,7 @@ function PipelinesVisual() {
                 className="font-mono"
                 fontSize="9"
                 fill={
-                  node.active ? "rgba(64,191,134,0.9)" : "rgba(255,255,255,0.5)"
+                  node.active ? "var(--vis-accent-green)" : "color-mix(in srgb, currentColor 50%, transparent)"
                 }
               >
                 {node.label}
@@ -606,7 +610,7 @@ function PipelinesVisual() {
       </div>
 
       {/* Bottom HUD */}
-      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-white/35">
+      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-foreground/35">
         Pipeline: img2img &middot; 3 stages
       </div>
       <div className="absolute bottom-2.5 right-3 font-mono text-[9px] text-emerald-400/60">
@@ -625,11 +629,11 @@ function TranscodingVisual() {
     { res: "360p", fps: "30fps", width: "42%" },
   ];
   return (
-    <div className="relative h-full overflow-hidden rounded-lg bg-[#0a0a0a]">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#0a0a0a] to-[#0d0d0d]" />
+    <div className="relative h-full overflow-hidden bg-surface">
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#0a0a0a] to-[#0d0d0d] light:from-[#f5f3eb] light:via-[#efece2] light:to-[#f5f3eb]" />
 
       {/* Mini player chrome */}
-      <div className="absolute inset-x-3 top-3 bottom-10 rounded-md border border-white/[0.1] bg-[#131313] overflow-hidden">
+      <div className="absolute inset-x-3 top-3 bottom-10 rounded-md border border-foreground/[0.1] bg-card overflow-hidden">
         {/* Video area gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent" />
 
@@ -653,14 +657,14 @@ function TranscodingVisual() {
                   className="absolute inset-0"
                   style={{
                     background:
-                      "linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%)",
+                      "linear-gradient(90deg, transparent 30%, color-mix(in srgb, currentColor 12%, transparent) 50%, transparent 70%)",
                     backgroundSize: "200% 100%",
                     animation: "shimmer 3s ease-in-out infinite",
                     animationDelay: `${i * 0.4}s`,
                   }}
                 />
               </div>
-              <span className="font-mono text-[10px] text-white/50 whitespace-nowrap">
+              <span className="font-mono text-[10px] text-foreground/50 whitespace-nowrap">
                 {r.res} {r.fps}
               </span>
             </div>
@@ -669,7 +673,7 @@ function TranscodingVisual() {
       </div>
 
       {/* Bottom stats */}
-      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-white/35">
+      <div className="absolute bottom-2.5 left-3 font-mono text-[9px] text-foreground/35">
         Bitrate: 4.2 Mbps &middot; Latency: 85ms
       </div>
     </div>
@@ -680,6 +684,7 @@ function TranscodingVisual() {
 const useCases: {
   title: string;
   description: string;
+  tag: string;
   attribution: string;
   Visual: React.ComponentType;
   colSpan: 2 | 4 | 6;
@@ -688,6 +693,7 @@ const useCases: {
     title: "AI-Generated Worlds",
     description:
       "Live environments inferred in real time from user inputs. Not pre-rendered, not pre-recorded. The world itself is the model's output.",
+    tag: "Generative",
     attribution: "Powered by Daydream on Livepeer.",
     Visual: WorldsVisual,
     colSpan: 4,
@@ -696,6 +702,7 @@ const useCases: {
     title: "AI Avatars",
     description:
       "Video representations of AI agents that respond in real time, for tutoring, telepresence, and conversational interfaces.",
+    tag: "Avatars",
     attribution: "Powered by Embody on Livepeer.",
     Visual: AvatarsVisual,
     colSpan: 2,
@@ -704,6 +711,7 @@ const useCases: {
     title: "Live Video Intelligence",
     description:
       "Real-time analysis of live streams: sports broadcasts, security feeds, manufacturing lines. Processed during, not after.",
+    tag: "Intelligence",
     attribution: "Emerging on Livepeer.",
     Visual: AnalysisVisual,
     colSpan: 2,
@@ -712,6 +720,7 @@ const useCases: {
     title: "Prompt-Driven Live Transformation",
     description:
       "A creator goes live and the stream adapts: lighting, environment, visual style, based on a text prompt, in real time.",
+    tag: "Pipelines",
     attribution: "Powered by Daydream on Livepeer.",
     Visual: PipelinesVisual,
     colSpan: 4,
@@ -720,6 +729,7 @@ const useCases: {
     title: "Live Transcoding & Streaming",
     description:
       "Adaptive bitrate transcoding across a global GPU network with sub-second latency.",
+    tag: "Streaming",
     attribution: "Live on Livepeer.",
     Visual: TranscodingVisual,
     colSpan: 6,
@@ -735,8 +745,6 @@ const colSpanClass: Record<number, string> = {
 export default function UseCases() {
   return (
     <section className="relative py-24 lg:py-32">
-      <div className="divider-gradient absolute top-0 left-0 right-0" />
-
       <Container>
         <motion.div
           initial="hidden"
@@ -748,13 +756,18 @@ export default function UseCases() {
           <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
             <SectionHeader
               label="Use Cases"
-              title="What you can build with real-time AI video"
+              title={
+                <>
+                  What you can build with{" "}
+                  <span className="text-foreground/50">real-time AI video</span>
+                </>
+              }
               description="Build live generated worlds, AI avatars, real-time style transfer, and more — powered by Livepeer's open GPU network."
               align="split"
             />
           </motion.div>
 
-          <div className="mt-20 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
+          <div className="mt-20 grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2 lg:grid-cols-6 lg:gap-y-6">
             {useCases.map((useCase) => (
               <motion.div
                 key={useCase.title}
@@ -762,17 +775,32 @@ export default function UseCases() {
                 transition={{ duration: 0.4 }}
                 className={`md:col-span-1 ${colSpanClass[useCase.colSpan]}`}
               >
-                <div className="block h-full overflow-hidden rounded-xl border border-white/[0.07] bg-[#1a1a1a]">
+                <div className="relative block h-full overflow-hidden rounded-xl border border-foreground/[0.07] bg-card">
+                  {/* Dark visual — edge-to-edge specimen frame */}
                   <div
-                    className={`p-2.5 pb-0 ${useCase.colSpan === 4 ? "h-[180px] lg:h-[240px]" : "h-[180px]"}`}
+                    className={`relative ${
+                      useCase.colSpan === 6
+                        ? "h-[200px] lg:h-[240px]"
+                        : useCase.colSpan === 4
+                          ? "h-[200px] lg:h-[290px]"
+                          : "h-[200px] lg:h-[220px]"
+                    }`}
                   >
                     <useCase.Visual />
+                    {/* Hairline divider where screen meets body */}
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
+                      aria-hidden="true"
+                      style={{ background: "var(--card-hairline)" }}
+                    />
                   </div>
-                  <div className="px-5 py-5">
-                    <h3 className="text-lg font-medium text-white/90">
+
+                  {/* Body */}
+                  <div className="px-5 py-6 lg:px-6 lg:py-7">
+                    <h3 className="text-[19px] font-bold tracking-tight text-foreground lg:text-[21px]">
                       {useCase.title}
                     </h3>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-white/40">
+                    <p className="mt-2.5 text-[13.5px] leading-[1.65] text-foreground/65">
                       {useCase.description}
                     </p>
                   </div>
