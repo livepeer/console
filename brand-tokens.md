@@ -34,6 +34,16 @@ Design system reference. Originally derived from the Holographik brand guideline
 | `blue-dark`   | `#145571`               | 198°, 70%, 26% | Pressed states     |
 | `blue-subtle` | `rgba(20,106,143,0.15)` | —              | Tinted backgrounds |
 
+### Semantic Accent — Warm
+
+Reserved exclusively for **liveness and activity indicators** — e.g. warm orchestrators, live pipelines, active inference. Not a decorative color. Do not use for buttons, links, CTAs, or hover states. When in doubt, use the green family.
+
+| Token          | Hex                     | Usage                                            |
+| -------------- | ----------------------- | ------------------------------------------------ |
+| `warm`         | `#F59E0B`               | Warm/live pill, status dot                       |
+| `warm-bright`  | `#FBBF24`               | Pulse halos, highlights on the pill              |
+| `warm-subtle`  | `rgba(245,158,11,0.12)` | Tinted backgrounds for warm-state surfaces       |
+
 ### Dark Surface Scale
 
 | Token          | Hex       | Usage             |

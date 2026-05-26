@@ -95,6 +95,68 @@ The site's signature visual is a layered grid system that combines B&W video/ima
 - **No CMS** — page content is static/hardcoded. Blog posts are local markdown files, not fetched from an external CMS.
 - **Minimal server-side fetching** — the only external data source is the Livepeer subgraph (protocol stats, ISR-cached). Don't add new external dependencies without discussion.
 
+## Dashboard conventions
+
+The `/dashboard/*` surface is a separate visual system from the marketing site (Geist sans + mono override, Linear-style floating-panel layout in `app/(dashboard)/dashboard/layout.tsx`). All dashboard data is mock-driven — see `lib/dashboard/mock-data.ts` and `types.ts`.
+
+### First-run flag
+
+The Home (`/dashboard`) shows `<FirstRunChecklist>` for any signed-in user where `localStorage["livepeer.firstRunDismissed"] !== "1"`. Skip / "I've made my first call" / clicking through to the playground all set the flag. The Quickstart sidebar entry clears it and dispatches a same-tab `livepeer:firstrun-changed` CustomEvent so Home re-reads. When real auth lands, AND this with a server-side run-history check.
+
+### Section headings
+
+Use `<SectionHeader>` from `components/dashboard/SectionHeader.tsx` (NOT `components/ui/SectionHeader.tsx` — that's marketing-tier `text-4xl`). Dashboard convention is `text-base font-semibold` headings; do not roll ad-hoc `<h2 className="text-base font-semibold">` markup.
+
+### KPI rows
+
+Wrap any row of `<KpiCard>` / `<StatCard>` in `<KpiStrip cols={3 | 4}>` (`components/dashboard/KpiStrip.tsx`). Don't roll ad-hoc `grid grid-cols-2 sm:grid-cols-4` containers — they drift over time.
+
+### Page max-widths
+
+Each page picks one based on content type and uses it for every inner max-width container (header, sticky tab strip, content) so they line up:
+
+- `max-w-5xl` — forms-heavy pages (Settings tabs, Model detail header)
+- `max-w-6xl` — data tables / charts (Network, Usage)
+- `max-w-7xl` — catalogs / dense grids (Explore, Models list)
+
+There's no shared `<DashboardPage>` wrapper because every page layers a sticky `<TabStrip>` between header and content, requiring the max-width to repeat 2-3 times intentionally per page.
+
+### Cards
+
+Dashboard surfaces use inline classes — typically `rounded-xl border border-hairline bg-{dark-surface|dark-card|transparent}` with `p-4` (data-dense rows) or `p-6` (feature blocks). The shared `<Card>` in `components/ui/Card.tsx` is for marketing surfaces only and has no dashboard importers.
+
+### Tables
+
+Tables on the dashboard are intentionally bespoke — Home "Your runs", `UsageTab` activity log, and `PaymentTab` connected-providers all roll their own markup because their interaction patterns differ (sticky mobile/desktop headers, live pulse on most-recent row, highlighted target row, etc.). There is no shared `<DataTable>` primitive. If a future surface needs a generic sortable table, build it then — don't try to back-fit a primitive that compromises the existing surfaces.
+
+### Form-control focus ring
+
+All form controls (`SearchInput`, `Select`, etc.) show `focus-visible:ring-1 focus-visible:ring-green-bright/30`. Don't ship border-only focus states.
+
+### Loading + error states
+
+Suspense boundaries on every dashboard route use `<DashboardPageSkeleton>` as the fallback (`components/dashboard/DashboardPageSkeleton.tsx`). The `(dashboard)/dashboard/error.tsx` segment-level boundary renders `<ErrorState>` (`components/ui/ErrorState.tsx`) for any thrown render error, with a request ID + retry + Discord help link.
+
+### Color / token rules
+
+- `globals.css` outside the `@theme` block contains zero raw hex/rgba — use `var(--color-X)` everywhere or `color-mix(in srgb, var(--color-X) N%, transparent)` for opacity-based tints. The only exception is the comment on line ~36 referencing `--color-shell`.
+- `warm` (orange) is reserved for **liveness/activity** indicators (model warm/cold status, "live" pulses). Never decorative.
+- Green = success / primary. Blue = cold / secondary. Red = failure.
+- Tokenomics is invisible by default — LPT, staking, orchestrator addresses, on-chain mechanics never appear on Home / Capabilities / Playground / Usage / Settings unless the user explicitly opts into a network/protocol view.
+
+### Iconography
+
+- Lucide React. Default stroke width is 1.5. Override only when the glyph reads too thin at the size you're using (e.g. `Activity` at sizes ≥ 16px reads better at `strokeWidth={1.75}`).
+- Sizes: `h-3.5 w-3.5` (14px) for inline label icons, `h-4 w-4` (16px) for buttons / nav, `h-5 w-5` (20px) for cards, `h-10 w-10` (40px) for empty-state hero glyphs.
+
+### Monospace
+
+Use `font-mono` for IDs, hashes, tokens, addresses, model `id` slugs (e.g. `daydream-video`), latency / cost / count numbers (`tabular-nums`). Use the default sans for human names (model display name, model provider, user display name).
+
+### Motion
+
+Existing tokens in `globals.css` `@theme`: `--motion-duration-fast` (150ms, hover/focus), `--motion-duration-base` (200ms, dropdowns/menus), `--motion-duration-slow` (300ms, drawers/dialogs). Easings: `--motion-easing-out` (most exits), `--motion-easing-in` (entries), `--motion-easing-spring` (drawer-style spring). All animations must respect `prefers-reduced-motion: reduce`.
+
 ## Brand & Styling
 
 Full spec in `brand-tokens.md` — colors, typography, logo rules, greyscale ramp, gradients, graphic elements.
