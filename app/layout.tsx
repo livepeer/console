@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { favoritPro, favoritMono, instrumentSerif } from "@/lib/fonts";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 import "./globals.css";
+
+// Header + Footer are scoped to the `(marketing)` route group so the dashboard
+// routes don't inherit the marketing chrome. See `app/(marketing)/layout.tsx`.
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -91,9 +92,7 @@ export default function RootLayout({
         )}
       </head>
       <body className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
