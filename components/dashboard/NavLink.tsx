@@ -7,7 +7,7 @@ import {
   Lock,
   type LucideIcon,
 } from "lucide-react";
-import Tooltip from "@/components/ui/Tooltip";
+import Tooltip from "@/components/design-system/Tooltip";
 
 interface NavLinkProps {
   href: string;

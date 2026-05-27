@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { LayoutGrid, Hammer, Globe, Plug, ArrowUpRight } from "lucide-react";
-import Badge from "@/components/ui/Badge";
+import Badge from "@/components/design-system/Badge";
 import { useHoverDropdown } from "@/components/dashboard/useHoverDropdown";
 
 /**
@@ -59,7 +59,7 @@ function AppsDropdownContent({ onClose }: { onClose: () => void }) {
     {
       label: "Developer Dashboard",
       subtitle: "Discover & Build",
-      href: "/dashboard",
+      href: "/home",
       external: false,
       icon: Hammer,
       iconBg: "bg-green/15",

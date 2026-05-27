@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { RotateCcw } from "lucide-react";
-import Select from "@/components/ui/Select";
+import Select from "@/components/design-system/Select";
 import CostTag from "@/components/dashboard/CostTag";
 import type { PlaygroundConfig, PlaygroundField } from "@/lib/dashboard/types";
 

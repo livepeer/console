@@ -308,7 +308,7 @@ export default function UsageView() {
             </p>
           </div>
           <Link
-            href="/dashboard/settings?tab=billing"
+            href="/settings?tab=billing"
             className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-2.5 text-[12px] text-fg-strong transition-colors hover:border-subtle hover:text-fg"
           >
             Compare plans
@@ -406,7 +406,7 @@ function BreakdownTable({
                 aria-hidden="true"
               />
               <Link
-                href={`/dashboard/jobs?capability=${c.id}`}
+                href={`/jobs?capability=${c.id}`}
                 className="truncate text-fg underline decoration-transparent decoration-1 underline-offset-[3px] transition-colors hover:text-green-bright hover:decoration-current"
               >
                 {c.name}

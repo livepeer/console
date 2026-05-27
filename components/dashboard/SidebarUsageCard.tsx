@@ -33,7 +33,7 @@ export default function SidebarUsageCard() {
   const baseClass =
     "block mt-2 mx-1 rounded-md border px-2.5 py-2 transition-colors";
   // The card stays visually stable across routes. The original design
-  // prototype had an active-state (green tint) when on /dashboard/usage,
+  // prototype had an active-state (green tint) when on /usage,
   // but in practice the green competes with the in-card progress bar
   // and duplicates the main-nav active highlight. Cleaner to keep this
   // a stable usage widget; route-active feedback lives on the Usage nav
@@ -43,7 +43,7 @@ export default function SidebarUsageCard() {
 
   return (
     <Link
-      href="/dashboard/usage"
+      href="/usage"
       title="Open usage details"
       className={`${baseClass} ${stateClass}`}
     >

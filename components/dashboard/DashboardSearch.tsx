@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, ArrowRight } from "lucide-react";
-import Dialog from "@/components/ui/Dialog";
+import Dialog from "@/components/design-system/Dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,32 +17,32 @@ interface SearchResult {
 // ─── Suggestions (shown before typing) ───────────────────────────────────────
 
 const SUGGESTIONS: SearchResult[] = [
-  { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/dashboard/explore" },
-  { title: "Explore capabilities", subtitle: "Browse capabilities available on the network", href: "/dashboard/explore" },
-  { title: "Get your API key", subtitle: "Authenticate and start sending requests", href: "/dashboard/settings?tab=tokens" },
-  { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/dashboard/models/frameworks-transcoding" },
+  { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/" },
+  { title: "Explore capabilities", subtitle: "Browse capabilities available on the network", href: "/" },
+  { title: "Get your API key", subtitle: "Authenticate and start sending requests", href: "/settings?tab=tokens" },
+  { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/models/frameworks-transcoding" },
 ];
 
 // ─── All searchable items ────────────────────────────────────────────────────
 
 const ALL_RESULTS: SearchResult[] = [
   ...SUGGESTIONS,
-  { title: "Daydream Video API", subtitle: "Real-time AI video generation", href: "/dashboard/models/daydream-video" },
-  { title: "Frameworks Transcoding", subtitle: "Adaptive bitrate transcoding", href: "/dashboard/models/frameworks-transcoding" },
-  { title: "FLUX.1 [schnell]", subtitle: "Fast text-to-image generation", href: "/dashboard/models/flux-schnell" },
-  { title: "SDXL Turbo", subtitle: "Real-time image generation", href: "/dashboard/models/sdxl-turbo" },
-  { title: "Stable Video Diffusion", subtitle: "Image-to-video synthesis", href: "/dashboard/models/stable-video-diffusion" },
-  { title: "LivePortrait", subtitle: "Real-time portrait animation", href: "/dashboard/models/live-video-to-video" },
-  { title: "Qwen3 32B", subtitle: "Large language model", href: "/dashboard/models/qwen3-32b" },
-  { title: "Llama 3 70B", subtitle: "Open LLM for chat and instructions", href: "/dashboard/models/llama-3-70b" },
-  { title: "Whisper v3 Large", subtitle: "Speech-to-text transcription", href: "/dashboard/models/whisper-v3" },
-  { title: "Kokoro TTS", subtitle: "Text-to-speech synthesis", href: "/dashboard/models/kokoro-tts" },
-  { title: "Home", subtitle: "Dashboard overview", href: "/dashboard" },
-  { title: "API Tokens", subtitle: "Manage your API keys", href: "/dashboard/settings?tab=tokens" },
-  { title: "Billing", subtitle: "Manage billing and payments", href: "/dashboard/settings?tab=billing" },
-  { title: "Usage", subtitle: "Request volume and spend", href: "/dashboard/usage" },
-  { title: "Account", subtitle: "Profile and security", href: "/dashboard/settings?tab=account" },
-  { title: "Settings", subtitle: "Account settings", href: "/dashboard/settings" },
+  { title: "Daydream Video API", subtitle: "Real-time AI video generation", href: "/models/daydream-video" },
+  { title: "Frameworks Transcoding", subtitle: "Adaptive bitrate transcoding", href: "/models/frameworks-transcoding" },
+  { title: "FLUX.1 [schnell]", subtitle: "Fast text-to-image generation", href: "/models/flux-schnell" },
+  { title: "SDXL Turbo", subtitle: "Real-time image generation", href: "/models/sdxl-turbo" },
+  { title: "Stable Video Diffusion", subtitle: "Image-to-video synthesis", href: "/models/stable-video-diffusion" },
+  { title: "LivePortrait", subtitle: "Real-time portrait animation", href: "/models/live-video-to-video" },
+  { title: "Qwen3 32B", subtitle: "Large language model", href: "/models/qwen3-32b" },
+  { title: "Llama 3 70B", subtitle: "Open LLM for chat and instructions", href: "/models/llama-3-70b" },
+  { title: "Whisper v3 Large", subtitle: "Speech-to-text transcription", href: "/models/whisper-v3" },
+  { title: "Kokoro TTS", subtitle: "Text-to-speech synthesis", href: "/models/kokoro-tts" },
+  { title: "Home", subtitle: "Dashboard overview", href: "/home" },
+  { title: "API Tokens", subtitle: "Manage your API keys", href: "/settings?tab=tokens" },
+  { title: "Billing", subtitle: "Manage billing and payments", href: "/settings?tab=billing" },
+  { title: "Usage", subtitle: "Request volume and spend", href: "/usage" },
+  { title: "Account", subtitle: "Profile and security", href: "/settings?tab=account" },
+  { title: "Settings", subtitle: "Account settings", href: "/settings" },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -214,7 +214,7 @@ export default function DashboardSearch({ mobile = false }: DashboardSearchProps
               <p className="text-xs text-fg-disabled">
                 Try a capability name or keyword
               </p>
-              <Link href="/dashboard/explore" onClick={closeDialog} className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors">
+              <Link href="/" onClick={closeDialog} className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors">
                 Browse all capabilities →
               </Link>
             </div>

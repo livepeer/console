@@ -72,7 +72,7 @@ function resolvePreference(p: ThemePreference): ResolvedTheme {
  * the dashboard in real time.
  *
  * The `<html data-theme="...">` attribute is set both by an inline script in
- * the dashboard layout (`app/(dashboard)/dashboard/layout.tsx` — runs before
+ * the dashboard layout (`app/(dashboard)/layout.tsx` — runs before
  * paint, prevents FOUT) and by this provider (keeps the attribute in sync
  * after hydration). The provider is the canonical writer post-mount; the
  * inline script just gets us through the first frame.

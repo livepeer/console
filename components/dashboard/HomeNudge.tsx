@@ -35,7 +35,7 @@ export default function HomeNudge() {
         title: `You're at ${Math.round(freePct)}% of your free tier this month.`,
         body: "Connect a payment provider to keep scaling without limits.",
         cta: "Set up billing",
-        href: "/dashboard/settings?tab=billing",
+        href: "/settings?tab=billing",
       };
     }
 
@@ -51,7 +51,7 @@ export default function HomeNudge() {
           title: "Streaming inference is faster for live applications.",
           body: `Sub-second latency over WebRTC. Start with ${realtimeModel.name}.`,
           cta: "Open playground",
-          href: `/dashboard/models/${realtimeModel.id}`,
+          href: `/models/${realtimeModel.id}`,
         };
       }
     }
@@ -68,7 +68,7 @@ export default function HomeNudge() {
           title: `${next.name} pairs well with what you're building.`,
           body: next.description,
           cta: "Open playground",
-          href: `/dashboard/models/${next.id}`,
+          href: `/models/${next.id}`,
         };
       }
     }

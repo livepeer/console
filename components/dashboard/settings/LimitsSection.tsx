@@ -20,7 +20,7 @@ const REGIONS = ["us-west", "us-east", "eu-central", "ap-southeast", "sa-east"];
  * Two cards:
  *  1. Limits & quotas — hard spend cap, concurrent streams, per-key rate
  *     limit, allowed regions (chip multi-select)
- *  2. Soft alerts — empty state pointing back to /dashboard/usage where
+ *  2. Soft alerts — empty state pointing back to /usage where
  *     alerts live next to the data they describe
  */
 export default function LimitsSection() {
@@ -101,7 +101,7 @@ export default function LimitsSection() {
           <p className="mt-1 text-[12.5px] text-fg-faint">
             Alerts live next to the data they describe.{" "}
             <Link
-              href="/dashboard/usage"
+              href="/usage"
               className="inline-flex items-center gap-1 text-fg-strong transition-colors hover:text-fg"
             >
               Go to Usage <ArrowRight className="h-3 w-3" aria-hidden="true" />

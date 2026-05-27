@@ -33,7 +33,7 @@ export function formatRuns(n: number): string {
 // ─── Job-row formatters ─────────────────────────────────────────────────────
 //
 // Shared by every surface that renders an `AccountActivityRow`: home "Recent
-// jobs" panel, standalone /dashboard/jobs view, and the model-detail Jobs
+// jobs" panel, standalone /jobs view, and the model-detail Jobs
 // tab. Centralized here so all three speak the same vocabulary (e.g. "284ms"
 // vs "1.2s", "5m ago" vs "yesterday") instead of three near-duplicate
 // implementations drifting out of sync.

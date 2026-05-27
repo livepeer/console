@@ -33,9 +33,9 @@ interface TabStripProps<T extends string = string> {
  * TabStrip — horizontal pill tab strip with a sliding active indicator.
  *
  * Used across:
- *  - `/dashboard/settings` (Account / API Tokens / Billing)
- *  - `/dashboard/network` (Overview / Utilization / Payments / GPUs)
- *  - `/dashboard/explore` (the Tasks/category row)
+ *  - `/settings` (Account / API Tokens / Billing)
+ *  - `/network` (Overview / Utilization / Payments / GPUs)
+ *  - `/` (the Tasks/category row)
  *
  * The active indicator uses `motion.div` with a shared `layoutId` so it slides
  * between tabs instead of snapping. Overflow is `scrollbar-none` horizontal —

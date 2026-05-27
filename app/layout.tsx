@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import Script from "next/script";
-import { favoritPro, favoritMono, instrumentSerif } from "@/lib/fonts";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-
-// Header + Footer are scoped to the `(marketing)` route group so the dashboard
-// routes don't inherit the marketing chrome. See `app/(marketing)/layout.tsx`.
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -12,25 +9,17 @@ export const metadata: Metadata = {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : "https://livepeer.org"
+        : "https://dashboard.livepeer.org"
   ),
-  title: "Livepeer — The open network for real-time AI video",
+  title: "Livepeer Developer Dashboard",
   description:
-    "Generate, transform, and interpret live video streams on a permissionless GPU network built for real-time video inference.",
-  openGraph: {
-    title: "Livepeer — The open network for real-time AI video",
-    description:
-      "Generate, transform, and interpret live video streams on a permissionless GPU network built for real-time video inference.",
-    siteName: "Livepeer",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Livepeer — The open network for real-time AI video",
-    description:
-      "Generate, transform, and interpret live video streams on a permissionless GPU network built for real-time video inference.",
-  },
+    "Browse AI capabilities, manage API keys, and monitor usage on the Livepeer network.",
 };
+
+// FOUT prevention — runs synchronously before paint so dual-source CSS
+// variables resolve to the stored theme on first render. ThemeProvider in
+// the (app) layout takes over after hydration.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'dark';var d=s==='dark'||(s==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout({
   children,
@@ -41,57 +30,12 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${favoritPro.variable} ${favoritMono.variable} ${instrumentSerif.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
     >
       <head>
-        {/* No-FOUC theme init — must run synchronously before paint so
-            the user's stored preference is applied before any CSS resolves.
-            We use a raw <script> via dangerouslySetInnerHTML rather than
-            `next/script` with beforeInteractive: in the App Router, that
-            strategy doesn't actually inject a synchronous inline tag for
-            children content (it encodes the source as JSON data for
-            Next's runtime to evaluate post-hydration). A raw inline script
-            in <head> is the only reliable pre-paint hook. */}
-        <script
-          id="theme-init"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=window.location.pathname;var force=p==='/foundation'||p.indexOf('/foundation/')===0;var t;if(force){t='dark';}else{var s=localStorage.getItem('theme');if(s==='system'){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}else if(s==='light'||s==='dark'){t=s;}else{t='dark';}}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
-          }}
-        />
-        {process.env.NEXT_PUBLIC_VERCEL_ENV === "production" && (
-          <>
-            {/* Google Analytics 4 */}
-            <Script
-              src="https://www.googletagmanager.com/gtag/js?id=G-4BFECXFFJD"
-              strategy="afterInteractive"
-            />
-            <Script id="gtag-init" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', 'G-4BFECXFFJD');
-                gtag('config', 'G-E4Q3BR9X93');
-              `}
-            </Script>
-
-            {/* Hotjar */}
-            <Script id="hotjar-init" strategy="afterInteractive">
-              {`
-                (function(h,o,t,j,a,r){
-                  h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-                  h._hjSettings={hjid:6388940,hjsv:6};
-                  a=o.getElementsByTagName('head')[0];
-                  r=o.createElement('script');r.async=1;
-                  r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-                  a.appendChild(r);
-                })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
-              `}
-            </Script>
-          </>
-        )}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         {children}
       </body>
     </html>

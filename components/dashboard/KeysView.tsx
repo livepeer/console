@@ -394,7 +394,7 @@ export default function KeysView() {
                 {/* Jobs · 7d */}
                 <div className="text-right">
                   <a
-                    href={`/dashboard/jobs?key=${k.id}`}
+                    href={`/jobs?key=${k.id}`}
                     className="font-mono text-[13px] text-fg underline decoration-transparent decoration-1 underline-offset-[3px] transition-colors hover:text-green-bright hover:decoration-current"
                   >
                     {k.runs7d.toLocaleString()}

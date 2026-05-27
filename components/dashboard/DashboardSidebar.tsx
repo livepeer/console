@@ -27,15 +27,15 @@ import {
   Users as UsersIcon,
   type LucideIcon,
 } from "lucide-react";
-import { LivepeerWordmark, LivepeerSymbol } from "@/components/icons/LivepeerLogo";
+import { LivepeerWordmark, LivepeerSymbol } from "@/components/design-system/LivepeerLogo";
 import { PORTAL_NAV_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/components/dashboard/AuthContext";
-import Drawer from "@/components/ui/Drawer";
+import Drawer from "@/components/design-system/Drawer";
 import NavLink from "@/components/dashboard/NavLink";
 import StatusDot from "@/components/dashboard/StatusDot";
 import SidebarUsageCard from "@/components/dashboard/SidebarUsageCard";
 import WorkspaceMenu from "@/components/dashboard/WorkspaceMenu";
-import Tooltip from "@/components/ui/Tooltip";
+import Tooltip from "@/components/design-system/Tooltip";
 import {
   MODELS,
   SETTINGS_API_KEYS,
@@ -56,13 +56,9 @@ const NAV_ICONS = {
 const COLLAPSED_KEY = "dashboard.sidebar.collapsed";
 
 function getNavActive(itemHref: string, pathname: string): boolean {
-  if (itemHref === "/dashboard") return pathname === "/dashboard";
-  if (itemHref === "/dashboard/explore") {
-    return (
-      pathname === "/dashboard/explore" ||
-      pathname.startsWith("/dashboard/explore/") ||
-      pathname.startsWith("/dashboard/models/")
-    );
+  if (itemHref === "/home") return pathname === "/home";
+  if (itemHref === "/") {
+    return pathname === "/" || pathname.startsWith("/models/");
   }
   // Tab-deep links inherit active state from path only — Settings page tabs
   // already mark the current sub-tab visually inside their own TabStrip.
@@ -89,7 +85,7 @@ interface SidebarContentProps {
 // Mirrors the Livepeer Dashboard v4 prototype's `loggedOut` Sidebar (see
 // `components.jsx`, the `if (loggedOut)` branch). Order top → bottom:
 //
-//   1. Brand row — wordmark links to /dashboard/explore (no workspace switcher)
+//   1. Brand row — wordmark links to / (no workspace switcher)
 //   2. Search button (Cmd-K, same as signed-in variant)
 //   3. Public nav — Explore (count), Docs (external)
 //   4. WORKSPACE eyebrow + locked nav: Home, Runs, Usage, API keys
@@ -119,18 +115,16 @@ function SignedOutSidebarContent({
   const pathname = usePathname();
   const router = useRouter();
   const exploreActive =
-    pathname === "/dashboard/explore" ||
-    pathname.startsWith("/dashboard/explore/") ||
-    pathname.startsWith("/dashboard/models/");
+    pathname === "/" || pathname.startsWith("/models/");
 
   return (
     <div className="flex h-full flex-col bg-shell">
-      {/* Brand row — wordmark links to /dashboard/explore (the public landing) */}
+      {/* Brand row — wordmark links to / (the public landing) */}
       <div
         className={`flex shrink-0 items-center pt-2 pb-2 ${padX} ${collapsed ? "flex-col gap-2.5" : "gap-1"}`}
       >
         <Link
-          href="/dashboard/explore"
+          href="/"
           aria-label="Livepeer Dashboard — explore capabilities"
           className={
             collapsed
@@ -244,7 +238,7 @@ function SignedOutSidebarContent({
         <ul className="space-y-px">
           <li>
             <NavLink
-              href="/dashboard/explore"
+              href="/"
               icon={LayoutGrid}
               label="Explore"
               active={exploreActive}
@@ -312,7 +306,7 @@ function SignedOutSidebarContent({
                 <button
                   type="button"
                   onClick={() => {
-                    router.push("/dashboard/signup");
+                    router.push("/signup");
                     onNavigate?.();
                   }}
                   className="btn-primary flex h-7 w-full items-center justify-center rounded-[4px] px-2.5 text-[12.5px] font-medium tracking-[-0.005em] transition-colors"
@@ -322,7 +316,7 @@ function SignedOutSidebarContent({
                 <button
                   type="button"
                   onClick={() => {
-                    router.push("/dashboard/login");
+                    router.push("/login");
                     onNavigate?.();
                   }}
                   className="flex h-[26px] w-full items-center justify-center rounded-[4px] text-[12px] font-medium tracking-[-0.005em] text-fg-muted transition-colors hover:bg-hover hover:text-fg"
@@ -339,7 +333,7 @@ function SignedOutSidebarContent({
           above for logged-out users, so we don't duplicate it here.) */}
       <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-1`}>
         <NavLink
-          href="/dashboard/network"
+          href="/network"
           icon={Globe}
           label="Network"
           collapsed={collapsed}
@@ -386,8 +380,8 @@ function SignedOutSidebarContent({
 // ─── Settings rail ──────────────────────────────────────────────────────────
 //
 // Renders inline inside the signed-in `SidebarContent` when the user is on a
-// `/dashboard/settings*` route. Per the v6 prototype's `SettingsRail` (see
-// `components.jsx`): a back-arrow header that returns to `/dashboard`,
+// `/settings*` route. Per the v6 prototype's `SettingsRail` (see
+// `components.jsx`): a back-arrow header that returns to `/home`,
 // followed by a `Workspace` group (General / Members / Billing / Limits) and
 // an `Account` group (Profile / Notifications / Security). The workspace
 // switcher and search above stay put; the usage strip and footer below stay
@@ -433,10 +427,10 @@ function SettingsRail({
   const router = useRouter();
 
   // Read the active sub-tab from `?tab=<id>` on the current URL. Default to
-  // "workspace" when on `/dashboard/settings` with no tab param — matches the
+  // "workspace" when on `/settings` with no tab param — matches the
   // prototype's fallback (`route === 'settings' ? 'workspace' : ...`).
   let activeTab = "workspace";
-  if (pathname === "/dashboard/settings" || pathname.startsWith("/dashboard/settings")) {
+  if (pathname === "/settings" || pathname.startsWith("/settings")) {
     const search = typeof window !== "undefined" ? window.location.search : "";
     const params = new URLSearchParams(search);
     const t = params.get("tab");
@@ -445,12 +439,12 @@ function SettingsRail({
 
   return (
     <div className={`flex flex-col ${padX}`}>
-      {/* Back arrow + "Settings" header — returns to /dashboard, mirroring
+      {/* Back arrow + "Settings" header — returns to /home, mirroring
           the prototype's `setRoute('home')` on the back button. */}
       <button
         type="button"
         onClick={() => {
-          router.push("/dashboard");
+          router.push("/home");
           onNavigate?.();
         }}
         className="mb-1 flex h-[26px] items-center gap-1.5 rounded-[4px] px-2 text-[13px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
@@ -468,7 +462,7 @@ function SettingsRail({
           </div>
           <ul className="space-y-px">
             {g.items.map((it) => {
-              const href = `/dashboard/settings?tab=${it.id}`;
+              const href = `/settings?tab=${it.id}`;
               const active = activeTab === it.id;
               return (
                 <li key={it.id}>
@@ -534,7 +528,7 @@ function SidebarContent({
             <WorkspaceMenu user={user} disconnect={disconnect} collapsed={collapsed} />
           ) : (
             <Link
-              href="/dashboard"
+              href="/home"
               aria-label="Livepeer Developer Dashboard"
               className="flex items-center"
               onClick={onNavigate}
@@ -617,10 +611,10 @@ function SidebarContent({
       </div>
 
       {/* Main nav block — primary nav + Pinned. Per the v6 prototype, when
-          the user is on /dashboard/settings/* the entire block is replaced
+          the user is on /settings/* the entire block is replaced
           inline by a `SettingsRail` (back-arrow header + workspace + account
           groups). Workspace switcher and search above stay put. */}
-      {pathname.startsWith("/dashboard/settings") ? (
+      {pathname.startsWith("/settings") ? (
         <SettingsRail pathname={pathname} padX={padX} onNavigate={onNavigate} />
       ) : (
         <>
@@ -634,10 +628,10 @@ function SidebarContent({
                 // collapsed sidebar shows icon only.
                 let meta: string | undefined;
                 if (!collapsed) {
-                  if (item.href === "/dashboard/explore")
+                  if (item.href === "/")
                     meta = formatRuns(MODELS.length);
-                  else if (item.href === "/dashboard/jobs") meta = "1.2K";
-                  else if (item.href === "/dashboard/keys")
+                  else if (item.href === "/jobs") meta = "1.2K";
+                  else if (item.href === "/keys")
                     meta = formatRuns(SETTINGS_API_KEYS.length);
                 }
                 // The constants array has heterogeneous shapes (some items
@@ -698,7 +692,7 @@ function SidebarContent({
                   return (
                     <li key={pin.id}>
                       <NavLink
-                        href={`/dashboard/models/${pin.id}?tab=playground`}
+                        href={`/models/${pin.id}?tab=playground`}
                         icon={Icon}
                         label={pin.label}
                         collapsed={false}
@@ -723,7 +717,7 @@ function SidebarContent({
           (no useful 26px representation) AND when the user is inside the
           settings sub-experience — the workspace usage strip would compete
           with the settings rail's own context. */}
-      {isConnected && !collapsed && !pathname.startsWith("/dashboard/settings") && (
+      {isConnected && !collapsed && !pathname.startsWith("/settings") && (
         <div className={`shrink-0 ${padX} pb-2`}>
           <SidebarUsageCard />
         </div>
@@ -736,7 +730,7 @@ function SidebarContent({
           only. */}
       <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-1`}>
         <NavLink
-          href="/dashboard/network"
+          href="/network"
           icon={Globe}
           label="Network"
           collapsed={collapsed}
