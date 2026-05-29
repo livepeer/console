@@ -12,7 +12,7 @@ import type { AccountActivityRow } from "@/lib/dashboard/types";
  * recent inferences:
  *
  *   1. Home "Recent jobs" panel
- *   2. Standalone `/dashboard/jobs` view
+ *   2. Standalone `/jobs` view
  *   3. Model detail page Jobs tab (filtered to one capability)
  *
  * Row vocabulary (left → right):
@@ -20,7 +20,7 @@ import type { AccountActivityRow } from "@/lib/dashboard/types";
  *   cost · via (signer) · relative time
  *
  * Columns share one grid template so the optional header row and body rows
- * align exactly. Each row is a Link to `/dashboard/usage?request={id}` so
+ * align exactly. Each row is a Link to `/usage?request={id}` so
  * clicking a row deep-links into the request inspector.
  */
 export interface JobsTableProps {
@@ -90,7 +90,7 @@ export default function JobsTable({
         return (
           <Link
             key={row.id}
-            href={`/dashboard/usage?request=${row.id}`}
+            href={`/usage?request=${row.id}`}
             className={`${cols} ${rowPadY} text-[12.5px] transition-colors hover:bg-hover ${
               i > 0 || showHeader ? "border-t border-hairline" : ""
             }`}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Video, VideoOff, Play, Square, Zap } from "lucide-react";
 import type { Model } from "@/lib/dashboard/types";
-import Select from "@/components/ui/Select";
+import Select from "@/components/design-system/Select";
 import CodeSnippets from "./CodeSnippets";
 import StatusDot from "@/components/dashboard/StatusDot";
 

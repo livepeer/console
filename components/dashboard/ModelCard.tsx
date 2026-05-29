@@ -68,7 +68,7 @@ export default function ModelCard({
 
   return (
     <Link
-      href={`/dashboard/models/${model.id}`}
+      href={`/models/${model.id}`}
       className="group flex flex-col overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card transition-[colors,transform] duration-150 ease-out hover:-translate-y-[1px] hover:border-strong"
     >
       {/* Thumbnail */}

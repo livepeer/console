@@ -34,7 +34,7 @@ interface DashboardPageHeaderProps {
  * not as a hero. Information density comes from the *content*; this bar is
  * pure chrome and stays out of the way.
  *
- * When the user is signed out (and not already on the `/dashboard/login`
+ * When the user is signed out (and not already on the `/login`
  * auth route), a `Sign in` / `Sign up` pair is appended to the right
  * actions cluster — mirrors the design prototype's `PageHead` injection
  * (`auth.authed === false && !auth.isAuthRoute`). A faint divider sits
@@ -50,8 +50,8 @@ export default function DashboardPageHeader({
   const { isConnected, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
   const isAuthRoute =
-    pathname.startsWith("/dashboard/login") ||
-    pathname.startsWith("/dashboard/signup");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup");
   // Hide auth CTAs while auth state is still resolving (one frame on first
   // paint) to avoid flashing them in for connected users.
   const showAuthCTAs = !isLoading && !isConnected && !isAuthRoute;
@@ -92,13 +92,13 @@ export default function DashboardPageHeader({
           {showAuthCTAs && (
             <>
               <Link
-                href="/dashboard/login"
+                href="/login"
                 className="inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
               >
                 Sign in
               </Link>
               <Link
-                href="/dashboard/signup"
+                href="/signup"
                 className="btn-primary inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
               >
                 Sign up

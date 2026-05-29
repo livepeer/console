@@ -42,7 +42,7 @@ export const MODELS: Model[] = [
     tags: ["real-time", "streaming", "video", "style-transfer"],
     sla: { uptime: "99.9%", latencyP99: "<100ms" },
     apiEndpoint: "https://api.daydream.live/v1",
-    providerUrl: "https://daydream.live/dashboard",
+    providerUrl: "https://daydream.live/home",
     networkPrice: { amount: 0.003, unit: "Minute" },
     playgroundConfig: {
       fields: [
@@ -121,7 +121,7 @@ Full-stack real-time AI video API powered by the Livepeer network.
     tags: ["transcoding", "streaming", "cdn", "enterprise"],
     sla: { uptime: "99.95%", latencyP99: "<200ms" },
     apiEndpoint: "https://frameworks.network/api",
-    providerUrl: "https://frameworks.network/dashboard",
+    providerUrl: "https://frameworks.network/home",
     playgroundConfig: {
       fields: [
         {
@@ -1226,7 +1226,7 @@ export const SOLUTIONS: SolutionProvider[] = [
     provider: "Daydream",
     description:
       "Full-stack real-time AI video API with world generation, style transfer, and depth estimation. Built on Livepeer's open network of orchestrators.",
-    dashboardUrl: "https://daydream.live/dashboard",
+    dashboardUrl: "https://daydream.live/home",
     capabilities: ["Video Generation", "Image Generation", "Video Understanding"],
     pricingSummary: "Usage-based from $0.006/min",
     trustBadges: ["Managed", "SLA"],
@@ -1665,7 +1665,7 @@ export const REMOTE_SIGNERS: RemoteSigner[] = [
   },
 ];
 
-// ─── Account Usage (per-account view under /dashboard/settings?tab=usage) ─────
+// ─── Account Usage (per-account view under /settings?tab=usage) ─────
 //
 // The monthly totals below are the canonical account usage figures for mocks.
 // They are derived from REMOTE_SIGNERS.monthlyUsage (Paymthouse + Livepeer Cloud)

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Dialog from "@/components/ui/Dialog";
+import Dialog from "@/components/design-system/Dialog";
 
 /**
  * KeyboardShortcuts — global `?` overlay + Linear-style `G+letter` nav.
@@ -45,12 +45,12 @@ const GROUPS: Group[] = [
 ];
 
 const NAV_TARGETS: Record<string, string> = {
-  h: "/dashboard",
-  e: "/dashboard/explore",
-  j: "/dashboard/jobs",
-  u: "/dashboard/usage",
-  k: "/dashboard/keys",
-  s: "/dashboard/settings",
+  h: "/home",
+  e: "/",
+  j: "/jobs",
+  u: "/usage",
+  k: "/keys",
+  s: "/settings",
 };
 
 function isFieldElement(el: EventTarget | null): boolean {

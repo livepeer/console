@@ -1,4 +1,4 @@
-import Skeleton from "@/components/ui/Skeleton";
+import Skeleton from "@/components/design-system/Skeleton";
 
 interface DashboardPageSkeletonProps {
   /** When true, render a row of tab placeholders below the title. Defaults

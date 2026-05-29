@@ -110,14 +110,14 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
         {/* CTA pair — theme-aware primary Sign in + bordered Create workspace */}
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
           <Link
-            href="/dashboard/login"
+            href="/login"
             className="btn-primary inline-flex h-9 min-w-[140px] items-center justify-center gap-1.5 rounded-[6px] px-4 text-[13px] font-medium transition-colors"
           >
             Sign in
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
           <Link
-            href="/dashboard/signup"
+            href="/signup"
             className="inline-flex h-9 items-center justify-center rounded-[6px] border border-hairline bg-dark-card px-4 text-[13px] text-fg-strong transition-colors hover:border-subtle hover:bg-hover hover:text-fg"
           >
             Create workspace
@@ -136,7 +136,7 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
 
         {/* Escape hatch — Explore capabilities */}
         <Link
-          href="/dashboard/explore"
+          href="/"
           className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg"
         >
           Explore capabilities

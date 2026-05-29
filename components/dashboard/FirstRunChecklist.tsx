@@ -7,7 +7,7 @@ import { MODELS, STARTER_API_KEY } from "@/lib/dashboard/mock-data";
 
 export const FIRST_RUN_DISMISSED_KEY = "livepeer.firstRunDismissed";
 /** Fired in-tab whenever the dismissal flag changes (storage events only fire
- *  across tabs). Listened to by /dashboard so Quickstart re-opens the checklist. */
+ *  across tabs). Listened to by /home so Quickstart re-opens the checklist. */
 export const FIRST_RUN_CHANGED_EVENT = "livepeer:firstrun-changed";
 const FLAGSHIP_MODEL_ID = "daydream-video";
 

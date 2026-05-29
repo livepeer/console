@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, type AuthProvider } from "@/components/dashboard/AuthContext";
-import { LivepeerWordmark } from "@/components/icons/LivepeerLogo";
+import { LivepeerWordmark } from "@/components/design-system/LivepeerLogo";
 
 function getInitials(name: string): string {
   return name
@@ -58,8 +58,8 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 interface LoginPageProps {
-  /** Which mode the page renders in. Driven by route — `/dashboard/login`
-   *  passes `"signin"`, `/dashboard/signup` passes `"signup"`. The footer
+  /** Which mode the page renders in. Driven by route — `/login`
+   *  passes `"signin"`, `/signup` passes `"signup"`. The footer
    *  toggle navigates between the two routes so the URL always matches the
    *  visible mode. */
   initialMode?: "signin" | "signup";
@@ -67,7 +67,7 @@ interface LoginPageProps {
 
 export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {}) {
   // Mode is owned by the route, not by local state — sibling pages
-  // `/dashboard/login` and `/dashboard/signup` re-mount this component
+  // `/login` and `/signup` re-mount this component
   // with the appropriate `initialMode`. The footer toggle is a `<Link>`
   // navigation, not a `setState` call, so the URL stays in sync with the
   // visible mode and a sign-up URL can be shared.
@@ -87,7 +87,7 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
       initials: getInitials(displayName),
       provider: "email",
     });
-    router.push("/dashboard");
+    router.push("/home");
   }
 
   function handleOAuthSubmit(provider: AuthProvider) {
@@ -103,7 +103,7 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
       initials: getInitials(profile.name),
       provider,
     });
-    router.push("/dashboard");
+    router.push("/home");
   }
 
   // Each surface is built from a tight 3-weight hierarchy:
@@ -259,7 +259,7 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
               <>
                 Don&apos;t have an account?{" "}
                 <Link
-                  href="/dashboard/signup"
+                  href="/signup"
                   className="text-fg-strong underline decoration-fg-disabled underline-offset-2 transition-colors hover:text-fg hover:decoration-fg-strong"
                 >
                   Sign up
@@ -269,7 +269,7 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
               <>
                 Already have an account?{" "}
                 <Link
-                  href="/dashboard/login"
+                  href="/login"
                   className="text-fg-strong underline decoration-fg-disabled underline-offset-2 transition-colors hover:text-fg hover:decoration-fg-strong"
                 >
                   Log in

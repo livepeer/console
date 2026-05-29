@@ -102,7 +102,7 @@ function TopPipelinesGrid() {
           return (
             <Link
               key={model.id}
-              href={`/dashboard/models/${model.id}`}
+              href={`/models/${model.id}`}
               className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-zebra"
             >
               <span className="w-5 text-right text-[11px] text-fg-disabled">
@@ -185,7 +185,7 @@ export default function OverviewTab() {
       {/* No in-tab section header — the page chrome (`Network · Live state of
           the open GPU network…`) and the active tab pill ("Overview") already
           identify the section. Repeating the title in the tab body adds noise
-          without adding signal — same pattern as `/dashboard/usage`. */}
+          without adding signal — same pattern as `/usage`. */}
 
       {/* KPI cards — 4 metrics with sparklines so each cell reads as
           monitoring, not just static figures. */}

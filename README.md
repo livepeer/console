@@ -1,83 +1,71 @@
-# Livepeer Website
+# Livepeer Developer Dashboard
 
-The official website for [Livepeer](https://livepeer.org) — open infrastructure for real-time AI video.
+The signed-in surface for developers using the Livepeer network — browse AI capabilities, manage API keys, monitor usage.
 
-## Tech Stack
+## Status
 
-- **Framework**: Next.js 15 (App Router)
-- **UI**: React 19, Tailwind CSS v4, Framer Motion 11
-- **Language**: TypeScript
-- **Fonts**: Favorit Pro & Favorit Mono (Dinamo Typefaces)
+Early development. All data is mock-driven (`lib/dashboard/mock-data.ts`) — there is no backend wired in yet. Auth is stubbed in `components/dashboard/AuthContext.tsx`.
 
-## Prerequisites
+This repo was extracted from [`livepeer/website`](https://github.com/livepeer/website) (branch `claude/dashboard-updates`) and ships independently from the marketing site.
 
-- [Node.js 22.x](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) (includes npm)
-- [pnpm v10.x](https://pnpm.io/installation) — install with `npm install -g pnpm` or `corepack enable`
-- [Docker](https://docs.docker.com/get-docker/) (optional) — required for the dev container
+## Tech stack
 
-> [!TIP]
-> Use `nvm install` or `asdf install` to automatically switch to the correct versions.
+- Next.js 15 (App Router), React 19, TypeScript
+- Tailwind CSS v4 (`@tailwindcss/postcss`)
+- Geist Sans + Mono via `geist`
+- Framer Motion 11, Lucide icons, Recharts
+- Package manager: pnpm
 
-## Getting Started
-
-### Install Dependencies
+## Commands
 
 ```bash
 pnpm install
+pnpm dev          # http://localhost:3000
+pnpm build        # production build (verify before pushing)
+pnpm lint         # ESLint, zero warnings
+pnpm typecheck    # tsc --noEmit
 ```
 
-### Set Up Environment Variables
-
-Copy the example env file and fill in the values:
-
-```bash
-cp .env.example .env.local
-```
-
-| Variable           | Required | Description                                                                              |
-| ------------------ | -------- | ---------------------------------------------------------------------------------------- |
-| `THEGRAPH_API_KEY` | No       | Authenticated subgraph requests for live protocol stats (falls back to hardcoded values) |
-
-### Run Development Server
-
-```bash
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Scripts
-
-| Command         | Description              |
-| --------------- | ------------------------ |
-| `npm run dev`   | Start development server |
-| `npm run build` | Create production build  |
-| `npm run start` | Serve production build   |
-| `npm run lint`  | Run ESLint               |
-
-## Dev Container (Recommended)
-
-Develop inside a pre-configured container — consistent tooling, zero local setup, and isolation from your host machine.
-
-1. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) in VS Code
-2. `Ctrl+Shift+P` → **"Dev Containers: Reopen in Container"**
-
-## Project Structure
+## Layout
 
 ```
-app/                  # Next.js App Router pages
-  brand/              # Brand guidelines page
-  primer/             # Livepeer primer page
-  use-cases/          # Use-case pages
+app/
+├── layout.tsx              # Root: html/body, Geist fonts, theme bootstrap
+├── globals.css             # Token layer + dashboard utilities
+├── (app)/                  # Dashboard chrome (sidebar, providers)
+│   ├── layout.tsx
+│   ├── page.tsx            # /  → Explore (public)
+│   ├── home/               # /home (auth-gated)
+│   ├── jobs, usage, keys, settings  # auth-gated
+│   ├── models/[id]         # public model detail
+│   └── network             # public network stats
+└── (auth)/                 # Login + signup (no sidebar)
+
 components/
-  home/               # Homepage sections (Hero, Capabilities, etc.)
-  layout/             # Header and Footer
-  ui/                 # Shared UI primitives (Button, Card, Container, etc.)
-  icons/              # Logo components (Symbol, Wordmark, Lockup)
-lib/                  # Constants, fonts, and custom hooks
-public/               # Static assets (images, videos, fonts)
+├── dashboard/              # All dashboard surfaces
+└── design-system/          # Vendored primitives — Badge, Button, Dialog,
+                            # Drawer, ErrorState, Select, Skeleton, Tooltip,
+                            # LivepeerLogo. Replace with @livepeer/design-system
+                            # when that package ships.
+
+lib/
+├── dashboard/              # Mock data, types, utils
+└── constants.ts            # PORTAL_NAV_ITEMS + EXTERNAL_LINKS
 ```
 
-## License
+## Routes
 
-See [LICENSE](LICENSE) for details.
+| URL                | Auth     | Surface                          |
+| ------------------ | -------- | -------------------------------- |
+| `/`                | public   | Explore — model catalog          |
+| `/home`            | required | Dashboard home (your runs / KPIs) |
+| `/jobs`            | required | Run history                      |
+| `/usage`           | required | Account usage                    |
+| `/keys`            | required | API keys                         |
+| `/settings`        | required | Account settings                 |
+| `/models/[id]`     | public   | Model detail + playground        |
+| `/network`         | public   | Network stats                    |
+| `/login`           | public   | Sign in                          |
+| `/signup`          | public   | Sign up                          |
+
+See `CLAUDE.md` for dashboard conventions (KPI rows, tables, motion tokens, color rules).
