@@ -1,0 +1,63 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import type { Model } from "@/lib/dashboard/types";
+import { DEFAULT_DISCOVERY_SERVICE_TYPE } from "@/lib/discovery/constants";
+
+type ModelState =
+  | { status: "loading" }
+  | { status: "ready"; model: Model }
+  | { status: "not_found" }
+  | { status: "error"; message: string };
+
+export function useDiscoveryModel(capabilityId: string | undefined): ModelState {
+  const [state, setState] = useState<ModelState>({ status: "loading" });
+
+  useEffect(() => {
+    if (!capabilityId) {
+      setState({ status: "not_found" });
+      return;
+    }
+
+    let cancelled = false;
+    setState({ status: "loading" });
+
+    const params = new URLSearchParams({ serviceType: DEFAULT_DISCOVERY_SERVICE_TYPE });
+    const path = `/api/discovery/models/${encodeURIComponent(capabilityId)}?${params}`;
+
+    void (async () => {
+      try {
+        const response = await fetch(path);
+        const body = (await response.json()) as { model?: Model; error?: string };
+
+        if (cancelled) return;
+
+        if (response.status === 404) {
+          setState({ status: "not_found" });
+          return;
+        }
+        if (!response.ok || !body.model) {
+          setState({
+            status: "error",
+            message: body.error ?? `Failed to load capability (${response.status})`,
+          });
+          return;
+        }
+
+        setState({ status: "ready", model: body.model });
+      } catch (error) {
+        if (cancelled) return;
+        setState({
+          status: "error",
+          message: error instanceof Error ? error.message : "Failed to load capability",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilityId]);
+
+  return state;
+}

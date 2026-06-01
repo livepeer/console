@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import LoginPage from "@/components/dashboard/LoginPage";
 
-/**
- * Signup route — sibling of `/login`. Renders the same
- * `LoginPage` component but seeds it with `initialMode="signup"`. The
- * footer toggle inside the page is a `<Link>` to `/login`, so
- * URL and visible mode stay in sync without query-param trickery.
- */
-export default function SignupRoute() {
+function SignupRouteInner() {
   const { isConnected } = useAuth();
   const router = useRouter();
 
@@ -24,4 +18,12 @@ export default function SignupRoute() {
   if (isConnected) return null;
 
   return <LoginPage initialMode="signup" />;
+}
+
+export default function SignupRoute() {
+  return (
+    <Suspense fallback={null}>
+      <SignupRouteInner />
+    </Suspense>
+  );
 }

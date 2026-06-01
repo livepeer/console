@@ -85,6 +85,8 @@ export interface Model {
   featured?: boolean;
   /** Supports streaming (WebRTC) inference in addition to request/response. The differentiator on the network — flagged as a capability pill and filterable on Explore. */
   realtime?: boolean;
+  /** LV2V model_id for gateway sessions when different from discovery capability `id`. */
+  gatewayModelId?: string;
   /** ISO-8601 date the model was published on the network. Drives the "NEW" badge and Recently-added sort. */
   releasedAt?: string;
   tags?: string[];

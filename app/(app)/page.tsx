@@ -15,8 +15,8 @@ import {
   Star,
   Search,
 } from "lucide-react";
-import { MODELS } from "@/lib/dashboard/mock-data";
 import Button from "@/components/design-system/Button";
+import { useExploreModels } from "@/lib/dashboard/useExploreModels";
 import Drawer from "@/components/design-system/Drawer";
 import { getModelIcon, formatRuns } from "@/lib/dashboard/utils";
 import { useStarredModels } from "@/lib/dashboard/useStarredModels";
@@ -391,7 +391,27 @@ export default function ExplorePage() {
   );
 }
 
+function ExploreLoadError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center">
+      <p className="text-sm text-fg-muted">Could not load capabilities from Discovery Service.</p>
+      <p className="mt-2 max-w-md font-mono text-xs text-fg-faint">{message}</p>
+      <Button className="mt-6" variant="secondary" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
+
 function ExplorePageInner() {
+  const exploreState = useExploreModels();
+  const { status, models, reload } = exploreState;
   const searchParams = useSearchParams();
   const initialCategory = (() => {
     const qp = searchParams.get("category");
@@ -412,12 +432,12 @@ function ExplorePageInner() {
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
   const dataMaxPrice = useMemo(
-    () => Math.max(...MODELS.map((m) => m.pricing.amount), 0.01),
-    [],
+    () => Math.max(...models.map((m) => m.pricing.amount), 0.01),
+    [models],
   );
 
   const filtered = useMemo(() => {
-    const result = MODELS.filter((m) => {
+    const result = models.filter((m) => {
       if (availabilityFilter === "warm" && m.status !== "hot") return false;
       if (availabilityFilter === "cold" && m.status !== "cold") return false;
       if (favoritesOnly && !isStarred(m.id)) return false;
@@ -443,7 +463,28 @@ function ExplorePageInner() {
     });
 
     return result;
-  }, [search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+  }, [models, search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+
+  if (status === "loading" && models.length === 0) {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageHeader title="Explore" icon={LayoutGrid} />
+        <DashboardPageSkeleton maxWidth="7xl" withTabs kpiCount={0} withChart={false} />
+      </main>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageHeader title="Explore" icon={LayoutGrid} />
+        <ExploreLoadError
+          message={exploreState.status === "error" ? exploreState.error : "Unknown error"}
+          onRetry={reload}
+        />
+      </main>
+    );
+  }
 
   const activeFilters = [
     ...(category
@@ -717,7 +758,7 @@ function ExplorePageInner() {
             min={priceMin}
             max={priceMax}
             onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }}
-            models={MODELS}
+            models={models}
           />
         </div>
 

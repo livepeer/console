@@ -28,11 +28,9 @@ import JobsTable from "@/components/dashboard/JobsTable";
 import StatusDot from "@/components/dashboard/StatusDot";
 import Tooltip from "@/components/design-system/Tooltip";
 import { useStarredModels } from "@/lib/dashboard/useStarredModels";
-import {
-  getModelById,
-  SETTINGS_API_KEYS,
-  MOCK_RECENT_REQUESTS,
-} from "@/lib/dashboard/mock-data";
+import { SETTINGS_API_KEYS, MOCK_RECENT_REQUESTS } from "@/lib/dashboard/mock-data";
+import { useDiscoveryModel } from "@/lib/dashboard/useDiscoveryModel";
+import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
 import { getModelIcon, formatRuns, formatPrice } from "@/lib/dashboard/utils";
 import PlaygroundForm from "@/components/dashboard/playground/PlaygroundForm";
 import JsonInput from "@/components/dashboard/playground/JsonInput";
@@ -40,6 +38,12 @@ import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput
 import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
+import LiveStreamPlayground from "@/components/dashboard/playground/LiveStreamPlayground";
+import { isGatewayEnabledPublic } from "@/lib/dashboard/gateway-public";
+import {
+  getStreamingFacadeEndpointLabel,
+  isStreamingCapabilityModel,
+} from "@/lib/dashboard/sdk-streaming-example";
 import ModelAnalytics from "@/components/dashboard/stats/ModelAnalytics";
 import type { Model } from "@/lib/dashboard/types";
 
@@ -156,6 +160,9 @@ function PlaygroundTab({ model }: { model: Model }) {
   }
 
   if (model.playgroundConfig.playgroundVariant === "webcam") {
+    if (isGatewayEnabledPublic()) {
+      return <LiveStreamPlayground model={model} />;
+    }
     return <WebcamPlayground model={model} />;
   }
 
@@ -289,8 +296,11 @@ function PlaygroundTab({ model }: { model: Model }) {
 
 function ApiTab({ model }: { model: Model }) {
   const baseUrl = model.apiEndpoint ?? "https://gateway.livepeer.org/v1";
-  const endpoint =
-    model.category === "Language"
+  const gatewayStreaming =
+    isGatewayEnabledPublic() && isStreamingCapabilityModel(model);
+  const endpoint = gatewayStreaming
+    ? getStreamingFacadeEndpointLabel(model)
+    : model.category === "Language"
       ? `${baseUrl}/chat/completions`
       : `${baseUrl}/${model.id}`;
   const defaultKey =
@@ -684,7 +694,8 @@ function ModelIdChip({ modelId }: { modelId: string }) {
 export default function ModelDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<Tab>("playground");
-  const model = getModelById(id);
+  const discovery = useDiscoveryModel(id);
+  const model = discovery.status === "ready" ? discovery.model : undefined;
 
   // Jobs filtered to this model — drives both the Jobs panel and the count
   // chip on the Jobs tab. `model` may be undefined here (404 path below); we
@@ -705,11 +716,36 @@ export default function ModelDetailPage() {
     [filteredRuns.length],
   );
 
+  if (discovery.status === "loading") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageSkeleton maxWidth="5xl" withTabs kpiCount={0} withChart={false} />
+      </main>
+    );
+  }
+
+  if (discovery.status === "error") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 text-center">
+          <p className="text-sm text-fg-muted">Could not load capability from Discovery Service.</p>
+          <p className="mt-2 max-w-md font-mono text-xs text-fg-faint">{discovery.message}</p>
+          <Link
+            href="/"
+            className="mt-6 text-xs text-green-bright hover:underline focus:outline-none rounded"
+          >
+            Back to Explore
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   if (!model) {
     return (
       <main id="main-content" className="flex flex-1 flex-col bg-dark">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <p className="text-sm text-fg-label">Model not found</p>
+          <p className="text-sm text-fg-label">Capability not found</p>
           <Link
             href="/"
             className="mt-3 text-xs text-green-bright hover:underline focus:outline-none rounded"

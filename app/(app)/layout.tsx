@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { AuthProvider } from "@/components/dashboard/AuthContext";
+import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
 import { ThemeProvider } from "@/components/dashboard/ThemeContext";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import KeyboardShortcuts from "@/components/dashboard/KeyboardShortcuts";
@@ -58,7 +58,7 @@ export default function DashboardLayout({
           paints. ThemeProvider below takes over post-hydration. */}
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       <ThemeProvider>
-        <AuthProvider>
+        <DashboardProviders>
           <div
             className={`flex min-h-screen flex-col bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden ${GeistSans.variable} ${GeistMono.variable}`}
             style={dashboardOverrides}
@@ -69,7 +69,7 @@ export default function DashboardLayout({
             </div>
             <KeyboardShortcuts />
           </div>
-        </AuthProvider>
+        </DashboardProviders>
       </ThemeProvider>
     </>
   );
