@@ -1,5 +1,9 @@
-import { PmtHouseError, getUtcCalendarMonthIsoBounds } from "@pymthouse/builder-sdk";
+import { PmtHouseError } from "@pymthouse/builder-sdk";
 import { createPmtHouseClientForPublicApp } from "@/lib/dashboard/device-flow";
+import {
+  dailyRequestSeriesForPipeline,
+  utcDateKeysForPeriod,
+} from "@/lib/dashboard/usage-capability-display";
 
 export type AccountUsageBalance = {
   externalUserId: string;
@@ -9,17 +13,29 @@ export type AccountUsageBalance = {
   hasAccess: boolean;
 };
 
+export type AccountUsageDailyPipelineRow = {
+  pipeline: string;
+  modelId: string;
+  date: string;
+  requestCount: number;
+  networkFeeUsdMicros: string;
+};
+
 export type AccountUsagePipelineRow = {
   pipeline: string;
   modelId: string;
   requestCount: number;
   networkFeeUsdMicros: string;
   endUserBillableUsdMicros: string;
+  /** OpenMeter daily buckets aligned to `period` (oldest → newest). */
+  dailyRequests: number[];
 };
 
 export type AccountUsagePayload = {
   clientId: string;
   period: { start: string; end: string };
+  /** UTC YYYY-MM-DD keys aligned with `pipelineModels[].dailyRequests` (oldest → newest). */
+  periodDayKeys: string[];
   priorPeriod: { start: string; end: string };
   balance: AccountUsageBalance | null;
   current: {
@@ -27,6 +43,7 @@ export type AccountUsagePayload = {
     networkFeeUsdMicros: string;
     endUserBillableUsdMicros: string;
     pipelineModels: AccountUsagePipelineRow[];
+    dailyByPipeline: AccountUsageDailyPipelineRow[];
   };
   prior: {
     requestCount: number;
@@ -130,31 +147,8 @@ export async function fetchAccountUsageForExternalUser(input: {
 }): Promise<AccountUsagePayload> {
   const publicClientId = readPublicClientId();
   const days = input.periodDays ?? 30;
-  const period =
-    days === 30
-      ? (() => {
-          const month = getUtcCalendarMonthIsoBounds();
-          const priorMonthEnd = new Date(month.startDate);
-          priorMonthEnd.setUTCMilliseconds(priorMonthEnd.getUTCMilliseconds() - 1);
-          const priorMonthStart = new Date(
-            Date.UTC(
-              priorMonthEnd.getUTCFullYear(),
-              priorMonthEnd.getUTCMonth(),
-              1,
-              0,
-              0,
-              0,
-              0,
-            ),
-          );
-          return {
-            startDate: month.startDate,
-            endDate: month.endDate,
-            priorStartDate: priorMonthStart.toISOString(),
-            priorEndDate: priorMonthEnd.toISOString(),
-          };
-        })()
-      : rollingPeriodDays(days);
+  // Rolling window so the chart's last bucket is always UTC today (not month-end).
+  const period = rollingPeriodDays(days);
 
   const client = createPmtHouseClientForPublicApp(publicClientId);
 
@@ -172,6 +166,16 @@ export async function fetchAccountUsageForExternalUser(input: {
     }),
   ]);
 
+  const periodBounds = { start: period.startDate, end: period.endDate };
+  const dayKeys = utcDateKeysForPeriod(periodBounds.start, periodBounds.end);
+  const dailyByPipeline = (currentScope.currentUser.dailyByPipeline ?? []).map((row) => ({
+    pipeline: row.pipeline,
+    modelId: row.modelId,
+    date: row.date,
+    requestCount: row.requestCount,
+    networkFeeUsdMicros: row.networkFeeUsdMicros,
+  }));
+
   const mapPipeline = (
     rows: typeof currentScope.currentUser.pipelineModels,
   ): AccountUsagePipelineRow[] =>
@@ -181,11 +185,18 @@ export async function fetchAccountUsageForExternalUser(input: {
       requestCount: row.requestCount,
       networkFeeUsdMicros: row.networkFeeUsdMicros,
       endUserBillableUsdMicros: row.endUserBillableUsdMicros,
+      dailyRequests: dailyRequestSeriesForPipeline({
+        pipeline: row.pipeline,
+        modelId: row.modelId,
+        dayKeys,
+        dailyByPipeline,
+      }),
     }));
 
   return {
     clientId: currentScope.clientId,
-    period: { start: period.startDate, end: period.endDate },
+    period: periodBounds,
+    periodDayKeys: dayKeys,
     priorPeriod: { start: period.priorStartDate, end: period.priorEndDate },
     balance,
     current: {
@@ -193,10 +204,21 @@ export async function fetchAccountUsageForExternalUser(input: {
       networkFeeUsdMicros: currentScope.currentUser.networkFeeUsdMicros,
       endUserBillableUsdMicros: currentScope.currentUser.endUserBillableUsdMicros,
       pipelineModels: mapPipeline(currentScope.currentUser.pipelineModels),
+      dailyByPipeline,
     },
     prior: {
       requestCount: priorScope.currentUser.requestCount,
-      pipelineModels: mapPipeline(priorScope.currentUser.pipelineModels),
+      pipelineModels: mapPipeline(
+        priorScope.currentUser.pipelineModels,
+      ).map((row) => ({
+        ...row,
+        dailyRequests: dailyRequestSeriesForPipeline({
+          pipeline: row.pipeline,
+          modelId: row.modelId,
+          dayKeys: utcDateKeysForPeriod(period.priorStartDate, period.priorEndDate),
+          dailyByPipeline: [],
+        }),
+      })),
     },
   };
 }

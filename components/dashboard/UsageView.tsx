@@ -6,6 +6,7 @@ import StackedAreaChart, { MiniSpark } from "@/components/dashboard/StackedAreaC
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { useAccountUsage } from "@/lib/dashboard/useAccountUsage";
+import { getUtcCalendarMonthIsoBounds } from "@pymthouse/builder-sdk";
 import {
   buildUsageCapabilityRows,
   formatPeriodResetLabel,
@@ -175,7 +176,8 @@ export default function UsageView() {
     return buildUsageCapabilityRows({
       current: usageState.data.current.pipelineModels,
       prior: usageState.data.prior.pipelineModels,
-      periodDays: PERIOD_DAYS,
+      period: usageState.data.period,
+      dailyByPipeline: usageState.data.current.dailyByPipeline,
     });
   }, [usageState]);
 
@@ -193,6 +195,12 @@ export default function UsageView() {
     });
   }, [capabilityRows, priceMin, priceMax, dataMaxSpend]);
 
+  const periodDayCount = useMemo(() => {
+    if (usageState.status !== "ready") return PERIOD_DAYS;
+    const first = capabilityRows[0]?.data.length;
+    return first && first > 0 ? first : PERIOD_DAYS;
+  }, [usageState, capabilityRows]);
+
   const forecastStats = useMemo(() => {
     if (usageState.status !== "ready") {
       return {
@@ -205,7 +213,8 @@ export default function UsageView() {
       };
     }
     const { current, prior } = usageState.data;
-    const totalsByDay = Array.from({ length: PERIOD_DAYS }, (_, dayIndex) =>
+    const dayCount = capabilityRows[0]?.data.length ?? PERIOD_DAYS;
+    const totalsByDay = Array.from({ length: dayCount }, (_, dayIndex) =>
       capabilityRows.reduce((sum, row) => sum + (row.data[dayIndex] ?? 0), 0),
     );
     const last7Avg =
@@ -255,7 +264,7 @@ export default function UsageView() {
   const { data } = usageState;
   const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
-  const resetsAt = formatPeriodResetLabel(data.period.end);
+  const resetsAt = formatPeriodResetLabel(getUtcCalendarMonthIsoBounds().endDate);
   const grantedMicros = data.balance?.lifetimeGrantedUsdMicros ?? null;
 
   return (
@@ -284,7 +293,7 @@ export default function UsageView() {
           <div>
             <p className="text-[17px] font-bold text-fg">Jobs by capability</p>
             <p className="mt-0.5 text-[12px] text-fg-muted">
-              Last {PERIOD_DAYS} days · {fmt(data.current.requestCount)} jobs · OpenMeter
+              {periodDayCount} days · {fmt(data.current.requestCount)} jobs · OpenMeter
             </p>
           </div>
           <div className="flex flex-wrap gap-3.5 justify-end text-[11.5px] text-fg-muted">
@@ -300,11 +309,12 @@ export default function UsageView() {
             ))}
           </div>
         </div>
-        <div className="px-3 pt-2 pb-1">
+        <div className="px-3 pt-2 pb-2">
           {filteredRows.length > 0 ? (
             <StackedAreaChart
               series={filteredRows.map((c) => ({ name: c.name, data: c.data }))}
               colors={filteredRows.map((c) => c.color)}
+              dayKeys={data.periodDayKeys}
             />
           ) : (
             <p className="py-12 text-center text-sm text-fg-faint">No usage in this period.</p>
