@@ -21,7 +21,7 @@ const KIND_TABS: { key: KindFilter; label: string }[] = [
 ];
 
 /**
- * CallsView — the standalone /calls list: every request this workspace made
+ * CallsView — the standalone /calls list: every call this organization made
  * across the network (what counts toward its usage). A Batch / Live segmented
  * filter splits the two invocation shapes the Runner SDK exposes — batch
  * `predict` request/response vs live streaming `session` — and the table's

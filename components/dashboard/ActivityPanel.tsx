@@ -11,7 +11,7 @@ import { MOCK_RECENT_REQUESTS } from "@/lib/dashboard/mock-data";
 import type { AccountActivityStatus } from "@/lib/dashboard/types";
 
 /**
- * ActivityPanel — the workspace's own recent requests: the calls it made
+ * ActivityPanel — the organization's own recent calls: the calls it made
  * across the network, which are what count toward its usage and spend. It's a
  * live preview of /usage. (Inbound traffic that other people send to this
  * org's public apps is *their* usage, not this org's, so it isn't shown here.)
@@ -45,7 +45,7 @@ export default function ActivityPanel() {
         variant="guided"
         icon={<Activity className="h-4 w-4" />}
         title="No activity yet"
-        description="Calls your workspace makes will stream here — what you ran, how it went, and what it cost."
+        description="Calls your organization makes will stream here — what you ran, how it went, and what it cost."
         action={{ label: "Browse apps", href: "/" }}
       />
     );
@@ -57,7 +57,7 @@ export default function ActivityPanel() {
         <div>
           <h2 className="text-[15px] font-semibold text-fg">Recent activity</h2>
           <p className="mt-0.5 font-mono text-[11.5px] tracking-[0.01em] text-fg-faint">
-            requests this workspace made
+            calls your organization made
           </p>
         </div>
         <Link

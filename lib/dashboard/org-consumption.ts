@@ -3,7 +3,7 @@ import { formatCompact } from "./org-fleet";
 /**
  * The CONSUME (outbound) ledger — the mirror of the "Your apps" SERVE ledger.
  *
- * A workspace doesn't only deploy apps; it also *calls* apps across the
+ * An organization doesn't only deploy apps; it also *calls* apps across the
  * network — its own, and (mostly) apps it didn't deploy. That outbound demand
  * is what drives spend. This module answers the operator's question: "how much
  * of my usage is on apps I didn't build?"
@@ -15,17 +15,17 @@ export interface ConsumedApp {
   /** App id when it's one of ours; otherwise a network slug for linking. */
   id: string;
   name: string;
-  /** Provider/owner label, or "Your workspace" for apps you deployed. */
+  /** Provider/owner label, or "Your organization" for apps you deployed. */
   owner: string;
-  /** Did THIS workspace deploy it? false = an app you didn't build. */
+  /** Did THIS organization deploy it? false = an app you didn't build. */
   owned: boolean;
   calls7d: number;
   /** Month-to-date spend in dollars. */
   spendNum: number;
 }
 
-// What this workspace calls. Mostly third-party network apps (you didn't deploy
-// them); a little is the workspace exercising its own apps.
+// What this organization calls. Mostly third-party network apps (you didn't
+// deploy them); a little is the org exercising its own apps.
 const CONSUMED_APPS_RAW: ConsumedApp[] = [
   { id: "daydream-video", name: "Daydream Video", owner: "daydream", owned: false, calls7d: 2_400, spendNum: 1.6 },
   { id: "flux-schnell", name: "FLUX Schnell", owner: "black-forest-labs", owned: false, calls7d: 1_900, spendNum: 0.95 },
@@ -34,8 +34,8 @@ const CONSUMED_APPS_RAW: ConsumedApp[] = [
   { id: "whisper-v3", name: "Whisper V3", owner: "openai", owned: false, calls7d: 600, spendNum: 0.45 },
   { id: "sdxl-turbo", name: "SDXL Turbo", owner: "stability", owned: false, calls7d: 700, spendNum: 0.4 },
   { id: "llama-3-70b", name: "Llama 3 70B", owner: "meta", owned: false, calls7d: 400, spendNum: 0.25 },
-  { id: "app-sentiment", name: "Sentiment", owner: "Your workspace", owned: true, calls7d: 400, spendNum: 0.4 },
-  { id: "app-image-upscale", name: "Image Upscale", owner: "Your workspace", owned: true, calls7d: 100, spendNum: 0.3 },
+  { id: "app-sentiment", name: "Sentiment", owner: "Your organization", owned: true, calls7d: 400, spendNum: 0.4 },
+  { id: "app-image-upscale", name: "Image Upscale", owner: "Your organization", owned: true, calls7d: 100, spendNum: 0.3 },
 ];
 
 export interface OrgConsumption {

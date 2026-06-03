@@ -61,7 +61,7 @@ const ROUTE_COPY: Record<SignInWallRoute, RouteCopy> = {
     icon: Activity,
     title: "Calls are organization-only",
     description:
-      "Every call your workspace makes — batch and live — is recorded against your organization. Sign in to see them, or try an app without an account.",
+      "Every call your organization makes — batch and live — is recorded here. Sign in to see them, or try an app without an account.",
   },
   usage: {
     icon: BarChart3,

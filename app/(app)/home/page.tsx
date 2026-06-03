@@ -49,7 +49,7 @@ function HomePageHeader() {
 
 // ─── Home Page ───
 //
-// "Mission control" rethink: a workspace sits between two flows of network
+// "Mission control" rethink: an organization sits between two flows of network
 // traffic — what it SERVES (inbound, apps it deployed) and what it CONSUMES
 // (outbound, apps across the network, mostly ones it didn't deploy). The Home
 // is organized around those two directions, not around personas. Composition:
@@ -59,8 +59,8 @@ function HomePageHeader() {
 //   3. Two ledgers — Deployed apps (what you serve: calls + Yours/External)
 //      beside Usage (what you consume: spend + Your apps/Others'). Each panel
 //      leads with its own directional summary; no separate hero band.
-//   4. Recent activity — the workspace's own requests (what counts toward
-//      its usage); a live preview of /usage
+//   4. Recent activity — the organization's own calls (what counts toward
+//      its usage); a live preview of /calls
 
 export default function HomePage() {
   const { isConnected, isLoading, user } = useAuth();
@@ -201,8 +201,8 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Recent activity — the workspace's own recent requests (what
-              counts toward its usage); a live preview of /usage. */}
+          {/* Recent activity — the organization's own recent calls (what
+              counts toward its usage); a live preview of /calls. */}
           <div className="home-rise mt-7" style={{ animationDelay: "220ms" }}>
             <ActivityPanel />
           </div>

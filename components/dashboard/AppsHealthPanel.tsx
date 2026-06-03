@@ -125,7 +125,7 @@ const GRID =
   "grid items-center gap-3 pl-5 pr-4 grid-cols-[minmax(0,1fr)_84px_52px] sm:grid-cols-[minmax(0,1fr)_104px_76px_84px_56px]";
 
 export default function AppsHealthPanel() {
-  const { apps, totalCalls7d } = getOrgFleet();
+  const { apps, count, totalCalls7d } = getOrgFleet();
   if (apps.length === 0) return null;
 
   // Attention first (error → building), then by traffic. The page opens on
@@ -153,17 +153,18 @@ export default function AppsHealthPanel() {
           </Link>
         </div>
 
-        {/* Total calls these apps served — a public count, like package
-            downloads. No first-party/third-party split. */}
+        {/* Hero is the app count (the title is a count-noun, so the big number
+            must agree with it). Calls served — a public count, like package
+            downloads — sits as the right-aligned secondary, mirroring Usage. */}
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-mono text-[22px] font-semibold leading-none tabular-nums tracking-[-0.01em] text-fg">
-            {formatCompact(totalCalls7d)}
+            {count}
           </span>
           <span className="font-mono text-[12px] text-fg-faint">
-            calls served · 7d
+            {count === 1 ? "app" : "apps"}
           </span>
-          <span className="ml-auto font-mono text-[11px] tabular-nums text-green-bright">
-            +18.2%
+          <span className="ml-auto font-mono text-[11px] tabular-nums text-fg-faint">
+            {formatCompact(totalCalls7d)} calls · 7d
           </span>
         </div>
       </div>

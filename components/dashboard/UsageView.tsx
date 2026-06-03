@@ -8,9 +8,9 @@ import StackedAreaChart, {
 } from "@/components/dashboard/StackedAreaChart";
 
 // Usage is an organization-level view: one free-tier pool and one bill span all
-// environments (matching Modal, which keeps "Usage & Billing" at its workspace
-// tier with no environment selector). Per-environment activity lives on the
-// env-scoped Jobs page instead.
+// environments (matching Modal, which keeps "Usage & Billing" at the
+// account/org tier with no environment selector). Per-environment activity
+// lives on the env-scoped Calls page instead.
 
 /**
  * UsageView — full Usage page body per the Livepeer Dashboard design v3

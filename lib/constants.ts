@@ -13,7 +13,7 @@
 //                     (matching Modal's organization-level "Usage & Billing"),
 //                     so it sits OUTSIDE the environment switcher's scope.
 //                     Calls is the per-request log behind Usage — every call
-//                     this workspace made (batch + live).
+//                     this organization made (batch + live).
 // Settings carries a chev-right (rendered by NavLink via `submenu: true`)
 // instead of a count, signaling that it leads into a sub-experience.
 export const PORTAL_NAV_ITEMS = [

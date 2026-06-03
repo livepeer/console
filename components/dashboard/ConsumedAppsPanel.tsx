@@ -10,7 +10,7 @@ import type { ConsumedApp } from "@/lib/dashboard/org-consumption";
 
 /**
  * Usage — the CONSUME (outbound) panel: a spend summary (split between your own
- * apps and apps you didn't deploy) over the list of apps this workspace calls.
+ * apps and apps you didn't deploy) over the list of apps this organization calls.
  * The counterpart to "Deployed apps". The owner sub-line tells own vs external
  * apart, so there's no separate tag column.
  */
@@ -46,7 +46,7 @@ export default function ConsumedAppsPanel({
           </Link>
         </div>
 
-        {/* Total spend across the apps this workspace calls. The per-app rows
+        {/* Total spend across the apps this organization calls. The per-app rows
             below show which are your own vs others'. */}
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-mono text-[22px] font-semibold leading-none tabular-nums tracking-[-0.01em] text-fg">
