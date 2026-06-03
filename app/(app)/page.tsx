@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useMemo } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -15,17 +15,23 @@ import {
   Star,
   Search,
 } from "lucide-react";
-import { MODELS } from "@/lib/dashboard/mock-data";
+import {
+  APPS,
+  publicPipelines,
+  pipelineToExploreApp,
+  SEED_PUBLIC_PIPELINE_APPS,
+  PIPELINE_APP_IDS,
+} from "@/lib/dashboard/mock-data";
 import Button from "@/components/design-system/Button";
 import Drawer from "@/components/design-system/Drawer";
-import { getModelIcon, formatRuns } from "@/lib/dashboard/utils";
-import { useStarredModels } from "@/lib/dashboard/useStarredModels";
-import ModelCard from "@/components/dashboard/ModelCard";
+import { getAppIcon, formatRuns } from "@/lib/dashboard/utils";
+import { useStarredApps } from "@/lib/dashboard/useStarredApps";
+import AppCard from "@/components/dashboard/AppCard";
 import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
 import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
-import type { Model, ModelCategory } from "@/lib/dashboard/types";
+import type { App, AppCategory } from "@/lib/dashboard/types";
 
-const VALID_CATEGORIES: ModelCategory[] = [
+const VALID_CATEGORIES: AppCategory[] = [
   "Video Generation",
   "Video Editing",
   "Video Understanding",
@@ -39,17 +45,17 @@ const VALID_CATEGORIES: ModelCategory[] = [
 
 type AvailabilityFilter = "all" | "warm" | "cold";
 
-const VIDEO_CATEGORIES: { label: ModelCategory; icon: ReturnType<typeof getModelIcon> }[] = [
-  { label: "Video Generation", icon: getModelIcon("Video Generation") },
-  { label: "Video Editing", icon: getModelIcon("Video Editing") },
-  { label: "Video Understanding", icon: getModelIcon("Video Understanding") },
-  { label: "Live Transcoding", icon: getModelIcon("Live Transcoding") },
+const VIDEO_CATEGORIES: { label: AppCategory; icon: ReturnType<typeof getAppIcon> }[] = [
+  { label: "Video Generation", icon: getAppIcon("Video Generation") },
+  { label: "Video Editing", icon: getAppIcon("Video Editing") },
+  { label: "Video Understanding", icon: getAppIcon("Video Understanding") },
+  { label: "Live Transcoding", icon: getAppIcon("Live Transcoding") },
 ];
 
-const OTHER_CATEGORIES: { label: ModelCategory; icon: ReturnType<typeof getModelIcon> }[] = [
-  { label: "Image Generation", icon: getModelIcon("Image Generation") },
-  { label: "Speech", icon: getModelIcon("Speech") },
-  { label: "Language", icon: getModelIcon("Language") },
+const OTHER_CATEGORIES: { label: AppCategory; icon: ReturnType<typeof getAppIcon> }[] = [
+  { label: "Image Generation", icon: getAppIcon("Image Generation") },
+  { label: "Speech", icon: getAppIcon("Speech") },
+  { label: "Language", icon: getAppIcon("Language") },
 ];
 
 const PRICE_BUCKETS = 20;
@@ -116,7 +122,7 @@ function ListHeaderRow() {
       role="row"
     >
       <div />
-      <div role="columnheader">Capability</div>
+      <div role="columnheader">App</div>
       <div role="columnheader" className="text-right">p50</div>
       <div role="columnheader" className="text-right">p95</div>
       <div role="columnheader" className="text-right">GPUs</div>
@@ -126,15 +132,15 @@ function ListHeaderRow() {
   );
 }
 
-function ModelListItem({ model }: { model: Model }) {
-  const Icon = getModelIcon(model.category);
+function ModelListItem({ model, href }: { model: App; href?: string }) {
+  const Icon = getAppIcon(model.category);
   const isWarm = model.status === "hot";
   const price = model.pricing.amount;
   const priceDecimals = price < 0.01 ? 4 : 3;
 
   return (
     <Link
-      href={`/models/${model.id}`}
+      href={href ?? `/apps/${model.id}`}
       className={`${LIST_GRID} border-b border-hairline px-2 py-2 text-[12.5px] transition-colors hover:bg-hover`}
     >
       {/* Icon thumbnail (24px square, bordered) */}
@@ -203,7 +209,7 @@ function ModelListItem({ model }: { model: Model }) {
 
 // ─── Price Range Filter ───
 
-function buildPriceHistogram(models: Model[]) {
+function buildPriceHistogram(models: App[]) {
   const prices = models.map((m) => m.pricing.amount);
   const maxPrice = Math.max(...prices, 0.01);
   const bucketSize = maxPrice / PRICE_BUCKETS;
@@ -227,7 +233,7 @@ function PriceRangeFilter({
   min: number;
   max: number;
   onChange: (min: number, max: number) => void;
-  models: Model[];
+  models: App[];
 }) {
   const { buckets, maxPrice } = useMemo(() => buildPriceHistogram(models), [models]);
   const minPrice = (min / 100) * maxPrice;
@@ -395,15 +401,15 @@ function ExplorePageInner() {
   const searchParams = useSearchParams();
   const initialCategory = (() => {
     const qp = searchParams.get("category");
-    return qp && VALID_CATEGORIES.includes(qp as ModelCategory)
-      ? (qp as ModelCategory)
+    return qp && VALID_CATEGORIES.includes(qp as AppCategory)
+      ? (qp as AppCategory)
       : null;
   })();
   const initialFavorites = searchParams.get("starred") === "1";
-  const { isStarred, starredIds } = useStarredModels();
+  const { isStarred, starredIds } = useStarredApps();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [category, setCategory] = useState<ModelCategory | null>(initialCategory);
+  const [category, setCategory] = useState<AppCategory | null>(initialCategory);
   // Sort is locked to the recommended ordering (warm + realtime tier, then runs7d desc).
   // The v3 design exposes no sort selector — ordering happens by default.
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -411,13 +417,30 @@ function ExplorePageInner() {
   const [favoritesOnly, setFavoritesOnly] = useState(initialFavorites);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
+
+  // Public pipelines (user-published apps) are listed in Explore alongside
+  // first-party network models. Seeded SSR-safely, then refreshed from the
+  // localStorage-backed publish state after mount so toggling a pipeline's
+  // visibility on its Settings tab is reflected here on next navigation.
+  const [pipelineModels, setPipelineModels] = useState<App[]>(
+    SEED_PUBLIC_PIPELINE_APPS,
+  );
+  useEffect(() => {
+    setPipelineModels(publicPipelines().map(pipelineToExploreApp));
+  }, []);
+
+  const allModels = useMemo(
+    () => [...APPS, ...pipelineModels],
+    [pipelineModels],
+  );
+
   const dataMaxPrice = useMemo(
-    () => Math.max(...MODELS.map((m) => m.pricing.amount), 0.01),
-    [],
+    () => Math.max(...allModels.map((m) => m.pricing.amount), 0.01),
+    [allModels],
   );
 
   const filtered = useMemo(() => {
-    const result = MODELS.filter((m) => {
+    const result = allModels.filter((m) => {
       if (availabilityFilter === "warm" && m.status !== "hot") return false;
       if (availabilityFilter === "cold" && m.status !== "cold") return false;
       if (favoritesOnly && !isStarred(m.id)) return false;
@@ -436,14 +459,14 @@ function ExplorePageInner() {
     // is always-on and deterministic.
     result.sort((a, b) => {
       if (a.featured !== b.featured) return a.featured ? -1 : 1;
-      const tier = (m: Model) => (m.realtime ? 0 : 2) + (m.status === "hot" ? 0 : 1);
+      const tier = (m: App) => (m.realtime ? 0 : 2) + (m.status === "hot" ? 0 : 1);
       const tierDiff = tier(a) - tier(b);
       if (tierDiff !== 0) return tierDiff;
       return b.runs7d - a.runs7d;
     });
 
     return result;
-  }, [search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+  }, [allModels, search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
 
   const activeFilters = [
     ...(category
@@ -459,7 +482,7 @@ function ExplorePageInner() {
 
   const ALL_CATEGORIES = [...VIDEO_CATEGORIES, ...OTHER_CATEGORIES];
 
-  const tabKeys: ({ key: "all"; label: string } | { key: ModelCategory; label: string })[] = [
+  const tabKeys: ({ key: "all"; label: string } | { key: AppCategory; label: string })[] = [
     { key: "all", label: "All" },
     ...ALL_CATEGORIES.map((c) => ({ key: c.label, label: c.label })),
   ];
@@ -522,7 +545,7 @@ function ExplorePageInner() {
       <div
         className="scrollbar-none flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-hairline px-5"
         role="tablist"
-        aria-label="Capability category"
+        aria-label="App category"
       >
         {tabKeys.map((tab) => {
           const isActive = (tab.key === "all" && category === null) || tab.key === category;
@@ -606,7 +629,7 @@ function ExplorePageInner() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search capabilities…"
+            placeholder="Search apps…"
             className="flex-1 bg-transparent text-[13px] text-fg-strong placeholder:text-fg-faint outline-none"
           />
         </div>
@@ -629,9 +652,20 @@ function ExplorePageInner() {
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-1 gap-3 px-5 pt-4 pb-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {filtered.map((model) => (
-              <ModelCard key={model.id} model={model} />
-            ))}
+            {filtered.map((model) => {
+              const isPipeline = PIPELINE_APP_IDS.has(model.id);
+              // Pipeline cards open the consumer/playground face (/apps/[id]);
+              // owners reach the operator console from a "Manage app" affordance
+              // there. The catalog is a consume surface, so a card never drops a
+              // caller straight into someone's operator view.
+              return (
+                <AppCard
+                  key={model.id}
+                  model={model}
+                  tag={isPipeline ? "Pipeline" : undefined}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="px-5 pb-8">
@@ -717,7 +751,7 @@ function ExplorePageInner() {
             min={priceMin}
             max={priceMax}
             onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }}
-            models={MODELS}
+            models={allModels}
           />
         </div>
 

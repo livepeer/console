@@ -15,7 +15,7 @@ import {
 const REGIONS = ["us-west", "us-east", "eu-central", "ap-southeast", "sa-east"];
 
 /**
- * Workspace · Limits — `?tab=usage-limits` per the v7 prototype.
+ * Organization · Limits — `?tab=usage-limits` per the v7 prototype.
  *
  * Two cards:
  *  1. Limits & quotas — hard spend cap, concurrent streams, per-key rate
@@ -28,12 +28,12 @@ export default function LimitsSection() {
     <>
       <SettingsHeader
         title="Limits & quotas"
-        sub="Caps applied to this workspace"
+        sub="Caps applied to this organization"
       />
       <SettingsCard>
         <SettingsField
           label="Hard spend cap"
-          hint="Suspend all capabilities if monthly spend exceeds this amount."
+          hint="Suspend all apps if monthly spend exceeds this amount."
         >
           <SettingsInputGroup>
             <InputAffix dim>$</InputAffix>
@@ -53,14 +53,14 @@ export default function LimitsSection() {
 
         <SettingsField
           label="Per-key rate limit"
-          hint="Jobs per second, applied to each API key."
+          hint="Calls per second, applied to each API key."
         >
           <SettingsInput defaultValue="10" />
         </SettingsField>
 
         <SettingsField
           label="Allowed regions"
-          hint="Restrict capabilities to specific GPU pools."
+          hint="Restrict apps to specific GPU pools."
         >
           <div className="flex flex-wrap gap-1.5">
             {REGIONS.map((r, i) => {

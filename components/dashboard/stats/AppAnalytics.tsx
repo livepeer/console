@@ -18,9 +18,9 @@ import {
   SimpleChartTooltip,
   StackedChartTooltip,
 } from "@/components/dashboard/statistics/ChartTooltip";
-import { generateModelStats, type StatsPeriod } from "@/lib/dashboard/model-stats";
+import { generateModelStats, type StatsPeriod } from "@/lib/dashboard/app-stats";
 import { computeAxisTicks } from "@/lib/dashboard/utils";
-import type { Model, NetworkStat } from "@/lib/dashboard/types";
+import type { App, NetworkStat } from "@/lib/dashboard/types";
 
 const PERIOD_OPTIONS: { key: StatsPeriod; label: string }[] = [
   { key: "24h", label: "24H" },
@@ -40,7 +40,7 @@ function formatRequestCount(v: number): string {
   return v.toString();
 }
 
-export default function ModelAnalytics({ model }: { model: Model }) {
+export default function AppAnalytics({ model }: { model: App }) {
   const [period, setPeriod] = useState<StatsPeriod>("7d");
   const stats = useMemo(() => generateModelStats(model, period), [model, period]);
   const requestsTicks = useMemo(

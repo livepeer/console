@@ -18,25 +18,25 @@ interface SearchResult {
 
 const SUGGESTIONS: SearchResult[] = [
   { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/" },
-  { title: "Explore capabilities", subtitle: "Browse capabilities available on the network", href: "/" },
+  { title: "Explore apps", subtitle: "Browse apps available on the network", href: "/" },
   { title: "Get your API key", subtitle: "Authenticate and start sending requests", href: "/settings?tab=tokens" },
-  { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/models/frameworks-transcoding" },
+  { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/apps/frameworks-transcoding" },
 ];
 
 // ─── All searchable items ────────────────────────────────────────────────────
 
 const ALL_RESULTS: SearchResult[] = [
   ...SUGGESTIONS,
-  { title: "Daydream Video API", subtitle: "Real-time AI video generation", href: "/models/daydream-video" },
-  { title: "Frameworks Transcoding", subtitle: "Adaptive bitrate transcoding", href: "/models/frameworks-transcoding" },
-  { title: "FLUX.1 [schnell]", subtitle: "Fast text-to-image generation", href: "/models/flux-schnell" },
-  { title: "SDXL Turbo", subtitle: "Real-time image generation", href: "/models/sdxl-turbo" },
-  { title: "Stable Video Diffusion", subtitle: "Image-to-video synthesis", href: "/models/stable-video-diffusion" },
-  { title: "LivePortrait", subtitle: "Real-time portrait animation", href: "/models/live-video-to-video" },
-  { title: "Qwen3 32B", subtitle: "Large language model", href: "/models/qwen3-32b" },
-  { title: "Llama 3 70B", subtitle: "Open LLM for chat and instructions", href: "/models/llama-3-70b" },
-  { title: "Whisper v3 Large", subtitle: "Speech-to-text transcription", href: "/models/whisper-v3" },
-  { title: "Kokoro TTS", subtitle: "Text-to-speech synthesis", href: "/models/kokoro-tts" },
+  { title: "Daydream Video API", subtitle: "Real-time AI video generation", href: "/apps/daydream-video" },
+  { title: "Frameworks Transcoding", subtitle: "Adaptive bitrate transcoding", href: "/apps/frameworks-transcoding" },
+  { title: "FLUX.1 [schnell]", subtitle: "Fast text-to-image generation", href: "/apps/flux-schnell" },
+  { title: "SDXL Turbo", subtitle: "Real-time image generation", href: "/apps/sdxl-turbo" },
+  { title: "Stable Video Diffusion", subtitle: "Image-to-video synthesis", href: "/apps/stable-video-diffusion" },
+  { title: "LivePortrait", subtitle: "Real-time portrait animation", href: "/apps/live-video-to-video" },
+  { title: "Qwen3 32B", subtitle: "Large language model", href: "/apps/qwen3-32b" },
+  { title: "Llama 3 70B", subtitle: "Open LLM for chat and instructions", href: "/apps/llama-3-70b" },
+  { title: "Whisper v3 Large", subtitle: "Speech-to-text transcription", href: "/apps/whisper-v3" },
+  { title: "Kokoro TTS", subtitle: "Text-to-speech synthesis", href: "/apps/kokoro-tts" },
   { title: "Home", subtitle: "Dashboard overview", href: "/home" },
   { title: "API Tokens", subtitle: "Manage your API keys", href: "/settings?tab=tokens" },
   { title: "Billing", subtitle: "Manage billing and payments", href: "/settings?tab=billing" },
@@ -180,7 +180,7 @@ export default function DashboardSearch({ mobile = false }: DashboardSearchProps
             ref={inputRef}
             type="text"
             aria-label="Search"
-            placeholder="Search capabilities, docs..."
+            placeholder="Search apps, docs..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}

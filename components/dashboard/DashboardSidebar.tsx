@@ -15,7 +15,6 @@ import {
   CreditCard,
   ExternalLink,
   Globe,
-  Plus,
   Key,
   Lock,
   Menu,
@@ -23,6 +22,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings as SettingsIcon,
+  Terminal,
   User as UserIcon,
   Users as UsersIcon,
   type LucideIcon,
@@ -34,13 +34,10 @@ import Drawer from "@/components/design-system/Drawer";
 import NavLink from "@/components/dashboard/NavLink";
 import StatusDot from "@/components/dashboard/StatusDot";
 import SidebarUsageCard from "@/components/dashboard/SidebarUsageCard";
-import WorkspaceMenu from "@/components/dashboard/WorkspaceMenu";
+import OrganizationMenu from "@/components/dashboard/OrganizationMenu";
 import Tooltip from "@/components/design-system/Tooltip";
-import {
-  MODELS,
-  SETTINGS_API_KEYS,
-} from "@/lib/dashboard/mock-data";
-import { formatRuns, getModelIcon } from "@/lib/dashboard/utils";
+import { APPS, SETTINGS_API_KEYS, PIPELINES } from "@/lib/dashboard/mock-data";
+import { formatRuns } from "@/lib/dashboard/utils";
 
 const NAV_ICONS = {
   House,
@@ -58,7 +55,7 @@ const COLLAPSED_KEY = "dashboard.sidebar.collapsed";
 function getNavActive(itemHref: string, pathname: string): boolean {
   if (itemHref === "/home") return pathname === "/home";
   if (itemHref === "/") {
-    return pathname === "/" || pathname.startsWith("/models/");
+    return pathname === "/";
   }
   // Tab-deep links inherit active state from path only — Settings page tabs
   // already mark the current sub-tab visually inside their own TabStrip.
@@ -85,17 +82,17 @@ interface SidebarContentProps {
 // Mirrors the Livepeer Dashboard v4 prototype's `loggedOut` Sidebar (see
 // `components.jsx`, the `if (loggedOut)` branch). Order top → bottom:
 //
-//   1. Brand row — wordmark links to / (no workspace switcher)
+//   1. Brand row — wordmark links to / (no organization switcher)
 //   2. Search button (Cmd-K, same as signed-in variant)
 //   3. Public nav — Explore (count), Docs (external)
-//   4. WORKSPACE eyebrow + locked nav: Home, Runs, Usage, API keys
+//   4. ORGANIZATION eyebrow + locked nav: Home, Runs, Usage, API keys
 //   5. Spacer
 //   6. Free-tier promo card — "Get an API key" + "Sign in"
 //   7. Footer — Network nav, status row
 //
 // Locked items still navigate to their real routes; those routes render a
 // `SignInWall` instead of their content so the sidebar stays put. The promo
-// card replaces the SidebarUsageCard since there's no workspace usage to
+// card replaces the SidebarUsageCard since there's no organization usage to
 // show; per the prototype the eyebrow is "Free tier" and the body sells the
 // 5-demo-runs hook with a single primary CTA.
 
@@ -115,7 +112,7 @@ function SignedOutSidebarContent({
   const pathname = usePathname();
   const router = useRouter();
   const exploreActive =
-    pathname === "/" || pathname.startsWith("/models/");
+    pathname === "/";
 
   return (
     <div className="flex h-full flex-col bg-shell">
@@ -125,7 +122,7 @@ function SignedOutSidebarContent({
       >
         <Link
           href="/"
-          aria-label="Livepeer Dashboard — explore capabilities"
+          aria-label="Livepeer Dashboard — explore apps"
           className={
             collapsed
               ? "flex h-[26px] w-[26px] items-center justify-center"
@@ -160,7 +157,7 @@ function SignedOutSidebarContent({
       </div>
 
       {/* Search button — same Cmd-K dispatch as the signed-in variant; copy
-          tweaked to "Search capabilities…" since there's no workspace to jump
+          tweaked to "Search apps…" since there's no organization to jump
           across. */}
       <div className={`shrink-0 pb-2 ${padX}`}>
         {collapsed ? (
@@ -233,7 +230,7 @@ function SignedOutSidebarContent({
         )}
       </div>
 
-      {/* Public nav — Explore + Docs */}
+      {/* Public nav — Explore + Stats + Docs */}
       <nav aria-label="Public navigation" className={`pb-2 ${padX}`}>
         <ul className="space-y-px">
           <li>
@@ -243,7 +240,17 @@ function SignedOutSidebarContent({
               label="Explore"
               active={exploreActive}
               collapsed={collapsed}
-              meta={collapsed ? undefined : formatRuns(MODELS.length)}
+              meta={collapsed ? undefined : formatRuns(APPS.length)}
+              onNavigate={onNavigate}
+            />
+          </li>
+          <li>
+            <NavLink
+              href="/network"
+              icon={Globe}
+              label="Stats"
+              active={pathname.startsWith("/network")}
+              collapsed={collapsed}
               onNavigate={onNavigate}
             />
           </li>
@@ -260,7 +267,7 @@ function SignedOutSidebarContent({
         </ul>
       </nav>
 
-      {/* (The locked-Workspace nav block previously rendered here — Home /
+      {/* (The locked-Organization nav block previously rendered here — Home /
           Jobs / Usage / API keys with lock icons — has been removed. Logged-
           out users now go straight from public nav to the Free-tier promo.
           Discovery of those routes happens through the promo's "Get an API
@@ -295,9 +302,9 @@ function SignedOutSidebarContent({
                 Free tier
               </p>
               <p className="mb-1.5 text-[14.5px] font-semibold leading-[1.25] tracking-[-0.01em] text-fg">
-                5 demo jobs
+                5 demo calls
                 <br />
-                per capability
+                per app
               </p>
               <p className="mb-2.5 text-[11.5px] leading-[1.45] text-fg-faint">
                 No credit card. Spin up in 30 seconds with an API key.
@@ -329,18 +336,7 @@ function SignedOutSidebarContent({
         </div>
       )}
 
-      {/* Footer — Network + status row. (Docs is already in the public nav
-          above for logged-out users, so we don't duplicate it here.) */}
-      <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-1`}>
-        <NavLink
-          href="/network"
-          icon={Globe}
-          label="Network"
-          collapsed={collapsed}
-          onNavigate={onNavigate}
-        />
-      </div>
-
+      {/* Status row. (Explore / Stats / Docs live in the public nav above.) */}
       <div className={`shrink-0 border-t border-hairline ${padX} py-2`}>
         {collapsed ? (
           // Tooltip's inline-flex wrapper would left-align the link inside
@@ -382,8 +378,8 @@ function SignedOutSidebarContent({
 // Renders inline inside the signed-in `SidebarContent` when the user is on a
 // `/settings*` route. Per the v6 prototype's `SettingsRail` (see
 // `components.jsx`): a back-arrow header that returns to `/home`,
-// followed by a `Workspace` group (General / Members / Billing / Limits) and
-// an `Account` group (Profile / Notifications / Security). The workspace
+// followed by a `Organization` group (General / Members / Billing / Limits) and
+// an `Account` group (Profile / Notifications / Security). The organization
 // switcher and search above stay put; the usage strip and footer below stay
 // put — only the main nav block + Pinned section swap to this rail.
 //
@@ -396,12 +392,13 @@ const SETTINGS_RAIL_GROUPS: {
   items: { id: string; label: string; icon: LucideIcon; meta?: string }[];
 }[] = [
   {
-    group: "Workspace",
+    group: "Organization",
     items: [
-      { id: "workspace", label: "General", icon: Box },
+      { id: "organization", label: "General", icon: Box },
       { id: "members", label: "Members", icon: UsersIcon, meta: "4" },
       { id: "billing", label: "Billing", icon: CreditCard },
       { id: "usage-limits", label: "Limits", icon: BarChart3 },
+      { id: "deploy-tokens", label: "Deploy tokens", icon: Terminal },
     ],
   },
   {
@@ -427,9 +424,9 @@ function SettingsRail({
   const router = useRouter();
 
   // Read the active sub-tab from `?tab=<id>` on the current URL. Default to
-  // "workspace" when on `/settings` with no tab param — matches the
-  // prototype's fallback (`route === 'settings' ? 'workspace' : ...`).
-  let activeTab = "workspace";
+  // "organization" when on `/settings` with no tab param — matches the
+  // prototype's fallback (`route === 'settings' ? 'organization' : ...`).
+  let activeTab = "organization";
   if (pathname === "/settings" || pathname.startsWith("/settings")) {
     const search = typeof window !== "undefined" ? window.location.search : "";
     const params = new URLSearchParams(search);
@@ -493,14 +490,55 @@ function SidebarContent({
 }: SidebarContentProps) {
   const pathname = usePathname();
   const { isConnected, isLoading, user, disconnect } = useAuth();
-
   const padX = collapsed ? "px-2.5" : "px-3";
 
+  // Nav — no global environment switcher. Environment is a per-page facet
+  // (a filter on Apps / API keys, defaulting to "All environments"), not a
+  // persistent global mode, so the sidebar is a flat task list:
+  //   • Primary — your organization resources (Home, Apps, API keys, Usage,
+  //     Settings — Settings sits last, under Usage).
+  //   • NETWORK — the global network (Explore, Stats), its own labeled group.
+  //   • Footer — Docs.
+  const primaryItems = PORTAL_NAV_ITEMS.filter((i) => i.zone !== "network");
+  const networkItems = PORTAL_NAV_ITEMS.filter((i) => i.zone === "network");
+
+  const renderNavItem = (item: (typeof PORTAL_NAV_ITEMS)[number]) => {
+    const Icon = NAV_ICONS[item.icon];
+    const active = getNavActive(item.href, pathname);
+    // Right-aligned mono meta counts. Only render expanded; collapsed shows
+    // icon only.
+    let meta: string | undefined;
+    if (!collapsed) {
+      if (item.href === "/") meta = formatRuns(APPS.length);
+      else if (item.href === "/apps")
+        meta = String(PIPELINES.length);
+      else if (item.href === "/keys")
+        meta = formatRuns(SETTINGS_API_KEYS.length);
+    }
+    const itemKbd = "kbd" in item ? (item.kbd as string) : undefined;
+    const itemSubmenu = "submenu" in item ? Boolean(item.submenu) : false;
+    return (
+      <li key={item.href}>
+        <NavLink
+          href={item.href}
+          icon={Icon}
+          label={item.label}
+          active={active}
+          collapsed={collapsed}
+          meta={meta}
+          kbd={!collapsed ? itemKbd : undefined}
+          submenu={itemSubmenu}
+          onNavigate={onNavigate}
+        />
+      </li>
+    );
+  };
+
   // Logged-out sidebar variant — per the v4 prototype's `loggedOut` Sidebar
-  // (components.jsx:43). Brand wordmark in place of the workspace switcher,
-  // Explore + Docs as the only enabled routes, the workspace block (Home /
+  // (components.jsx:43). Brand wordmark in place of the organization switcher,
+  // Explore + Docs as the only enabled routes, the organization block (Home /
   // Jobs / Usage / API keys) shown but locked, and a Free-tier promo block
-  // replacing the workspace usage card. We intentionally render this only
+  // replacing the organization usage card. We intentionally render this only
   // once auth state has hydrated to avoid a one-frame flash of the signed-in
   // chrome on cold load.
   if (!isLoading && !isConnected) {
@@ -517,15 +555,15 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col bg-shell">
-      {/* Top: workspace switcher (FB Flipbook ▾). Per the v6 prototype, the
+      {/* Top: organization switcher (FB Flipbook ▾). Per the v6 prototype, the
           row is *just* the switcher — no "+ New" button, no collapse toggle.
-          Workspace-scoped actions live inside the dropdown instead. */}
+          Organization-scoped actions live inside the dropdown instead. */}
       <div
-        className={`flex shrink-0 items-center pt-2 pb-2 ${padX} ${collapsed ? "flex-col gap-2.5" : "gap-1"}`}
+        className={`flex shrink-0 items-center pt-2 pb-1 ${padX} ${collapsed ? "flex-col gap-2.5" : "gap-1"}`}
       >
         <div className={collapsed ? "" : "min-w-0 flex-1"}>
           {isConnected && user ? (
-            <WorkspaceMenu user={user} disconnect={disconnect} collapsed={collapsed} />
+            <OrganizationMenu user={user} disconnect={disconnect} collapsed={collapsed} />
           ) : (
             <Link
               href="/home"
@@ -610,100 +648,33 @@ function SidebarContent({
         )}
       </div>
 
-      {/* Main nav block — primary nav + Pinned. Per the v6 prototype, when
-          the user is on /settings/* the entire block is replaced
-          inline by a `SettingsRail` (back-arrow header + workspace + account
-          groups). Workspace switcher and search above stay put. */}
+      {/* Destinations. Home + your organization resources are the unlabeled
+          primary list (scope shown per-page via the header chip); the global
+          NETWORK destinations get their own labeled section below. On /settings
+          the whole list is replaced by the SettingsRail. */}
       {pathname.startsWith("/settings") ? (
         <SettingsRail pathname={pathname} padX={padX} onNavigate={onNavigate} />
       ) : (
         <>
-          {/* Primary nav */}
-          <nav aria-label="Developer Dashboard" className={`pb-2 ${padX}`}>
-            <ul className="space-y-px">
-              {PORTAL_NAV_ITEMS.map((item) => {
-                const Icon = NAV_ICONS[item.icon];
-                const active = getNavActive(item.href, pathname);
-                // Right-aligned mono meta counts. Only render expanded;
-                // collapsed sidebar shows icon only.
-                let meta: string | undefined;
-                if (!collapsed) {
-                  if (item.href === "/")
-                    meta = formatRuns(MODELS.length);
-                  else if (item.href === "/jobs") meta = "1.2K";
-                  else if (item.href === "/keys")
-                    meta = formatRuns(SETTINGS_API_KEYS.length);
-                }
-                // The constants array has heterogeneous shapes (some items
-                // carry `kbd`, only Settings carries `submenu`). Narrow via
-                // `in` checks rather than assert away the union.
-                const itemKbd =
-                  "kbd" in item ? (item.kbd as string) : undefined;
-                const itemSubmenu =
-                  "submenu" in item ? Boolean(item.submenu) : false;
-                return (
-                  <li key={item.href}>
-                    <NavLink
-                      href={item.href}
-                      icon={Icon}
-                      label={item.label}
-                      active={active}
-                      collapsed={collapsed}
-                      meta={meta}
-                      kbd={!collapsed ? itemKbd : undefined}
-                      submenu={itemSubmenu}
-                      onNavigate={onNavigate}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
+          {/* Primary — your organization resources. Environment is a per-page
+              facet (a filter on Apps / Runs / API keys), not a global mode, so
+              there's no environment switcher heading these. */}
+          <nav aria-label="Primary" className={`pb-1 ${padX}`}>
+            <ul className="space-y-px">{primaryItems.map(renderNavItem)}</ul>
           </nav>
 
-          {/* Pinned section — capabilities the user works with. Mono-uppercase
-              section label per the Livepeer Console design. Hardcoded to
-              mirror the prototype (Daydream Video / FLUX / Transcode);
-              resolves real models where available, falls back to a string
-              label. */}
-          {!collapsed && (
-            <div className={`shrink-0 ${padX} pb-2`}>
-              <div className="flex items-center gap-2 px-2.5 pt-3 pb-1">
+          {/* NETWORK — the global network: browse the catalog + network health.
+              A distinct category from your own resources above. */}
+          <nav aria-label="Network" className={`pb-1 ${padX}`}>
+            {!collapsed && (
+              <div className="px-2.5 pt-2 pb-1">
                 <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-                  Pinned
+                  Network
                 </span>
-                <span className="flex-1" />
-                <button
-                  type="button"
-                  aria-label="Manage pins"
-                  title="Manage pins"
-                  className="grid h-[18px] w-[18px] place-items-center rounded-[3px] text-fg-faint transition-colors hover:bg-hover hover:text-fg-strong"
-                >
-                  <Plus className="h-3 w-3" aria-hidden="true" />
-                </button>
               </div>
-              <ul className="space-y-px">
-                {[
-                  { id: "daydream-video", label: "Daydream Video" },
-                  { id: "flux-schnell", label: "FLUX [schnell]" },
-                  { id: "frameworks-transcoding", label: "Transcode" },
-                ].map((pin) => {
-                  const model = MODELS.find((m) => m.id === pin.id);
-                  const Icon = model ? getModelIcon(model.category) : LayoutGrid;
-                  return (
-                    <li key={pin.id}>
-                      <NavLink
-                        href={`/models/${pin.id}?tab=playground`}
-                        icon={Icon}
-                        label={pin.label}
-                        collapsed={false}
-                        onNavigate={onNavigate}
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+            )}
+            <ul className="space-y-px">{networkItems.map(renderNavItem)}</ul>
+          </nav>
         </>
       )}
 
@@ -715,7 +686,7 @@ function SidebarContent({
           bottom margin (pb-2) clears the footer's border-t hairline so the
           card doesn't visually sit on the divider. Hidden when collapsed
           (no useful 26px representation) AND when the user is inside the
-          settings sub-experience — the workspace usage strip would compete
+          settings sub-experience — the organization usage strip would compete
           with the settings rail's own context. */}
       {isConnected && !collapsed && !pathname.startsWith("/settings") && (
         <div className={`shrink-0 ${padX} pb-2`}>
@@ -723,20 +694,10 @@ function SidebarContent({
         </div>
       )}
 
-      {/* Footer: Network + Docs. Settings has moved into the workspace
-          dropdown (`Workspace settings`), so it doesn't appear here.
-          Logged-out users get a separate footer rendered by the
-          `SignedOutSidebarContent` branch above; this footer is signed-in
-          only. */}
-      <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-1`}>
-        <NavLink
-          href="/network"
-          icon={Globe}
-          label="Network"
-          collapsed={collapsed}
-          onNavigate={onNavigate}
-        />
-
+      {/* Footer: Docs. (Settings now sits under Usage in the primary list.)
+          Logged-out users get a separate footer rendered by
+          `SignedOutSidebarContent`; this one is signed-in only. */}
+      <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-px`}>
         <NavLink
           href="https://docs.livepeer.org"
           icon={BookOpen}
@@ -834,7 +795,7 @@ export default function DashboardSidebar() {
        *  z-30 establishes a stacking context above the main content area
        *  (which has its own implicit context via `overflow-y-auto`). Without
        *  this, absolutely-positioned children that escape the sidebar's
-       *  bounds — e.g. the WorkspaceMenu dropdown — paint *under* main-area
+       *  bounds — e.g. the OrganizationMenu dropdown — paint *under* main-area
        *  content (model thumbnails) because main comes later in DOM order. */}
       <aside
         className={`hidden md:flex sticky top-0 z-30 h-screen shrink-0 flex-col ${desktopWidth} ${transition}`}

@@ -18,13 +18,13 @@ import {
   API_REQUEST_SERIES,
   TOP_APIS,
   API_COLORS,
-  MODELS,
+  APPS,
 } from "@/lib/dashboard/mock-data";
 import {
   computeAxisTicks,
   formatRuns,
   generateSparklineData,
-  getModelIcon,
+  getAppIcon,
 } from "@/lib/dashboard/utils";
 import Link from "next/link";
 import type { NetworkStat } from "@/lib/dashboard/types";
@@ -61,18 +61,18 @@ function filterByPeriod<T extends { date: string }>(data: T[], period: Period): 
 function TopPipelinesGrid() {
   const sorted = useMemo(
     () =>
-      [...MODELS]
+      [...APPS]
         .sort((a, b) => b.runs7d - a.runs7d)
         .slice(0, 9),
     [],
   );
 
-  const othersRuns = MODELS
+  const othersRuns = APPS
     .sort((a, b) => b.runs7d - a.runs7d)
     .slice(9)
     .reduce((s, m) => s + m.runs7d, 0);
 
-  const totalRuns = MODELS.reduce((s, m) => s + m.runs7d, 0);
+  const totalRuns = APPS.reduce((s, m) => s + m.runs7d, 0);
 
   return (
     <div className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
@@ -96,13 +96,13 @@ function TopPipelinesGrid() {
 
       <div className="divide-y divide-[var(--color-border-hairline)]">
         {sorted.map((model, i) => {
-          const Icon = getModelIcon(model.category);
+          const Icon = getAppIcon(model.category);
           const color = API_COLORS[i % API_COLORS.length];
           const pct = ((model.runs7d / totalRuns) * 100).toFixed(1);
           return (
             <Link
               key={model.id}
-              href={`/models/${model.id}`}
+              href={`/apps/${model.id}`}
               className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-zebra"
             >
               <span className="w-5 text-right text-[11px] text-fg-disabled">

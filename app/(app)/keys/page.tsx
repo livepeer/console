@@ -12,8 +12,8 @@ export default function KeysPage() {
 
   if (isLoading) return null;
 
-  // Workspace-only — logged-out users see the route-specific sign-in wall
-  // ("API keys are scoped to a workspace…") instead of the keys table.
+  // Organization-only — logged-out users see the route-specific sign-in wall
+  // ("API keys are scoped to an organization…") instead of the keys table.
   if (!isConnected) return <SignInWall route="keys" />;
 
   return <KeysView />;
