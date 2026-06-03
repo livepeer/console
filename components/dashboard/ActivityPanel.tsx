@@ -13,7 +13,7 @@ import type { AccountActivityStatus } from "@/lib/dashboard/types";
 /**
  * ActivityPanel — the organization's own recent calls: the calls it made
  * across the network, which are what count toward its usage and spend. It's a
- * live preview of /usage. (Inbound traffic that other people send to this
+ * live preview of /calls. (Inbound traffic that other people send to this
  * org's public apps is *their* usage, not this org's, so it isn't shown here.)
  */
 
@@ -61,7 +61,7 @@ export default function ActivityPanel() {
           </p>
         </div>
         <Link
-          href="/usage"
+          href="/calls"
           className="group inline-flex shrink-0 items-center gap-1 font-mono text-[11.5px] uppercase tracking-[0.04em] text-fg-faint transition-colors hover:text-fg"
         >
           View all
