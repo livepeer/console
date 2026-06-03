@@ -27,7 +27,7 @@ export default function OrganizationPage() {
             No published apps belong to &ldquo;{slug}&rdquo;.
           </p>
           <Link
-            href="/"
+            href="/explore"
             className="mt-4 inline-flex items-center gap-1.5 text-[13px] text-green-bright hover:text-green-light"
           >
             Explore apps

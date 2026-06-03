@@ -144,7 +144,7 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
 
         {/* Escape hatch — Explore apps */}
         <Link
-          href="/"
+          href="/explore"
           className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg"
         >
           Explore apps

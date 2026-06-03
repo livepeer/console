@@ -46,7 +46,7 @@ export default function ActivityPanel() {
         icon={<Activity className="h-4 w-4" />}
         title="No activity yet"
         description="Calls your organization makes will stream here — what you ran, how it went, and what it cost."
-        action={{ label: "Browse apps", href: "/" }}
+        action={{ label: "Browse apps", href: "/explore" }}
       />
     );
   }

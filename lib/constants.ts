@@ -18,7 +18,7 @@
 // instead of a count, signaling that it leads into a sub-experience.
 export const PORTAL_NAV_ITEMS = [
   { label: "Home", href: "/home", icon: "House" as const, kbd: "G H", zone: "home" as const },
-  { label: "Explore", href: "/", icon: "LayoutGrid" as const, zone: "network" as const },
+  { label: "Explore", href: "/explore", icon: "LayoutGrid" as const, zone: "network" as const },
   { label: "Stats", href: "/network", icon: "Globe" as const, zone: "network" as const },
   { label: "Apps", href: "/apps", icon: "Box" as const, zone: "environment" as const },
   { label: "API keys", href: "/keys", icon: "Key" as const, zone: "environment" as const },

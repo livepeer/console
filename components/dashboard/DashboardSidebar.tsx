@@ -54,9 +54,6 @@ const COLLAPSED_KEY = "dashboard.sidebar.collapsed";
 
 function getNavActive(itemHref: string, pathname: string): boolean {
   if (itemHref === "/home") return pathname === "/home";
-  if (itemHref === "/") {
-    return pathname === "/";
-  }
   // Tab-deep links inherit active state from path only — Settings page tabs
   // already mark the current sub-tab visually inside their own TabStrip.
   if (itemHref.includes("?")) {
@@ -111,8 +108,9 @@ function SignedOutSidebarContent({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const exploreActive =
-    pathname === "/";
+  // Explore is canonically /explore, but signed-out visitors also see it as the
+  // landing at /, so both count as "on Explore".
+  const exploreActive = pathname === "/" || pathname.startsWith("/explore");
 
   return (
     <div className="flex h-full flex-col bg-shell">
@@ -235,7 +233,7 @@ function SignedOutSidebarContent({
         <ul className="space-y-px">
           <li>
             <NavLink
-              href="/"
+              href="/explore"
               icon={LayoutGrid}
               label="Explore"
               active={exploreActive}
@@ -509,7 +507,7 @@ function SidebarContent({
     // icon only.
     let meta: string | undefined;
     if (!collapsed) {
-      if (item.href === "/") meta = formatRuns(APPS.length);
+      if (item.href === "/explore") meta = formatRuns(APPS.length);
       else if (item.href === "/apps")
         meta = String(PIPELINES.length);
       else if (item.href === "/keys")

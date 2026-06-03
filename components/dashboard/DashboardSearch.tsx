@@ -17,8 +17,8 @@ interface SearchResult {
 // ─── Suggestions (shown before typing) ───────────────────────────────────────
 
 const SUGGESTIONS: SearchResult[] = [
-  { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/" },
-  { title: "Explore apps", subtitle: "Browse apps available on the network", href: "/" },
+  { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/explore" },
+  { title: "Explore apps", subtitle: "Browse apps available on the network", href: "/explore" },
   { title: "Get your API key", subtitle: "Authenticate and start sending requests", href: "/settings?tab=tokens" },
   { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/apps/frameworks-transcoding" },
 ];
@@ -214,7 +214,7 @@ export default function DashboardSearch({ mobile = false }: DashboardSearchProps
               <p className="text-xs text-fg-disabled">
                 Try a capability name or keyword
               </p>
-              <Link href="/" onClick={closeDialog} className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors">
+              <Link href="/explore" onClick={closeDialog} className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors">
                 Browse all capabilities →
               </Link>
             </div>

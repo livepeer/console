@@ -661,7 +661,7 @@ export default function AppDetailPage() {
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <p className="text-sm text-fg-label">App not found</p>
           <Link
-            href="/"
+            href="/explore"
             className="mt-3 text-xs text-green-bright hover:underline focus:outline-none rounded"
           >
             Back to Explore
@@ -781,7 +781,7 @@ export default function AppDetailPage() {
                 {isOwner &&
                   (visibility === "public" ? (
                     <Link
-                      href="/"
+                      href="/explore"
                       className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
                       title="Listed in Explore"
                     >
