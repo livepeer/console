@@ -53,10 +53,10 @@ import type { App, PipelineVisibility } from "@/lib/dashboard/types";
 // specific model so the badge tracks reality (zero for empty, drops the chip
 // entirely so we don't show "Jobs (0)").
 
-// The consumer tabs are visible to everyone; the owner of the app additionally
-// gets Overview (the deployment console chrome), Logs, and Settings — same page,
-// extra tabs, gated by ownership. This is the GitHub model (everyone sees the
-// repo; owners also see Settings).
+// Everyone sees the consumer tabs (Overview, Playground, API, README, Stats,
+// Logs); the owner additionally gets Settings — same page, one extra tab gated
+// by ownership. This is the GitHub model (everyone sees the repo; owners also
+// see Settings).
 type Tab =
   | "overview"
   | "playground"
@@ -73,6 +73,11 @@ type TabSpec = {
   count?: number;
 };
 
+// Overview leads when the app is deployment-backed (so there's something to
+// show). It's a read-only summary — KPIs + deployment metadata — viewable by
+// anyone who can see the app, not just the owner.
+const OVERVIEW_TAB: TabSpec = { key: "overview", label: "Overview", icon: Box };
+
 const TABS: TabSpec[] = [
   { key: "playground", label: "Playground", icon: Play },
   { key: "api", label: "API", icon: Code },
@@ -81,13 +86,8 @@ const TABS: TabSpec[] = [
   { key: "jobs", label: "Logs", icon: Activity },
 ];
 
-// Owner-only tabs, bracketing the consumer set: Overview leads (the deployment
-// console), Settings trails. (Runs is the single activity view — per-app raw
-// log-tailing lives on the Apps-list Logs view, filterable to one app.)
-const OWNER_LEAD_TABS: TabSpec[] = [
-  { key: "overview", label: "Overview", icon: Box },
-];
-const OWNER_TRAIL_TABS: TabSpec[] = [
+// The one ownership-gated tab — the deploy/publish controls trail the set.
+const OWNER_TABS: TabSpec[] = [
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -629,16 +629,15 @@ export default function AppDetailPage() {
     );
   }, [model]);
 
-  // Tab set: consumer tabs for everyone; owners get Overview (lead) + Logs &
-  // Settings (trail) — same template, ownership just unlocks more tabs.
+  // Tab set: Overview (when deployment-backed) + the consumer tabs are shown to
+  // everyone; owners additionally get the Settings trail.
   const tabs: TabSpec[] = useMemo(() => {
     const consumer = TABS.map((t) =>
       t.key === "jobs" ? { ...t, count: filteredRuns.length } : t,
     );
-    return isOwner
-      ? [...OWNER_LEAD_TABS, ...consumer, ...OWNER_TRAIL_TABS]
-      : consumer;
-  }, [filteredRuns.length, isOwner]);
+    const base = pipeline ? [OVERVIEW_TAB, ...consumer] : consumer;
+    return isOwner ? [...base, ...OWNER_TABS] : base;
+  }, [filteredRuns.length, isOwner, pipeline]);
 
   // Default landing tab: owners land on Overview (the console chrome); everyone
   // else on Playground. A `?tab=` param overrides when the viewer has that tab.
@@ -892,7 +891,8 @@ export default function AppDetailPage() {
             id={`tabpanel-${activeTab}`}
             aria-labelledby={`tab-${activeTab}`}
           >
-            {/* Owner-only tabs reuse the operator console chrome verbatim. */}
+            {/* Overview (read-only summary, shown to anyone) + Settings (owner
+                only) reuse the deployment-console chrome verbatim. */}
             {activeTab === "overview" && pipeline && (
               <OverviewTab app={pipeline} />
             )}
