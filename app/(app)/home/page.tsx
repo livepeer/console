@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BarChart3, ChevronDown, House } from "lucide-react";
+import { House } from "lucide-react";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { getOrgFleet } from "@/lib/dashboard/org-fleet";
 import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
@@ -17,34 +16,14 @@ import ConsumedAppsPanel from "@/components/dashboard/ConsumedAppsPanel";
 import ActivityPanel from "@/components/dashboard/ActivityPanel";
 import SectionHeader from "@/components/dashboard/SectionHeader";
 
-// ─── Home page header — chrome bar with Period selector + actions ───
+// ─── Home page header — just the title chrome ───
+//
+// No header actions: Home mixes timeframes (calls · 7d, spend · MTD, relative
+// activity), so a page-wide "Period" selector would be misleading, and "View
+// usage" is already reachable from the sidebar and the Usage panel below.
 
 function HomePageHeader() {
-  return (
-    <DashboardPageHeader
-      title="Home"
-      icon={House}
-      actions={
-        <>
-          <button
-            type="button"
-            className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-transparent px-2.5 text-[12.5px] text-fg-strong transition-colors hover:border-hairline hover:bg-hover hover:text-fg"
-          >
-            <span className="text-fg-faint">Period</span>
-            <span>7d</span>
-            <ChevronDown className="h-3 w-3" aria-hidden="true" />
-          </button>
-          <Link
-            href="/usage"
-            className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-transparent px-2.5 text-[12.5px] text-fg-strong transition-colors hover:border-hairline hover:bg-hover hover:text-fg"
-          >
-            <BarChart3 className="h-3 w-3" aria-hidden="true" />
-            View usage
-          </Link>
-        </>
-      }
-    />
-  );
+  return <DashboardPageHeader title="Home" icon={House} />;
 }
 
 // ─── Home Page ───

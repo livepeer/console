@@ -57,7 +57,7 @@ export default function ActivityPanel() {
         <div>
           <h2 className="text-[15px] font-semibold text-fg">Recent activity</h2>
           <p className="mt-0.5 font-mono text-[11.5px] tracking-[0.01em] text-fg-faint">
-            calls your organization made
+            calls you&apos;ve made
           </p>
         </div>
         <Link
