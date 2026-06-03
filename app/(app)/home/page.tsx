@@ -28,16 +28,16 @@ function HomePageHeader() {
 
 // ─── Home Page ───
 //
-// "Mission control" rethink: an organization sits between two flows of network
-// traffic — what it SERVES (inbound, apps it deployed) and what it CONSUMES
-// (outbound, apps across the network, mostly ones it didn't deploy). The Home
-// is organized around those two directions, not around personas. Composition:
-//   1. Command bar — system readout (served + spent) + greeting + an adaptive
-//      attention line naming the single most urgent thing on arrival
+// "Mission control" rethink: an organization has two relationships with the
+// network — apps it DEPLOYS (which orchestrators serve on its behalf) and apps
+// it CONSUMES (the calls it makes across the network, mostly to apps it didn't
+// deploy). The Home is organized around those two directions, not personas.
+// Composition:
+//   1. Command bar — org readout + greeting + an adaptive attention line
+//      naming the single most urgent thing on arrival
 //   2. Get started — auto-detecting onboarding, until the loop is done
-//   3. Two ledgers — Deployed apps (what you serve: calls + Yours/External)
-//      beside Usage (what you consume: spend + Your apps/Others'). Each panel
-//      leads with its own directional summary; no separate hero band.
+//   3. Two ledgers — Deployed apps (count + their 7-day call volume) beside
+//      Usage (spend on the apps you call). Each leads with its own summary.
 //   4. Recent activity — the organization's own calls (what counts toward
 //      its usage); a live preview of /calls
 
@@ -161,11 +161,10 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* The two ledgers — Deployed apps (what you serve) beside Usage
-              (what you consume). Each leads with its own directional summary
-              (served split / spend split), so there's no separate hero band.
-              On a consumer-only org with no deployed apps, Usage carries the
-              row on its own. */}
+          {/* The two ledgers — Deployed apps (what you've published to the
+              network) beside Usage (what you consume from it). Each leads with
+              its own summary, so there's no separate hero band. On a
+              consumer-only org with no deployed apps, Usage carries the row. */}
           {hasApps ? (
             <div
               className="home-rise mt-7 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2"

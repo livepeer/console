@@ -10,7 +10,7 @@ import type { Pipeline } from "./types";
  * is how the headline number and the table drift apart. Compute once, here.
  *
  * A deployed app's call count is a single public number (think package
- * downloads) — there's no first-party/third-party split on served traffic.
+ * downloads) — the network handles the calls; the org just published the app.
  */
 export interface OrgFleet {
   /** One entry per app, deduped by pipelineId, original order preserved. */
@@ -19,7 +19,7 @@ export interface OrgFleet {
   deployed: number;
   building: number;
   errored: number;
-  /** Sum of 7-day calls served across the deduped set. */
+  /** Sum of 7-day call volume across the deduped set (calls these apps handled). */
   totalCalls7d: number;
 }
 

@@ -154,8 +154,9 @@ export default function AppsHealthPanel() {
         </div>
 
         {/* Hero is the app count (the title is a count-noun, so the big number
-            must agree with it). Calls served — a public count, like package
-            downloads — sits as the right-aligned secondary, mirroring Usage. */}
+            must agree with it). Call volume — the calls the network handled for
+            these apps, a public count like package downloads — sits as the
+            right-aligned secondary, mirroring Usage. */}
         <div className="mt-2 flex items-baseline gap-2">
           <span className="font-mono text-[22px] font-semibold leading-none tabular-nums tracking-[-0.01em] text-fg">
             {count}

@@ -1,7 +1,7 @@
 import { formatCompact } from "./org-fleet";
 
 /**
- * The CONSUME (outbound) ledger — the mirror of the "Your apps" SERVE ledger.
+ * The CONSUME (outbound) ledger — the mirror of the "Deployed apps" ledger.
  *
  * An organization doesn't only deploy apps; it also *calls* apps across the
  * network — its own, and (mostly) apps it didn't deploy. That outbound demand
