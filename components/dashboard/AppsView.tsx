@@ -227,7 +227,7 @@ export default function AppsView() {
       ) : (
         <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
           <p className="mb-6 max-w-[640px] text-[13.5px] leading-[1.55] text-fg-muted">
-            Your apps — pipelines deployed with the Runner SDK — in{" "}
+            Your apps — pipelines deployed with the Livepeer CLI — in{" "}
             <span className="font-medium text-fg-strong">{scopeLabel}</span>.
             Public apps are listed in Explore; private ones run only for this
             organization&apos;s keys.

@@ -52,7 +52,7 @@ export default function FirstRunChecklist({ onDismiss }: Props) {
       <Step
         num={1}
         title="Deploy an example app"
-        desc="Push a ready-made hello-world pipeline with the Runner SDK — it builds the image and registers your app on the network."
+        desc="Push a ready-made hello-world pipeline with the Livepeer CLI — it builds the image and registers your app on the network."
         done={hasDeployed}
         active={!hasDeployed}
         command={deployCmd}
