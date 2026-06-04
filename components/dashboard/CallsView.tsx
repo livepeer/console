@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Activity, Filter, Search } from "lucide-react";
 import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
 import CallsTable from "@/components/dashboard/CallsTable";
+import CallDetailDrawer from "@/components/dashboard/CallDetailDrawer";
 import EnvironmentFilter, {
   ALL_ENVIRONMENTS,
 } from "@/components/dashboard/EnvironmentFilter";
@@ -11,6 +13,7 @@ import {
   recentRequestsForEnvironment,
   MOCK_RECENT_REQUESTS,
 } from "@/lib/dashboard/mock-data";
+import type { AccountActivityRow } from "@/lib/dashboard/types";
 
 type KindFilter = "all" | "batch" | "live";
 
@@ -26,11 +29,35 @@ const KIND_TABS: { key: KindFilter; label: string }[] = [
  * filter splits the two invocation shapes the Runner SDK exposes — batch
  * `predict` request/response vs live streaming `session` — and the table's
  * metric column follows suit (latency for batch, session duration for live).
+ * Clicking a row opens the per-call inspector (a right-side drawer) via
+ * `?request={id}` — useSearchParams needs the Suspense boundary below.
  */
 export default function CallsView() {
+  return (
+    <Suspense fallback={null}>
+      <CallsViewInner />
+    </Suspense>
+  );
+}
+
+function CallsViewInner() {
   const [query, setQuery] = useState("");
   const [envFilter, setEnvFilter] = useState(ALL_ENVIRONMENTS);
   const [kind, setKind] = useState<KindFilter>("all");
+
+  // The open call is URL-addressable (`/calls?request={id}`) so the inspector
+  // is deep-linkable and the back button closes it. `shownRow` is held through
+  // the close transition so the drawer animates out with its content intact.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestId = searchParams.get("request");
+  const openCall = requestId
+    ? (MOCK_RECENT_REQUESTS.find((r) => r.id === requestId) ?? null)
+    : null;
+  const [shownRow, setShownRow] = useState<AccountActivityRow | null>(null);
+  useEffect(() => {
+    if (openCall) setShownRow(openCall);
+  }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allEnvs = envFilter === ALL_ENVIRONMENTS;
 
@@ -149,6 +176,12 @@ export default function CallsView() {
           showEnvironment={allEnvs}
         />
       )}
+
+      <CallDetailDrawer
+        row={shownRow}
+        open={!!openCall}
+        onClose={() => router.push("/calls")}
+      />
     </>
   );
 }

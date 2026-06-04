@@ -95,7 +95,7 @@ export default function CallsTable({
         return (
           <Link
             key={row.id}
-            href={`/usage?request=${row.id}`}
+            href={`/calls?request=${row.id}`}
             className={`${cols} ${rowPadY} text-[12.5px] transition-colors hover:bg-hover ${
               i > 0 || showHeader ? "border-t border-hairline" : ""
             }`}

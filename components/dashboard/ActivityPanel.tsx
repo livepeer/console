@@ -85,7 +85,7 @@ export default function ActivityPanel() {
       {rows.map((row, i) => (
         <Link
           key={row.id}
-          href={`/usage?request=${row.id}`}
+          href={`/calls?request=${row.id}`}
           className={`${GRID} py-2.5 transition-colors hover:bg-zebra ${
             i > 0 ? "border-t border-hairline" : ""
           }`}
