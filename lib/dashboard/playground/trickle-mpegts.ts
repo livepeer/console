@@ -34,14 +34,14 @@ const MSE_AVC_CODEC_CANDIDATES = [
   'video/mp4; codecs="avc1.64001E"',
 ] as const;
 
-const PROGRESSIVE_FLUSH_INTERVAL_MS = 250;
-const PROGRESSIVE_FLUSH_MIN_BYTES = 64 * 1024;
-const LIVE_EDGE_LAG_SECONDS = 0.75;
-const DEFAULT_LIVE_PLAYBACK_RATE = 1;
-const MIN_LIVE_PLAYBACK_RATE = 0.25;
-const MAX_LIVE_PLAYBACK_RATE = 1;
-const LOW_BUFFER_LAG_SECONDS = 0.5;
-const TARGET_BUFFER_LAG_SECONDS = 1.6;
+const PROGRESSIVE_FLUSH_INTERVAL_MS = 80;
+const PROGRESSIVE_FLUSH_MIN_BYTES = 8 * 1024;
+const LIVE_EDGE_LAG_SECONDS = 0.3;
+const DEFAULT_LIVE_PLAYBACK_RATE = 1.04;
+const MIN_LIVE_PLAYBACK_RATE = 0.85;
+const MAX_LIVE_PLAYBACK_RATE = 1.08;
+const LOW_BUFFER_LAG_SECONDS = 0.15;
+const TARGET_BUFFER_LAG_SECONDS = 0.6;
 
 function pickMseAvcMimeType(): string {
   if (typeof MediaSource === "undefined") {
@@ -93,12 +93,11 @@ export class MpegTsPublisher {
     this.jmuxer = new JMuxer({
       node: sink,
       mode: "video",
-      flushingTime: 500,
+      flushingTime: 100,
       fps: this.fps,
       clearBuffer: true,
       onData: (data: ArrayBuffer) => {
         const bytes = new Uint8Array(data);
-        // Do not await on the hot path — caller should bound network uploads separately.
         void this.onSegment(bytes);
       },
     });
@@ -386,8 +385,8 @@ export class MpegTsPlayer {
     }
     try {
       const end = video.buffered.end(video.buffered.length - 1);
-      if (end > 0.1) {
-        video.currentTime = Math.max(0, end - LIVE_EDGE_LAG_SECONDS);
+      if (end > 0.05) {
+        video.currentTime = Math.max(0, end - 0.05);
       }
       void video.play().catch(() => undefined);
     } catch {
@@ -438,16 +437,18 @@ export class MpegTsPlayer {
     const bufferedEnd = video.buffered.end(video.buffered.length - 1);
     const bufferedLag = bufferedEnd - video.currentTime;
 
-    let playbackRate = DEFAULT_LIVE_PLAYBACK_RATE;
+    let playbackRate: number;
     if (bufferedLag < LOW_BUFFER_LAG_SECONDS) {
       playbackRate = MIN_LIVE_PLAYBACK_RATE;
-    } else if (bufferedLag < TARGET_BUFFER_LAG_SECONDS) {
+    } else if (bufferedLag > TARGET_BUFFER_LAG_SECONDS) {
+      playbackRate = MAX_LIVE_PLAYBACK_RATE;
+    } else {
       const lagScale =
         (bufferedLag - LOW_BUFFER_LAG_SECONDS) /
         (TARGET_BUFFER_LAG_SECONDS - LOW_BUFFER_LAG_SECONDS);
       playbackRate =
-        MIN_LIVE_PLAYBACK_RATE +
-        (MAX_LIVE_PLAYBACK_RATE - MIN_LIVE_PLAYBACK_RATE) * lagScale;
+        DEFAULT_LIVE_PLAYBACK_RATE +
+        (MAX_LIVE_PLAYBACK_RATE - DEFAULT_LIVE_PLAYBACK_RATE) * lagScale;
     }
     video.playbackRate = playbackRate;
   }

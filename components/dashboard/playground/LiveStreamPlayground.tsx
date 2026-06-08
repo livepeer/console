@@ -283,7 +283,7 @@ export default function LiveStreamPlayground({ model }: { model: Model }) {
         player.pushChunk(chunk);
       });
       if (!segment || !subscribeActiveRef.current) {
-        await sleep(200);
+        await sleep(50);
         if (subscribeActiveRef.current) {
           void subscribeLoop();
         }
@@ -297,7 +297,7 @@ export default function LiveStreamPlayground({ model }: { model: Model }) {
       const isExactDuplicate = segment.segmentSeq === lastSeq && segmentBytes <= lastBytes;
 
       if (isOlderSegment || isExactDuplicate) {
-        await sleep(80);
+        await sleep(20);
         if (subscribeActiveRef.current) {
           void subscribeLoop();
         }
@@ -307,12 +307,13 @@ export default function LiveStreamPlayground({ model }: { model: Model }) {
       lastOutputSegmentBytesRef.current = segmentBytes;
       setOutputSegmentSeq(segment.segmentSeq);
       player.flushSegment();
+
       if (subscribeActiveRef.current) {
         void subscribeLoop();
       }
     } catch {
       if (subscribeActiveRef.current) {
-        await sleep(500);
+        await sleep(300);
         if (subscribeActiveRef.current) {
           void subscribeLoop();
         }

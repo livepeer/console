@@ -18,6 +18,26 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
+  /**
+   * @pymthouse/builder-sdk gateway calls `/sign-orchestrator-info` at the origin root
+   * (httpOrigin strips `/api/signer`). Map those paths to the dashboard signer proxy.
+   */
+  async rewrites() {
+    return [
+      {
+        source: "/sign-orchestrator-info",
+        destination: "/api/signer/sign-orchestrator-info",
+      },
+      {
+        source: "/discover-orchestrators",
+        destination: "/api/signer/discover-orchestrators",
+      },
+      {
+        source: "/generate-live-payment",
+        destination: "/api/signer/generate-live-payment",
+      },
+    ];
+  },
   async redirects() {
     return [
       // Old livepeer.org routes → new site equivalents
