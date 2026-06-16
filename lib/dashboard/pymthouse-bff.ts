@@ -126,11 +126,13 @@ export async function fetchAccountUsageForExternalUser(input: {
       externalUserId: input.externalUserId,
       startDate: period.startDate,
       endDate: period.endDate,
+      includeRetail: true,
     }),
     client.fetchUsageForExternalUser({
       externalUserId: input.externalUserId,
       startDate: period.priorStartDate,
       endDate: period.priorEndDate,
+      includeRetail: true,
     }),
   ]);
 
