@@ -3,6 +3,11 @@ import { PmtHouseError } from "@pymthouse/builder-sdk";
 import { fetchAccountUsageForExternalUser } from "@/lib/dashboard/pymthouse-bff";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// Usage/balance is live data; never let the browser or any CDN replay a stale
+// response (the balance would otherwise freeze at the first cached read).
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" } as const;
 
 export async function GET(request: NextRequest) {
   const externalUserId = request.nextUrl.searchParams.get("externalUserId")?.trim();
@@ -27,15 +32,18 @@ export async function GET(request: NextRequest) {
       externalUserId,
       periodDays,
     });
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (error instanceof PmtHouseError) {
       return NextResponse.json(
         { error: error.message, code: error.code },
-        { status: error.status },
+        { status: error.status, headers: NO_STORE_HEADERS },
       );
     }
     const message = error instanceof Error ? error.message : "Usage fetch failed";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json(
+      { error: message },
+      { status: 502, headers: NO_STORE_HEADERS },
+    );
   }
 }

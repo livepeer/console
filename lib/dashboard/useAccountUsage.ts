@@ -24,7 +24,9 @@ export function useAccountUsage(externalUserId: string | undefined, periodDays =
         externalUserId: externalUserId.trim(),
         days: String(periodDays),
       });
-      const response = await fetch(`/api/pymthouse/account-usage?${params}`);
+      const response = await fetch(`/api/pymthouse/account-usage?${params}`, {
+        cache: "no-store",
+      });
       const body = (await response.json()) as AccountUsagePayload & {
         error?: string;
       };
