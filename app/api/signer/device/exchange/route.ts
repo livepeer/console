@@ -18,10 +18,6 @@ function readDeviceExchangeConfig() {
     m2mClientSecret,
     allowInsecureHttp: process.env.PYMTHOUSE_ALLOW_INSECURE_HTTP === "1",
     signerUrl,
-    // pymthouse's token-exchange grant requires audience/resource === the OIDC
-    // issuer (signerJwtAudience()); without this the SDK falls back to the
-    // deprecated "livepeer-remote-signer" literal and the IdP returns invalid_target.
-    audience: issuerUrl,
   };
 }
 
