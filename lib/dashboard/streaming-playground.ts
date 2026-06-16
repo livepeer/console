@@ -11,8 +11,8 @@ export function isLv2vPlaygroundCapability(capability: string): boolean {
 }
 
 /**
- * model_id for POST /api/gateway/sessions and signer discovery caps.
- * Discovery page id may differ from orchestrator pipeline model name.
+ * Resolve the orchestrator pipeline model name for a capability.
+ * Discovery page id may differ from the orchestrator pipeline model name.
  */
 export function resolveGatewayModelId(capability: string): string {
   const id = capability.trim();

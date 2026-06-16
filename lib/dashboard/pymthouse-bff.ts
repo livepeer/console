@@ -1,4 +1,4 @@
-import { PmtHouseError } from "@pymthouse/builder-sdk";
+import { PmtHouseError, type PmtHouseClient } from "@pymthouse/builder-sdk";
 import { createPmtHouseClientForPublicApp } from "@/lib/dashboard/device-flow";
 import {
   dailyRequestSeriesForPipeline,
@@ -91,54 +91,22 @@ function rollingPeriodDays(days: number, now = new Date()): {
 }
 
 async function fetchUsageBalance(
-  publicClientId: string,
+  client: PmtHouseClient,
   externalUserId: string,
 ): Promise<AccountUsageBalance | null> {
-  const issuerUrl = process.env.PYMTHOUSE_ISSUER_URL?.trim();
-  if (!issuerUrl) {
+  try {
+    const balance = await client.getUsageBalance(externalUserId);
+    return {
+      externalUserId: balance.externalUserId ?? externalUserId,
+      balanceUsdMicros: balance.balanceUsdMicros ?? "0",
+      consumedUsdMicros: balance.consumedUsdMicros ?? "0",
+      lifetimeGrantedUsdMicros: balance.lifetimeGrantedUsdMicros ?? "0",
+      hasAccess: Boolean(balance.hasAccess),
+    };
+  } catch {
+    // Balance is best-effort — usage still renders without the allowance strip.
     return null;
   }
-  const appsOrigin = issuerUrl.replace(/\/api\/v1\/oidc\/?$/i, "");
-  const url = new URL(
-    `${appsOrigin}/api/v1/apps/${encodeURIComponent(publicClientId)}/usage/balance`,
-  );
-  url.searchParams.set("externalUserId", externalUserId);
-
-  const m2mId = process.env.PYMTHOUSE_M2M_CLIENT_ID?.trim();
-  const m2mSecret = process.env.PYMTHOUSE_M2M_CLIENT_SECRET?.trim();
-  if (!m2mId || !m2mSecret) {
-    return null;
-  }
-
-  const basic = Buffer.from(`${m2mId}:${m2mSecret}`).toString("base64");
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Authorization: `Basic ${basic}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const body = (await response.json()) as {
-    externalUserId?: string;
-    balanceUsdMicros?: string;
-    consumedUsdMicros?: string;
-    lifetimeGrantedUsdMicros?: string;
-    hasAccess?: boolean;
-  };
-
-  return {
-    externalUserId: body.externalUserId ?? externalUserId,
-    balanceUsdMicros: body.balanceUsdMicros ?? "0",
-    consumedUsdMicros: body.consumedUsdMicros ?? "0",
-    lifetimeGrantedUsdMicros: body.lifetimeGrantedUsdMicros ?? "0",
-    hasAccess: Boolean(body.hasAccess),
-  };
 }
 
 export async function fetchAccountUsageForExternalUser(input: {
@@ -153,7 +121,7 @@ export async function fetchAccountUsageForExternalUser(input: {
   const client = createPmtHouseClientForPublicApp(publicClientId);
 
   const [balance, currentScope, priorScope] = await Promise.all([
-    fetchUsageBalance(publicClientId, input.externalUserId),
+    fetchUsageBalance(client, input.externalUserId),
     client.fetchUsageForExternalUser({
       externalUserId: input.externalUserId,
       startDate: period.startDate,

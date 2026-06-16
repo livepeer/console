@@ -1,6 +1,24 @@
 import "server-only";
 
-import { resolveDashboardSignerUpstreamUrl } from "@/lib/dashboard/gateway-config.server";
+function issuerOriginFromIssuerUrl(issuerUrl: string): string {
+  let base = issuerUrl.trim().replace(/\/+$/, "");
+  if (base.endsWith("/api/v1/oidc")) {
+    base = base.slice(0, -"/api/v1/oidc".length);
+  } else if (base.endsWith("/oidc")) {
+    base = base.slice(0, -"/oidc".length);
+  }
+  return base.replace(/\/+$/, "");
+}
+
+function resolveDashboardSignerUpstreamUrl(): string | null {
+  const env = process.env;
+  const issuerUrl = env.PYMTHOUSE_ISSUER_URL?.trim();
+  const signerUrl =
+    env.PYMTHOUSE_SIGNER_URL?.trim() ||
+    env.SIGNER_PUBLIC_URL?.trim() ||
+    (issuerUrl ? `${issuerOriginFromIssuerUrl(issuerUrl)}/api/signer` : "");
+  return signerUrl || null;
+}
 
 const ALLOWED_SIGNER_PROXY_SUFFIXES = new Set([
   "sign-orchestrator-info",

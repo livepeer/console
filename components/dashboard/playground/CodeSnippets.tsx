@@ -4,12 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import CopyButton from "@/components/dashboard/CopyButton";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { STARTER_API_KEY } from "@/lib/dashboard/mock-data";
-import { isGatewayEnabledPublic } from "@/lib/dashboard/gateway-public";
-import {
-  buildGatewayStreamingSnippet,
-  buildPythonSdkStreamingSnippet,
-  isStreamingCapabilityModel,
-} from "@/lib/dashboard/sdk-streaming-example";
 import type { Model } from "@/lib/dashboard/types";
 
 type Lang = "curl" | "python" | "node" | "http";
@@ -202,22 +196,10 @@ export default function CodeSnippets({
     ? mockToken
     : PLACEHOLDER_TOKEN;
 
-  const useGatewayStreaming =
-    isGatewayEnabledPublic() && isStreamingCapabilityModel(model);
-
-  const snippets = useMemo(() => {
-    if (useGatewayStreaming) {
-      const gateway = buildGatewayStreamingSnippet(model);
-      const python = buildPythonSdkStreamingSnippet(model);
-      return {
-        curl: gateway,
-        python,
-        node: gateway,
-        http: gateway,
-      };
-    }
-    return generateSnippets(model, token, runValues);
-  }, [model, token, runValues, useGatewayStreaming]);
+  const snippets = useMemo(
+    () => generateSnippets(model, token, runValues),
+    [model, token, runValues],
+  );
   const activeLang = fixedLang ?? lang;
 
   return (

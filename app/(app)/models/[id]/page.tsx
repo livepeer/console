@@ -38,12 +38,6 @@ import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput
 import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
-import LiveStreamPlayground from "@/components/dashboard/playground/LiveStreamPlayground";
-import { isGatewayEnabledPublic } from "@/lib/dashboard/gateway-public";
-import {
-  getStreamingFacadeEndpointLabel,
-  isStreamingCapabilityModel,
-} from "@/lib/dashboard/sdk-streaming-example";
 import ModelAnalytics from "@/components/dashboard/stats/ModelAnalytics";
 import type { Model } from "@/lib/dashboard/types";
 
@@ -160,9 +154,6 @@ function PlaygroundTab({ model }: { model: Model }) {
   }
 
   if (model.playgroundConfig.playgroundVariant === "webcam") {
-    if (isGatewayEnabledPublic()) {
-      return <LiveStreamPlayground model={model} />;
-    }
     return <WebcamPlayground model={model} />;
   }
 
@@ -296,11 +287,8 @@ function PlaygroundTab({ model }: { model: Model }) {
 
 function ApiTab({ model }: { model: Model }) {
   const baseUrl = model.apiEndpoint ?? "https://gateway.livepeer.org/v1";
-  const gatewayStreaming =
-    isGatewayEnabledPublic() && isStreamingCapabilityModel(model);
-  const endpoint = gatewayStreaming
-    ? getStreamingFacadeEndpointLabel(model)
-    : model.category === "Language"
+  const endpoint =
+    model.category === "Language"
       ? `${baseUrl}/chat/completions`
       : `${baseUrl}/${model.id}`;
   const defaultKey =
