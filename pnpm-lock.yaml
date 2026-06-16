@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@pymthouse/builder-sdk':
-        specifier: 0.4.2-rc.1
-        version: 0.4.2-rc.1
+        specifier: 0.4.3
+        version: 0.4.3
       framer-motion:
         specifier: ^11.15.0
         version: 11.18.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -401,8 +401,8 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@pymthouse/builder-sdk@0.4.2-rc.1':
-    resolution: {integrity: sha512-kkDQy5SrSPXJPN72qNLgh8acpNG6ClDQ7Lc3NFv1mG7Bp2CgeEJWwqL1HfqdT5ao5G/JzDWhleKq0Gm3xV+uzA==}
+  '@pymthouse/builder-sdk@0.4.3':
+    resolution: {integrity: sha512-1cwK78PDekyd2BYC59OJeSorT8XT+laNp7dQj+JC9FNcO4TmJs32Yz4EzhWZohUXszIpejas3J+KXWh9HR8hrw==}
     engines: {node: '>=20'}
 
   '@reduxjs/toolkit@2.11.2':
@@ -2331,7 +2331,7 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@pymthouse/builder-sdk@0.4.2-rc.1':
+  '@pymthouse/builder-sdk@0.4.3':
     dependencies:
       oauth4webapi: 3.8.6
 
