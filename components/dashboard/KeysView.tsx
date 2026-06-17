@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   BookOpen,
@@ -279,15 +278,7 @@ export default function KeysView() {
             </span>
             . Pass your key as a Bearer token in the Authorization header. Each
             key is scoped to one environment — showing{" "}
-            <span className="font-medium text-fg-strong">{scopeLabel}</span>. To
-            deploy your own apps, use{" "}
-            <Link
-              href="/settings?tab=deploy-tokens"
-              className="text-green-bright underline decoration-green-bright/40 underline-offset-2 hover:text-green-light"
-            >
-              Deploy tokens
-            </Link>{" "}
-            instead.
+            <span className="font-medium text-fg-strong">{scopeLabel}</span>.
           </p>
         </div>
 

@@ -599,7 +599,12 @@ export default function AppDetailPage() {
   // render base; for a private app with no catalog listing we derive it from the
   // pipeline so the same template still works.
   const pipeline = getPipelineById(id);
-  const isOwner = isConnected && PIPELINE_APP_IDS.has(id);
+  // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
+  // stacked apps PR. In the consumer base the app detail is view-only for
+  // everyone, so owner mode is gated off here; the stacked PR's revert removes
+  // this flag to re-enable ownership.
+  const OWNER_MODE_ENABLED = false;
+  const isOwner = OWNER_MODE_ENABLED && isConnected && PIPELINE_APP_IDS.has(id);
   const model =
     getCapabilityById(id) ??
     (pipeline ? pipelineToExploreApp(pipeline) : undefined);

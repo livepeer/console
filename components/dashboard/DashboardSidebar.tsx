@@ -22,7 +22,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings as SettingsIcon,
-  Terminal,
   User as UserIcon,
   Users as UsersIcon,
   type LucideIcon,
@@ -36,7 +35,7 @@ import StatusDot from "@/components/dashboard/StatusDot";
 import SidebarUsageCard from "@/components/dashboard/SidebarUsageCard";
 import OrganizationMenu from "@/components/dashboard/OrganizationMenu";
 import Tooltip from "@/components/design-system/Tooltip";
-import { APPS, SETTINGS_API_KEYS, PIPELINES } from "@/lib/dashboard/mock-data";
+import { APPS, SETTINGS_API_KEYS } from "@/lib/dashboard/mock-data";
 import { formatRuns } from "@/lib/dashboard/utils";
 
 const NAV_ICONS = {
@@ -396,7 +395,6 @@ const SETTINGS_RAIL_GROUPS: {
       { id: "members", label: "Members", icon: UsersIcon, meta: "4" },
       { id: "billing", label: "Billing", icon: CreditCard },
       { id: "usage-limits", label: "Limits", icon: BarChart3 },
-      { id: "deploy-tokens", label: "Deploy tokens", icon: Terminal },
     ],
   },
   {
@@ -508,8 +506,6 @@ function SidebarContent({
     let meta: string | undefined;
     if (!collapsed) {
       if (item.href === "/explore") meta = formatRuns(APPS.length);
-      else if (item.href === "/apps")
-        meta = String(PIPELINES.length);
       else if (item.href === "/keys")
         meta = formatRuns(SETTINGS_API_KEYS.length);
     }

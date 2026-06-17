@@ -4,14 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { House } from "lucide-react";
 import { useAuth } from "@/components/dashboard/AuthContext";
-import { getOrgFleet } from "@/lib/dashboard/org-fleet";
 import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
 import FirstRunChecklist, {
   FIRST_RUN_CHANGED_EVENT,
   FIRST_RUN_DISMISSED_KEY,
 } from "@/components/dashboard/FirstRunChecklist";
 import HomeCommandBar from "@/components/dashboard/HomeCommandBar";
-import AppsHealthPanel from "@/components/dashboard/AppsHealthPanel";
 import ConsumedAppsPanel from "@/components/dashboard/ConsumedAppsPanel";
 import ActivityPanel from "@/components/dashboard/ActivityPanel";
 import SectionHeader from "@/components/dashboard/SectionHeader";
@@ -28,18 +26,14 @@ function HomePageHeader() {
 
 // ─── Home Page ───
 //
-// "Mission control" rethink: an organization has two relationships with the
-// network — apps it DEPLOYS (which orchestrators serve on its behalf) and apps
-// it CONSUMES (the calls it makes across the network, mostly to apps it didn't
-// deploy). The Home is organized around those two directions, not personas.
-// Composition:
-//   1. Command bar — org readout + greeting + an adaptive attention line
-//      naming the single most urgent thing on arrival
-//   2. Get started — auto-detecting onboarding, until the loop is done
-//   3. Two ledgers — Deployed apps (count + their 7-day call volume) beside
-//      Usage (spend on the apps you call). Each leads with its own summary.
-//   4. Recent activity — the organization's own calls (what counts toward
-//      its usage); a live preview of /calls
+// The consumer home: what you're using on the network and what it costs.
+// (Operator/publishing surfaces — deployed apps, deploy onboarding — live in a
+// separate, stacked PR.) Composition:
+//   1. Command bar — org readout + greeting
+//   2. Get started — auto-detecting onboarding: create your account, get your
+//      API key, call an app
+//   3. Usage (spend on the apps you call) beside Recent activity (your own
+//      calls — a live preview of /calls)
 
 export default function HomePage() {
   const { isConnected, isLoading, user } = useAuth();
@@ -103,10 +97,6 @@ export default function HomePage() {
   const organization = "Flipbook";
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
-  // The Fleet anchors the console split; a consumer-only org with no deployed
-  // apps drops to a single column so the Vitals rail carries the page.
-  const hasApps = getOrgFleet().count > 0;
-
   // Signed-out users are redirected to / via the useEffect
   // above; render nothing in the meantime (one frame max) so they don't see
   // a flash of organization-mock data before the redirect lands.
@@ -141,8 +131,8 @@ export default function HomePage() {
             <HomeCommandBar organization={organization} firstName={firstName} />
           </div>
 
-          {/* Onboarding — auto-detecting: deploy an example app, then call it.
-              Shown until dismissed; full-width above the console split. */}
+          {/* Onboarding — auto-detecting: get your API key, then call an app.
+              Shown until dismissed; full-width above the panels. */}
           {showFirstRun && (
             <div className="home-rise" style={{ animationDelay: "60ms" }}>
               <SectionHeader
@@ -161,27 +151,13 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* The two ledgers — Deployed apps (what you've published to the
-              network) beside Usage (what you consume from it). Each leads with
-              its own summary, so there's no separate hero band. On a
-              consumer-only org with no deployed apps, Usage carries the row. */}
-          {hasApps ? (
-            <div
-              className="home-rise mt-7 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2"
-              style={{ animationDelay: "120ms" }}
-            >
-              <AppsHealthPanel />
-              <ConsumedAppsPanel organization={organization} />
-            </div>
-          ) : (
-            <div className="home-rise mt-7" style={{ animationDelay: "120ms" }}>
-              <ConsumedAppsPanel organization={organization} />
-            </div>
-          )}
-
-          {/* Recent activity — the organization's own recent calls (what
-              counts toward its usage); a live preview of /calls. */}
-          <div className="home-rise mt-7" style={{ animationDelay: "220ms" }}>
+          {/* Usage (what you spend calling apps) beside Recent activity (your
+              own calls — a live preview of /calls). Even-height pair. */}
+          <div
+            className="home-rise mt-7 grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2"
+            style={{ animationDelay: "120ms" }}
+          >
+            <ConsumedAppsPanel organization={organization} />
             <ActivityPanel />
           </div>
         </div>
