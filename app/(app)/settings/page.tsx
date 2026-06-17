@@ -11,12 +11,13 @@ import GeneralSection from "@/components/dashboard/settings/GeneralSection";
 import MembersSection from "@/components/dashboard/settings/MembersSection";
 import BillingSection from "@/components/dashboard/settings/BillingSection";
 import LimitsSection from "@/components/dashboard/settings/LimitsSection";
+import DeployTokensSection from "@/components/dashboard/settings/DeployTokensSection";
 import ProfileSection from "@/components/dashboard/settings/ProfileSection";
 import NotificationsSection from "@/components/dashboard/settings/NotificationsSection";
 import SecuritySection from "@/components/dashboard/settings/SecuritySection";
 import AppearanceSection from "@/components/dashboard/settings/AppearanceSection";
 
-// The 7 settings sub-tabs, two groups (Organization + Account). The sidebar's
+// The 8 settings sub-tabs, two groups (Organization + Account). The sidebar's
 // SettingsRail is the navigation surface — there's no horizontal TabStrip on
 // this page; the rail and the breadcrumb together tell the user where they
 // are. `appearance` is the local-only theme picker (light/dark/system) added
@@ -26,6 +27,7 @@ type SettingsTab =
   | "members"
   | "billing"
   | "usage-limits"
+  | "deploy-tokens"
   | "profile"
   | "notifications"
   | "security"
@@ -36,6 +38,7 @@ const VALID_TABS: SettingsTab[] = [
   "members",
   "billing",
   "usage-limits",
+  "deploy-tokens",
   "profile",
   "notifications",
   "security",
@@ -47,6 +50,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   members: "Members",
   billing: "Billing",
   "usage-limits": "Limits",
+  "deploy-tokens": "Deploy tokens",
   profile: "Profile",
   notifications: "Notifications",
   security: "Security",
@@ -139,6 +143,7 @@ function SettingsContent() {
           {tab === "members" && <MembersSection />}
           {tab === "billing" && <BillingSection />}
           {tab === "usage-limits" && <LimitsSection />}
+          {tab === "deploy-tokens" && <DeployTokensSection />}
           {tab === "profile" && <ProfileSection />}
           {tab === "notifications" && <NotificationsSection />}
           {tab === "security" && <SecuritySection />}

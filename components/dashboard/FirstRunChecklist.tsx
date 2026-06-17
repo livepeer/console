@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import CopyButton from "@/components/dashboard/CopyButton";
 import {
+  OWNED_APPS,
   MOCK_RECENT_REQUESTS,
   STARTER_API_KEY,
 } from "@/lib/dashboard/mock-data";
@@ -18,30 +19,31 @@ interface Props {
 }
 
 /**
- * Prototype override. The demo org already has a key + recorded calls, so
- * auto-detection would mark every step done and the checklist would only ever
- * show its completed state. Forcing this keeps the onboarding loop visible in
- * the prototype. Set to `false` once real per-account state backs the steps.
+ * Prototype override. The demo org (Flipbook) already has deployed apps and
+ * recorded calls, so auto-detection would mark both onboarding steps done and
+ * the checklist would only ever show its completed state. Forcing this keeps
+ * the pre-deploy flow visible in the prototype. Set to `false` (or delete this
+ * and the guards below) once real per-account run history backs the steps.
  */
-const MOCK_FORCE_ONBOARDING = true;
+const MOCK_FORCE_PREDEPLOY = true;
 
 /**
- * FirstRunChecklist — the consumer's first loop in three steps: **create your
- * account → get your API key → call an app**. Step 1 completes the moment
- * you're signed in; the rest auto-detect from real state (you have a key ·
- * you've made a call) — no "I've done it" buttons. The active step shows the
- * command to run; finished steps check themselves off.
+ * FirstRunChecklist — operator-first onboarding: the core platform loop in two
+ * steps, **deploy an example app → call it**. Completion is auto-detected from
+ * real state (you have a deployed app · you've made a call) — there are no
+ * "I've done it" buttons to self-attest. The active step shows the command to
+ * run; finished steps check themselves off.
  */
 export default function FirstRunChecklist({ onDismiss }: Props) {
-  // You're signed in to see this, so the account step is already complete.
-  const hasAccount = true;
-  const hasKey = !MOCK_FORCE_ONBOARDING && Boolean(STARTER_API_KEY);
-  const hasCall = !MOCK_FORCE_ONBOARDING && MOCK_RECENT_REQUESTS.length > 0;
-  const allDone = hasAccount && hasKey && hasCall;
+  const hasDeployed =
+    !MOCK_FORCE_PREDEPLOY &&
+    OWNED_APPS.some((a) => a.deployment.status === "deployed");
+  const hasCall = !MOCK_FORCE_PREDEPLOY && MOCK_RECENT_REQUESTS.length > 0;
+  const allDone = hasDeployed && hasCall;
 
   const token = `${STARTER_API_KEY.prefix}_live_…`;
-  const keyCmd = "livepeer keys create --name default";
-  const callCmd = `curl https://api.livepeer.org/run/flux-schnell -H "Authorization: Bearer ${token}" -d '{"prompt":"a neon city at night"}'`;
+  const deployCmd = "livepeer init hello-world && livepeer push --env production";
+  const callCmd = `curl https://api.livepeer.org/run/hello-world -H "Authorization: Bearer ${token}" -d '{"input":"hello"}'`;
 
   return (
     <section
@@ -50,28 +52,19 @@ export default function FirstRunChecklist({ onDismiss }: Props) {
     >
       <Step
         num={1}
-        title="Create your account"
-        desc="You're signed in — your organization is ready to go."
-        done={hasAccount}
-        active={!hasAccount}
-        command=""
+        title="Deploy an example app"
+        desc="Push a ready-made hello-world pipeline with the Livepeer CLI — it builds the image and registers your app on the network."
+        done={hasDeployed}
+        active={!hasDeployed}
+        command={deployCmd}
       />
       <Step
         num={2}
-        title="Get your API key"
-        desc="Mint a key to authenticate your requests — or grab one on the API keys page."
-        done={hasKey}
-        active={hasAccount && !hasKey}
-        pending={!hasAccount}
-        command={keyCmd}
-      />
-      <Step
-        num={3}
-        title="Call an app"
-        desc="Send your first request to any app on the network and get a response back."
+        title="Call your app"
+        desc="Send your first request and get a response back — the full loop, end to end."
         done={hasCall}
-        active={hasKey && !hasCall}
-        pending={!hasKey}
+        active={hasDeployed && !hasCall}
+        pending={!hasDeployed}
         command={callCmd}
       />
 
@@ -81,7 +74,7 @@ export default function FirstRunChecklist({ onDismiss }: Props) {
             <span className="grid h-5 w-5 place-items-center rounded-full bg-green text-white">
               <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
             </span>
-            You&apos;ve got a key and made your first call — you&apos;re all set.
+            You&apos;ve deployed and called an app — that&apos;s the whole loop.
           </p>
           <button
             type="button"

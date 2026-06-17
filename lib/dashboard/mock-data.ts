@@ -2,6 +2,7 @@ import type {
   Environment,
   AppCategory,
   AppDeployment,
+  Pipeline,
   PipelineKind,
   PipelineStatusKind,
   PipelineEndpoint,
@@ -1750,6 +1751,20 @@ export function getPipelineById(id: string): App | undefined {
 export const PIPELINE_APP_IDS: ReadonlySet<string> = new Set(
   APPS.filter((a) => a.provider === OWNED_APP_PROVIDER).map((a) => a.id),
 );
+
+/**
+ * The org's own deployed apps as `Pipeline`s (every one carries a deployment
+ * manifest, so `app.deployment` is non-optional here). This is the operator's
+ * fleet — the per-environment deployment rows the Apps/Logs surfaces iterate.
+ */
+export const OWNED_APPS: Pipeline[] = APPS.filter(
+  (a): a is Pipeline => a.provider === OWNED_APP_PROVIDER && !!a.deployment,
+);
+
+/** The org's apps deployed into a given environment. */
+export function appsInEnvironment(environmentId: string): Pipeline[] {
+  return OWNED_APPS.filter((a) => a.deployment.environmentId === environmentId);
+}
 
 /** All apps sharing a `pipelineId` — the per-environment deployments. */
 export function deploymentsForPipeline(pipelineId: string): App[] {
