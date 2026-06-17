@@ -20,17 +20,20 @@ export interface Environment {
   isDefault?: boolean;
 }
 
-// ─── Apps (Pipelines) ────────────────────────────────────────────────────────
+// ─── Apps (deployed pipelines) ──────────────────────────────────────────────
 //
-// An App is a deployed Pipeline — the unit a builder pushes with the Runner SDK
-// (`livepeer push` against a `livepeer.yaml`, identified by `pipelineId`). It is
-// the Livepeer analog of a Modal "App": a named, deployed capability that lives
-// inside an Environment. Two transport kinds mirror the SDK's two base classes:
+// There is ONE app type. An app IS a deployed pipeline — the unit a builder
+// pushes with the Runner SDK (`livepeer push` against a `livepeer.yaml`,
+// identified by `pipelineId`). It is the Livepeer analog of a Modal "App": a
+// named, deployed capability that lives inside an Environment. Its deployment /
+// pipeline manifest hangs off `app.deployment` (an `AppDeployment`); the
+// catalog-facing fields (name, provider, pricing, latency, …) live at the top
+// level on `App`. Two transport kinds mirror the SDK's two base classes:
 //   - "batch"  → `Pipeline`      (POST /predict, request/response or SSE)
 //   - "live"   → `LivePipeline`  (trickle, POST /stream/{start,stop,params})
 //
-// Visibility is binary and identical to Explore-presence: a "public" pipeline IS
-// listed in the Explore catalog; a "private" one runs only for its own keys.
+// Visibility is binary and identical to Explore-presence: a "public" deployment
+// IS listed in the Explore catalog; a "private" one runs only for its own keys.
 
 export type PipelineKind = "batch" | "live";
 
@@ -48,10 +51,13 @@ export interface PipelineEndpoint {
   description?: string;
 }
 
-export interface Pipeline {
-  id: string;
-  /** Display name, e.g. "Sentiment". */
-  name: string;
+/**
+ * The pipeline/deployment manifest for an app. Holds everything specific to a
+ * single deployed instance — its Runner SDK identity, environment, build, and
+ * live operational metrics. Catalog-facing fields (name, provider, pricing,
+ * latency, …) live on `App` itself; this is the operator-facing manifest.
+ */
+export interface AppDeployment {
   /** Runner SDK identifier from livepeer.yaml, e.g. "sentiment". */
   pipelineId: string;
   /** Environment this deployment lives in. */
@@ -59,8 +65,6 @@ export interface Pipeline {
   kind: PipelineKind;
   status: PipelineStatusKind;
   visibility: PipelineVisibility;
-  /** One-line summary, shown in the list and (when public) on the Explore card. */
-  description: string;
   /** module:class entrypoint from the manifest, e.g. "pipeline:Sentiment". */
   entrypoint: string;
   /** GPU class from the manifest, or null for CPU pipelines. */
@@ -79,11 +83,14 @@ export interface Pipeline {
   errorRatePct: number;
   /** HTTP surface the orchestrator hits — drives the Overview "Endpoints" list. */
   endpoints: PipelineEndpoint[];
-  /** Category used for the Explore card when public. */
-  category: AppCategory;
-  /** List price + unit, used on the Explore card when public. */
-  price: { amount: number; unit: PricingUnit };
 }
+
+/**
+ * Transitional alias: an app that definitely carries its deployment manifest.
+ * Lets the operator components keep their `app: Pipeline` prop types while the
+ * codebase migrates manifest reads to `app.deployment.X`.
+ */
+export type Pipeline = App & { deployment: AppDeployment };
 
 export type AppCategory =
   | "Video Generation"
@@ -187,6 +194,9 @@ export interface App {
   };
   playgroundConfig?: PlaygroundConfig;
   readme?: string;
+  /** The pipeline/deployment manifest. Present once the app is deployed; the
+   *  org's own apps and (in the mock) every catalog app carry one. */
+  deployment?: AppDeployment;
 }
 
 /**

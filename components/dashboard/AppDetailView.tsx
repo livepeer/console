@@ -23,12 +23,11 @@ import KpiStrip from "@/components/dashboard/KpiStrip";
 import KpiCard from "@/components/dashboard/KpiCard";
 import CopyButton from "@/components/dashboard/CopyButton";
 import {
-  getPipelineById,
+  getAppById,
   effectiveVisibility,
   setPipelineVisibility,
   deploymentsForPipeline,
   getEnvironmentById,
-  pipelineToExploreApp,
 } from "@/lib/dashboard/mock-data";
 import { formatPrice } from "@/lib/dashboard/utils";
 import type {
@@ -122,24 +121,18 @@ function Card({
 /**
  * OverviewTab — the app's front page, shown to anyone (consumer or owner).
  *
- * It renders from the catalog `model` (App), which exists for every app, so it
- * works for the public apps a consumer browses from Explore — not just the
- * org's own deployments. The deployment manifest (`pipeline`) is optional: when
- * present (the org's deployment-backed apps) it adds the Deployment + Schema
- * cards and the per-route endpoint list; when absent (a public catalog app) a
- * lighter Details card stands in so the tab is still useful.
+ * It renders from the catalog fields on `app` (which exist for every app, so it
+ * works for the public apps a consumer browses from Explore) and enriches with
+ * the deployment manifest (`app.deployment`) when present — the Deployment +
+ * Schema cards and the per-route endpoint list. Since unification every app
+ * carries a deployment, but the `app.deployment` guards remain for safety.
  */
-export function OverviewTab({
-  model,
-  pipeline,
-}: {
-  model: App;
-  pipeline?: Pipeline;
-}) {
+export function OverviewTab({ app }: { app: App }) {
+  const deployment = app.deployment;
   // Call endpoint — the deployed pipelineId when we have it, else the catalog
   // slug. Live apps stream over a websocket; batch apps are request/response.
-  const slug = pipeline?.pipelineId ?? model.id;
-  const isLive = pipeline ? pipeline.kind === "live" : Boolean(model.realtime);
+  const slug = deployment?.pipelineId ?? app.id;
+  const isLive = deployment ? deployment.kind === "live" : Boolean(app.realtime);
   const baseUrl = isLive
     ? `wss://api.livepeer.org/live/${slug}`
     : `https://api.livepeer.org/run/${slug}`;
@@ -147,11 +140,11 @@ export function OverviewTab({
   // The request schema is derived from the deployment manifest, so it's only
   // available for deployment-backed apps.
   const schema = useMemo(() => {
-    if (!pipeline) return null;
-    if (pipeline.kind === "live") {
+    if (!deployment) return null;
+    if (deployment.kind === "live") {
       return JSON.stringify(
         {
-          pipeline_id: pipeline.pipelineId,
+          pipeline_id: deployment.pipelineId,
           transport: "trickle",
           channels: ["video", "events", "data"],
           params: { type: "object", additionalProperties: true },
@@ -162,76 +155,76 @@ export function OverviewTab({
     }
     return JSON.stringify(
       {
-        pipeline_id: pipeline.pipelineId,
+        pipeline_id: deployment.pipelineId,
         input: { type: "object", required: ["input"] },
         output: { type: "object" },
-        streaming: pipeline.name.includes("SSE"),
+        streaming: app.name.includes("SSE"),
       },
       null,
       2,
     );
-  }, [pipeline]);
+  }, [deployment, app.name]);
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Headline stats — from the catalog model, available for every app.
+      {/* Headline stats — from the catalog fields, available for every app.
           Warm-orchestrator count is a liveness/capacity signal for the caller. */}
       <KpiStrip cols={4}>
-        <KpiCard label="Calls · 7d" value={model.runs7d.toLocaleString()} />
+        <KpiCard label="Calls · 7d" value={app.runs7d.toLocaleString()} />
         <KpiCard
           label="p50 latency"
-          value={model.latency > 0 ? String(model.latency) : "—"}
-          unit={model.latency > 0 ? "ms" : undefined}
+          value={app.latency > 0 ? String(app.latency) : "—"}
+          unit={app.latency > 0 ? "ms" : undefined}
         />
-        <KpiCard label="Uptime" value={model.uptime.toFixed(1)} unit="%" />
+        <KpiCard label="Uptime" value={app.uptime.toFixed(1)} unit="%" />
         <KpiCard
           label="Warm orchestrators"
-          value={String(model.orchestrators)}
+          value={String(app.orchestrators)}
         />
       </KpiStrip>
 
-      {pipeline ? (
+      {deployment ? (
         <Card title="Deployment" icon={Box}>
           <MetaRow label="Pipeline ID">
-            <span className="font-mono text-[12.5px]">{pipeline.pipelineId}</span>
+            <span className="font-mono text-[12.5px]">{deployment.pipelineId}</span>
           </MetaRow>
           <MetaRow label="Entrypoint">
-            <span className="font-mono text-[12.5px]">{pipeline.entrypoint}</span>
+            <span className="font-mono text-[12.5px]">{deployment.entrypoint}</span>
           </MetaRow>
           <MetaRow label="Image">
             <span className="font-mono text-[12px] text-fg-muted">
-              {pipeline.image}
+              {deployment.image}
             </span>
           </MetaRow>
           <MetaRow label="Version">
-            <span className="font-mono text-[12.5px]">{pipeline.version}</span>
+            <span className="font-mono text-[12.5px]">{deployment.version}</span>
           </MetaRow>
           <MetaRow label="GPU">
-            {pipeline.gpu ? (
-              <span className="font-mono text-[12.5px]">{pipeline.gpu}</span>
+            {deployment.gpu ? (
+              <span className="font-mono text-[12.5px]">{deployment.gpu}</span>
             ) : (
               <span className="text-fg-faint">CPU</span>
             )}
           </MetaRow>
           <MetaRow label="Last deployed">
-            {formatDeployed(pipeline.lastDeployedAt)}
+            {formatDeployed(deployment.lastDeployedAt)}
           </MetaRow>
           <MetaRow label="Deployed by">
             <span className="inline-flex items-center gap-1.5">
               <span
                 className="grid h-4 w-4 place-items-center rounded text-[8.5px] font-semibold text-white"
-                style={{ background: pipeline.createdBy.color }}
+                style={{ background: deployment.createdBy.color }}
                 aria-hidden="true"
               >
-                {pipeline.createdBy.initials}
+                {deployment.createdBy.initials}
               </span>
-              {pipeline.createdBy.name}
+              {deployment.createdBy.name}
             </span>
           </MetaRow>
           <MetaRow label="Environments">
             <span className="flex flex-wrap items-center gap-1.5">
-              {deploymentsForPipeline(pipeline.pipelineId).map((d) => {
-                const env = getEnvironmentById(d.environmentId);
+              {deploymentsForPipeline(deployment.pipelineId).map((d) => {
+                const env = getEnvironmentById(d.deployment!.environmentId);
                 const dotColor =
                   env?.kind === "production"
                     ? "var(--color-green-bright)"
@@ -246,7 +239,7 @@ export function OverviewTab({
                       style={{ background: dotColor }}
                       aria-hidden="true"
                     />
-                    {env?.name ?? d.environmentId}
+                    {env?.name ?? d.deployment!.environmentId}
                   </span>
                 );
               })}
@@ -255,15 +248,15 @@ export function OverviewTab({
         </Card>
       ) : (
         <Card title="Details" icon={ScrollText}>
-          <MetaRow label="Provider">{model.provider}</MetaRow>
+          <MetaRow label="Provider">{app.provider}</MetaRow>
           <MetaRow label="Category">
-            <span className="font-mono text-[12.5px]">{model.category}</span>
+            <span className="font-mono text-[12.5px]">{app.category}</span>
           </MetaRow>
           <MetaRow label="Type">
             {isLive ? "Live · streaming" : "Batch · request/response"}
           </MetaRow>
           <MetaRow label="Pricing">
-            <span className="font-mono text-[12.5px]">{formatPrice(model)}</span>
+            <span className="font-mono text-[12.5px]">{formatPrice(app)}</span>
           </MetaRow>
         </Card>
       )}
@@ -277,9 +270,9 @@ export function OverviewTab({
             <CopyButton value={baseUrl} iconOnly />
           </div>
         </div>
-        {pipeline && (
+        {deployment && (
           <div className="px-1 py-1">
-            {pipeline.endpoints.map((e) => (
+            {deployment.endpoints.map((e) => (
               <div
                 key={`${e.method} ${e.path}`}
                 className="flex items-center gap-3 rounded-[4px] px-3 py-2"
@@ -319,16 +312,17 @@ export function OverviewTab({
 type LogLine = { t: string; level: "info" | "warn" | "error"; msg: string };
 
 function buildLogs(app: Pipeline): LogLine[] {
-  if (app.status === "building") {
+  const deployment = app.deployment;
+  if (deployment.status === "building") {
     return [
-      { t: "08:55:02", level: "info", msg: `Building image for ${app.pipelineId}…` },
+      { t: "08:55:02", level: "info", msg: `Building image for ${deployment.pipelineId}…` },
       { t: "08:55:04", level: "info", msg: "Resolving python packages" },
       { t: "08:55:39", level: "info", msg: "Running prepare step (caching weights)" },
       { t: "08:56:10", level: "info", msg: "Pushing layers to registry" },
       { t: "08:56:22", level: "warn", msg: "Image is large (4.2 GB) — first cold start may be slow" },
     ];
   }
-  if (app.status === "error") {
+  if (deployment.status === "error") {
     return [
       { t: "22:01:00", level: "info", msg: "Session started — events channel open" },
       { t: "22:01:00", level: "info", msg: `setup() complete · model=whisper-tiny.en` },
@@ -337,7 +331,7 @@ function buildLogs(app: Pipeline): LogLine[] {
       { t: "22:01:09", level: "error", msg: "5 records emitted → 3 delivered" },
     ];
   }
-  if (app.kind === "live") {
+  if (deployment.kind === "live") {
     return [
       { t: "17:30:00", level: "info", msg: "Session started — allocating video track" },
       { t: "17:30:00", level: "info", msg: "heartbeat task started" },
@@ -347,7 +341,7 @@ function buildLogs(app: Pipeline): LogLine[] {
     ];
   }
   return [
-    { t: "14:09:00", level: "info", msg: `POST /predict · 200 · ${app.p50LatencyMs}ms` },
+    { t: "14:09:00", level: "info", msg: `POST /predict · 200 · ${deployment.p50LatencyMs}ms` },
     { t: "14:09:01", level: "info", msg: "POST /predict · 200 · 71ms" },
     { t: "14:09:02", level: "info", msg: "POST /predict · 200 · 59ms" },
     { t: "14:09:03", level: "warn", msg: "POST /predict · 200 · 184ms (slow — orchestrator cold)" },
@@ -369,7 +363,7 @@ export function LogsTab({ app }: { app: Pipeline }) {
           <ScrollText className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
           Logs
         </span>
-        {app.status === "deployed" && (
+        {app.deployment.status === "deployed" && (
           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-fg-faint">
             <StatusDot tone="green" />
             live
@@ -480,7 +474,7 @@ export function SettingsTab({
           <p className="text-[12.5px] text-fg-muted">
             Stopping halts the deployment; deleting removes{" "}
             <span className="font-mono text-[11.5px] text-fg-strong">
-              {app.pipelineId}
+              {app.deployment.pipelineId}
             </span>{" "}
             from this environment.
           </p>
@@ -524,8 +518,8 @@ export function AppDetailHeader({
   coverImage?: string;
   Icon?: React.ElementType;
 }) {
-  const status = STATUS_META[app.status];
-  const deployments = deploymentsForPipeline(app.pipelineId);
+  const status = STATUS_META[app.deployment.status];
+  const deployments = deploymentsForPipeline(app.deployment.pipelineId);
   return (
     <>
       {/* Breadcrumb */}
@@ -568,23 +562,23 @@ export function AppDetailHeader({
           {app.name}
         </h1>
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-          <StatusDot tone={status.tone} static={app.status !== "deployed"} />
+          <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
           {status.label}
         </span>
         <span
           className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
           title={
-            app.kind === "live"
+            app.deployment.kind === "live"
               ? "LivePipeline · trickle transport"
               : "Pipeline · request/response"
           }
         >
-          {app.kind === "live" ? (
+          {app.deployment.kind === "live" ? (
             <Radio className="h-3 w-3 text-blue-bright" aria-hidden="true" />
           ) : (
             <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
           )}
-          {app.kind === "live" ? "Live" : "Batch"}
+          {app.deployment.kind === "live" ? "Live" : "Batch"}
         </span>
         {visibility === "public" && (
           <Link
@@ -618,7 +612,7 @@ export function AppDetailHeader({
             Deployed in
           </span>
           {deployments.map((d) => {
-            const env = getEnvironmentById(d.environmentId);
+            const env = getEnvironmentById(d.deployment!.environmentId);
             const active = d.id === app.id;
             const dotColor =
               env?.kind === "production"
@@ -640,7 +634,7 @@ export function AppDetailHeader({
                   style={{ background: dotColor }}
                   aria-hidden="true"
                 />
-                {env?.name ?? d.environmentId}
+                {env?.name ?? d.deployment!.environmentId}
               </Link>
             );
           })}
@@ -655,10 +649,15 @@ export function AppDetailHeader({
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function AppDetailView({ appId }: { appId: string }) {
-  const app = getPipelineById(appId);
+  // This operator console is only meaningful for a deployment-backed app, so we
+  // narrow to apps that carry a manifest (`Pipeline = App & { deployment }`).
+  const resolved = getAppById(appId);
+  const app: Pipeline | undefined = resolved?.deployment
+    ? (resolved as Pipeline)
+    : undefined;
   const [tab, setTab] = useState<TabKey>("overview");
   const [visibility, setVisibility] = useState<PipelineVisibility>(
-    app?.visibility ?? "private",
+    app?.deployment.visibility ?? "private",
   );
 
   // Hydrate visibility from the persisted override after mount (avoids SSR
@@ -672,10 +671,10 @@ export default function AppDetailView({ appId }: { appId: string }) {
 
   if (!app) return <AppNotFound />;
 
-  const status = STATUS_META[app.status];
+  const status = STATUS_META[app.deployment.status];
 
   // Environments this pipeline is deployed to, for the "Deployed in" pills.
-  const deployments = deploymentsForPipeline(app.pipelineId);
+  const deployments = deploymentsForPipeline(app.deployment.pipelineId);
 
   const toggleVisibility = () => {
     const next: PipelineVisibility =
@@ -708,23 +707,23 @@ export default function AppDetailView({ appId }: { appId: string }) {
             {app.name}
           </h1>
           <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-            <StatusDot tone={status.tone} static={app.status !== "deployed"} />
+            <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
             {status.label}
           </span>
           <span
             className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
             title={
-              app.kind === "live"
+              app.deployment.kind === "live"
                 ? "LivePipeline · trickle transport"
                 : "Pipeline · request/response"
             }
           >
-            {app.kind === "live" ? (
+            {app.deployment.kind === "live" ? (
               <Radio className="h-3 w-3 text-blue-bright" aria-hidden="true" />
             ) : (
               <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
             )}
-            {app.kind === "live" ? "Live" : "Batch"}
+            {app.deployment.kind === "live" ? "Live" : "Batch"}
           </span>
           {visibility === "public" && (
             <Link
@@ -761,7 +760,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
               Deployed in
             </span>
             {deployments.map((d) => {
-              const env = getEnvironmentById(d.environmentId);
+              const env = getEnvironmentById(d.deployment!.environmentId);
               const active = d.id === app.id;
               const dotColor =
                 env?.kind === "production"
@@ -783,7 +782,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
                     style={{ background: dotColor }}
                     aria-hidden="true"
                   />
-                  {env?.name ?? d.environmentId}
+                  {env?.name ?? d.deployment!.environmentId}
                 </Link>
               );
             })}
@@ -804,9 +803,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
 
       {/* Tab content */}
       <div className="mx-auto w-full max-w-[1024px] px-7 pb-20 pt-6">
-        {tab === "overview" && (
-          <OverviewTab model={pipelineToExploreApp(app)} pipeline={app} />
-        )}
+        {tab === "overview" && <OverviewTab app={app} />}
         {tab === "logs" && <LogsTab app={app} />}
         {tab === "settings" && (
           <SettingsTab

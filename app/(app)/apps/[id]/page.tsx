@@ -22,9 +22,7 @@ import KeyBadge from "@/components/dashboard/KeyBadge";
 import CallsTable from "@/components/dashboard/CallsTable";
 import StatusDot from "@/components/dashboard/StatusDot";
 import {
-  getCapabilityById,
-  getPipelineById,
-  pipelineToExploreApp,
+  getAppById,
   effectiveVisibility,
   setPipelineVisibility,
   organizationSlug,
@@ -44,7 +42,7 @@ import {
   OverviewTab,
   SettingsTab,
 } from "@/components/dashboard/AppDetailView";
-import type { App, PipelineVisibility } from "@/lib/dashboard/types";
+import type { App, Pipeline, PipelineVisibility } from "@/lib/dashboard/types";
 
 // ─── Tabs ───
 //
@@ -595,45 +593,41 @@ export default function AppDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { isConnected } = useAuth();
 
-  // The owned deployment (exists for your apps, public or private) and the
-  // public catalog entry (exists for any listed app). The catalog object is the
-  // render base; for a private app with no catalog listing we derive it from the
-  // pipeline so the same template still works.
-  const pipeline = getPipelineById(id);
+  // The unified app — its catalog face and (always, since unification) its
+  // deployment manifest under `app.deployment`. One id-based lookup resolves
+  // both the org's own apps and the third-party catalog models.
+  const app = getAppById(id);
   // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
   // stacked apps PR. In the consumer base the app detail is view-only for
   // everyone, so owner mode is gated off here; the stacked PR's revert removes
   // this flag to re-enable ownership.
   const OWNER_MODE_ENABLED = false;
   const isOwner = OWNER_MODE_ENABLED && isConnected && PIPELINE_APP_IDS.has(id);
-  const model =
-    getCapabilityById(id) ??
-    (pipeline ? pipelineToExploreApp(pipeline) : undefined);
 
   // Visibility (publish state) for the owner Settings tab.
   const [visibility, setVisibility] = useState<PipelineVisibility>(
-    pipeline?.visibility ?? "private",
+    app?.deployment?.visibility ?? "private",
   );
   useEffect(() => {
-    if (pipeline) setVisibility(effectiveVisibility(pipeline));
+    if (app) setVisibility(effectiveVisibility(app));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
   const toggleVisibility = () => {
-    if (!pipeline) return;
+    if (!app) return;
     const next: PipelineVisibility =
       visibility === "public" ? "private" : "public";
-    setPipelineVisibility(pipeline.id, next);
+    setPipelineVisibility(app.id, next);
     setVisibility(next);
   };
 
   // Runs filtered to this app — drives both the Runs panel and the count chip.
-  // `model` may be undefined (404 path below); run the hook unconditionally.
+  // `app` may be undefined (404 path below); run the hook unconditionally.
   const filteredRuns = useMemo(() => {
-    if (!model) return [];
+    if (!app) return [];
     return MOCK_RECENT_REQUESTS.filter((r) =>
-      modelMatchesRow(model.id, r.model),
+      modelMatchesRow(app.id, r.model),
     );
-  }, [model]);
+  }, [app]);
 
   // Tab set: Overview + the consumer tabs are shown to everyone (Overview
   // renders from the catalog model, so it's there for any app); owners
@@ -663,7 +657,7 @@ export default function AppDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner]);
 
-  if (!model) {
+  if (!app) {
     return (
       <main id="main-content" className="flex flex-1 flex-col bg-dark">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -679,40 +673,41 @@ export default function AppDetailPage() {
     );
   }
 
-  const Icon = getAppIcon(model.category);
+  const deployment = app.deployment;
+  const Icon = getAppIcon(app.category);
 
   // One status indicator: deploy state for owners, runtime liveness for
   // consumers. One type indicator: Live (streaming) vs Batch (request/response).
   const statusTone =
-    isOwner && pipeline
-      ? pipeline.status === "deployed"
+    isOwner && deployment
+      ? deployment.status === "deployed"
         ? "green"
-        : pipeline.status === "error"
+        : deployment.status === "error"
           ? "red"
-          : pipeline.status === "building"
+          : deployment.status === "building"
             ? "amber"
             : "blue"
-      : model.status === "hot"
+      : app.status === "hot"
         ? "warm"
         : "blue";
   const statusLabel =
-    isOwner && pipeline
-      ? pipeline.status === "deployed"
+    isOwner && deployment
+      ? deployment.status === "deployed"
         ? "Deployed"
-        : pipeline.status === "building"
+        : deployment.status === "building"
           ? "Building"
-          : pipeline.status === "error"
+          : deployment.status === "error"
             ? "Error"
             : "Stopped"
-      : model.status === "hot"
+      : app.status === "hot"
         ? "warm"
         : "cold";
   const statusStatic =
-    isOwner && pipeline
-      ? pipeline.status !== "deployed"
-      : model.status !== "hot";
+    isOwner && deployment
+      ? deployment.status !== "deployed"
+      : app.status !== "hot";
   const isLive =
-    isOwner && pipeline ? pipeline.kind === "live" : Boolean(model.realtime);
+    isOwner && deployment ? deployment.kind === "live" : Boolean(app.realtime);
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
@@ -725,15 +720,15 @@ export default function AppDetailPage() {
           aria-label="Breadcrumb"
         >
           <Link
-            href={`/orgs/${organizationSlug(model.provider)}`}
+            href={`/orgs/${organizationSlug(app.provider)}`}
             className="text-fg-muted transition-colors hover:text-fg"
           >
-            {model.provider}
+            {app.provider}
           </Link>
           <span className="text-fg-disabled" aria-hidden="true">
             /
           </span>
-          <span className="truncate font-medium text-fg">{model.name}</span>
+          <span className="truncate font-medium text-fg">{app.name}</span>
         </nav>
       </div>
 
@@ -745,9 +740,9 @@ export default function AppDetailPage() {
           <div className="flex items-start gap-4">
             {/* Thumbnail — cover image, or a bordered icon tile fallback. */}
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-subtle bg-dark-card">
-              {model.coverImage ? (
+              {app.coverImage ? (
                 <img
-                  src={model.coverImage}
+                  src={app.coverImage}
                   alt=""
                   className="h-full w-full object-cover"
                 />
@@ -769,7 +764,7 @@ export default function AppDetailPage() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
-                  {model.name}
+                  {app.name}
                 </h1>
                 <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
                   <StatusDot tone={statusTone} static={statusStatic} />
@@ -811,7 +806,7 @@ export default function AppDetailPage() {
                 </button>
               </div>
               <p className="mt-2 max-w-[680px] text-[13.5px] leading-[1.5] text-fg-muted">
-                {model.description}
+                {app.description}
               </p>
             </div>
           </div>
@@ -903,22 +898,20 @@ export default function AppDetailPage() {
                 only) reuse the deployment-console chrome verbatim. Overview
                 renders from the catalog model, so it works for any app; the
                 deployment manifest, when present, enriches it. */}
-            {activeTab === "overview" && (
-              <OverviewTab model={model} pipeline={pipeline} />
-            )}
-            {activeTab === "settings" && pipeline && (
+            {activeTab === "overview" && <OverviewTab app={app} />}
+            {activeTab === "settings" && app.deployment && (
               <SettingsTab
-                app={pipeline}
+                app={app as Pipeline}
                 visibility={visibility}
                 onToggleVisibility={toggleVisibility}
               />
             )}
-            {activeTab === "playground" && <PlaygroundTab model={model} />}
-            {activeTab === "api" && <ApiTab model={model} />}
-            {activeTab === "readme" && <ReadmeTab model={model} />}
-            {activeTab === "stats" && <StatsTab model={model} />}
+            {activeTab === "playground" && <PlaygroundTab model={app} />}
+            {activeTab === "api" && <ApiTab model={app} />}
+            {activeTab === "readme" && <ReadmeTab model={app} />}
+            {activeTab === "stats" && <StatsTab model={app} />}
             {activeTab === "jobs" && (
-              <JobsTab model={model} runs={filteredRuns} />
+              <JobsTab model={app} runs={filteredRuns} />
             )}
           </div>
         </div>
