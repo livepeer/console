@@ -1,7 +1,13 @@
 import type {
   Environment,
-  Pipeline,
+  AppCategory,
+  AppDeployment,
+  PipelineKind,
+  PipelineStatusKind,
+  PipelineEndpoint,
   PipelineVisibility,
+  PricingUnit,
+  PlaygroundConfig,
   App,
   ApiKey,
   EcosystemApp,
@@ -76,7 +82,35 @@ const LIVE_ENDPOINTS = [
 const ZAIN = { name: "Zain", initials: "ZM", color: "var(--color-green)" };
 const MAYA = { name: "Maya", initials: "MK", color: "#7c3aed" };
 
-export const PIPELINES: Pipeline[] = [
+// The org's own deployed apps, authored in the flat (pre-unification) Pipeline
+// shape so the literal below still reads naturally. `legacyToApp` lifts the
+// catalog-facing fields to the top level and nests the manifest under
+// `deployment` to produce the unified `App`.
+interface LegacyDeployment {
+  id: string;
+  name: string;
+  pipelineId: string;
+  environmentId: string;
+  kind: PipelineKind;
+  status: PipelineStatusKind;
+  visibility: PipelineVisibility;
+  description: string;
+  entrypoint: string;
+  gpu: string | null;
+  image: string;
+  version: string;
+  lastDeployedAt: string;
+  createdBy: { name: string; initials: string; color: string };
+  warmOrchestrators: number;
+  calls7d: number;
+  p50LatencyMs: number;
+  errorRatePct: number;
+  endpoints: PipelineEndpoint[];
+  category: AppCategory;
+  price: { amount: number; unit: PricingUnit };
+}
+
+const LEGACY_DEPLOYMENTS: LegacyDeployment[] = [
   // ── Production ──────────────────────────────────────────────────────────────
   {
     id: "app-sentiment",
@@ -303,78 +337,16 @@ export const PIPELINES: Pipeline[] = [
   },
 ];
 
-export function pipelinesForEnvironment(environmentId: string): Pipeline[] {
-  return PIPELINES.filter((p) => p.environmentId === environmentId);
-}
+// The provider label for the org's own deployed apps.
+const OWNED_APP_PROVIDER = "Flipbook";
 
-export function getPipelineById(id: string): Pipeline | undefined {
-  return PIPELINES.find((p) => p.id === id);
-}
-
-// ─── Multi-environment deployment helpers ─────────────────────────────────────
-// A pipeline's identity is its `pipelineId`; it can have a deployment in each
-// environment. These resolve the deployment set for a given pipeline so the app
-// detail can show "Deployed in: prod, dev" and follow the env switcher to the
-// right deployment.
-
-export function deploymentsForPipeline(pipelineId: string): Pipeline[] {
-  return PIPELINES.filter((p) => p.pipelineId === pipelineId);
-}
-
-export function environmentsForPipeline(pipelineId: string): string[] {
-  return deploymentsForPipeline(pipelineId).map((p) => p.environmentId);
-}
-
-export function deploymentInEnvironment(
-  pipelineId: string,
-  environmentId: string,
-): Pipeline | undefined {
-  return PIPELINES.find(
-    (p) => p.pipelineId === pipelineId && p.environmentId === environmentId,
-  );
-}
-
-// Publish state. A pipeline's visibility is whether it is listed in Explore.
-// Seed visibility lives on each Pipeline; runtime toggles are persisted as
-// per-id overrides in localStorage so the Apps Settings tab and the Explore
-// grid agree across navigation. Client-only — guarded for SSR.
-const PIPELINE_VISIBILITY_KEY = "livepeer.pipelineVisibility";
-
-function readVisibilityOverrides(): Record<string, PipelineVisibility> {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(
-      localStorage.getItem(PIPELINE_VISIBILITY_KEY) || "{}",
-    ) as Record<string, PipelineVisibility>;
-  } catch {
-    return {};
-  }
-}
-
-export function effectiveVisibility(p: Pipeline): PipelineVisibility {
-  return readVisibilityOverrides()[p.id] ?? p.visibility;
-}
-
-export function setPipelineVisibility(
-  id: string,
-  visibility: PipelineVisibility,
-): void {
-  if (typeof window === "undefined") return;
-  const overrides = readVisibilityOverrides();
-  overrides[id] = visibility;
-  localStorage.setItem(PIPELINE_VISIBILITY_KEY, JSON.stringify(overrides));
-}
-
-export function publicPipelines(): Pipeline[] {
-  return PIPELINES.filter((p) => effectiveVisibility(p) === "public");
-}
-
-// A minimal playground config derived from the pipeline's kind/category, so the
-// consumer face of a published pipeline (its /apps/[id] page) is runnable like
-// any first-party capability.
-function pipelinePlayground(p: Pipeline): import("./types").PlaygroundConfig {
-  const seed = `https://picsum.photos/seed/${p.pipelineId}`;
-  if (p.kind === "live") {
+// A minimal playground config derived from a deployment's kind/category, so the
+// consumer face of a published app (its /apps/[id] page) is runnable like any
+// first-party capability. Matches what the former `pipelineToExploreApp`
+// produced.
+function deploymentPlayground(d: LegacyDeployment): PlaygroundConfig {
+  const seed = `https://picsum.photos/seed/${d.pipelineId}`;
+  if (d.kind === "live") {
     return {
       fields: [],
       outputType: "video",
@@ -382,7 +354,7 @@ function pipelinePlayground(p: Pipeline): import("./types").PlaygroundConfig {
       mockOutputUrl: `${seed}/640/360`,
     };
   }
-  if (p.category === "Image Generation") {
+  if (d.category === "Image Generation") {
     return {
       fields: [
         {
@@ -406,71 +378,148 @@ function pipelinePlayground(p: Pipeline): import("./types").PlaygroundConfig {
         type: "textarea",
         required: true,
         placeholder: "Enter input for the pipeline…",
-        description: `Input passed to ${p.pipelineId}.predict().`,
+        description: `Input passed to ${d.pipelineId}.predict().`,
       },
     ],
     outputType: "json",
     mockOutputJson: {
-      pipeline_id: p.pipelineId,
+      pipeline_id: d.pipelineId,
       output: { label: "positive", score: 0.97 },
-      metrics: { inference_time: p.p50LatencyMs / 1000 },
+      metrics: { inference_time: d.p50LatencyMs / 1000 },
     },
   };
 }
 
 /**
- * Map a Pipeline onto the App shape so its consumer face flows through the
- * existing Explore card / model-detail / playground machinery. The Explore card
- * and detail page both resolve via this; ownership-aware affordances (Manage)
- * are layered on at the view level.
+ * Lift a flat `LegacyDeployment` into the unified `App`: catalog-facing fields
+ * to the top level, the manifest under `deployment`. The derived catalog fields
+ * reproduce exactly what the former `pipelineToExploreApp` produced for Explore
+ * display, plus carry the full deployment manifest.
  */
-export function pipelineToExploreApp(p: Pipeline): App {
-  const warm = p.status === "deployed" && p.warmOrchestrators > 0;
+function legacyToApp(d: LegacyDeployment): App {
+  const warm = d.status === "deployed" && d.warmOrchestrators > 0;
   return {
-    id: p.id,
-    name: p.name,
-    provider: "Flipbook",
-    category: p.category,
-    description: p.description,
+    id: d.id,
+    name: d.name,
+    provider: OWNED_APP_PROVIDER,
+    category: d.category,
+    description: d.description,
     status: warm ? "hot" : "cold",
-    pricing: { amount: p.price.amount, unit: p.price.unit },
-    latency: p.p50LatencyMs,
-    orchestrators: p.warmOrchestrators,
-    runs7d: p.calls7d,
-    uptime: Math.max(0, 100 - p.errorRatePct),
-    realtime: p.kind === "live",
-    playgroundConfig: pipelinePlayground(p),
+    pricing: { amount: d.price.amount, unit: d.price.unit },
+    latency: d.p50LatencyMs,
+    orchestrators: d.warmOrchestrators,
+    runs7d: d.calls7d,
+    uptime: Math.max(0, 100 - d.errorRatePct),
+    realtime: d.kind === "live",
+    playgroundConfig: deploymentPlayground(d),
+    deployment: {
+      pipelineId: d.pipelineId,
+      environmentId: d.environmentId,
+      kind: d.kind,
+      status: d.status,
+      visibility: d.visibility,
+      entrypoint: d.entrypoint,
+      gpu: d.gpu,
+      image: d.image,
+      version: d.version,
+      lastDeployedAt: d.lastDeployedAt,
+      createdBy: d.createdBy,
+      warmOrchestrators: d.warmOrchestrators,
+      calls7d: d.calls7d,
+      p50LatencyMs: d.p50LatencyMs,
+      errorRatePct: d.errorRatePct,
+      endpoints: d.endpoints,
+    },
   };
 }
 
-/**
- * Resolve a capability by id for the consumer detail/playground page — a
- * first-party model OR a pipeline (the consumer face of a deployed app). All
- * pipelines resolve here so an owner can preview a private pipeline's
- * playground; in production this would gate non-owners to public pipelines.
- */
-export function getCapabilityById(id: string): App | undefined {
-  const model = getModelById(id);
-  if (model) return model;
-  const pipeline = getPipelineById(id);
-  return pipeline ? pipelineToExploreApp(pipeline) : undefined;
+// Fixed deploy timestamp for derived catalog deployments — never Date.now().
+const CATALOG_DEPLOYED_AT = "2025-05-01T12:00:00Z";
+
+const CATALOG_BATCH_ENDPOINTS: PipelineEndpoint[] = [
+  { method: "POST", path: "/predict", description: "Request/response inference" },
+  { method: "GET", path: "/health", description: "Health probe" },
+];
+const CATALOG_LIVE_ENDPOINTS: PipelineEndpoint[] = [
+  { method: "WS", path: "/stream" },
+];
+
+function pascalCaseFromId(id: string): string {
+  return id
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 }
 
-// SSR-safe seed: public pipelines by their *seed* visibility only (no
-// localStorage). Used as the initial Explore state so server and first client
-// render agree; a useEffect then swaps in the localStorage-aware set.
-export const SEED_PUBLIC_PIPELINE_APPS: App[] = PIPELINES.filter(
-  (p) => p.visibility === "public",
-).map(pipelineToExploreApp);
+function slugFromProvider(provider: string): string {
+  return provider
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-/** Ids of pipeline-backed Explore cards — lets Explore route them to /apps/[id]. */
-export const PIPELINE_APP_IDS: ReadonlySet<string> = new Set(
-  PIPELINES.map((p) => p.id),
-);
+function providerInitials(provider: string): string {
+  const parts = provider.trim().split(/\s+/).filter(Boolean);
+  const raw =
+    parts.length === 1
+      ? parts[0].slice(0, 2)
+      : parts[0][0] + parts[parts.length - 1][0];
+  return raw.toUpperCase();
+}
+
+// GPU class plausibly inferred from category for catalog deployments.
+function gpuForCategory(category: AppCategory): string | null {
+  if (category === "Language" || category === "Speech") return "A100 40GB";
+  if (
+    category === "Image Generation" ||
+    category === "Video Generation" ||
+    category === "Video Editing" ||
+    category === "Video Understanding" ||
+    category === "Live Transcoding"
+  )
+    return "L40S";
+  return null;
+}
+
+/**
+ * Ensure an app carries a deployment manifest. Returns the app unchanged if it
+ * already has one (the org's own apps); otherwise derives a plausible manifest
+ * from the catalog fields so every app is uniformly "a deployed pipeline".
+ */
+function withDerivedDeployment(a: App): App {
+  if (a.deployment) return a;
+  const kind: PipelineKind = a.realtime ? "live" : "batch";
+  const deployment: AppDeployment = {
+    pipelineId: a.id,
+    environmentId: "env-production",
+    kind,
+    status: "deployed",
+    visibility: "public",
+    entrypoint: `pipeline:${pascalCaseFromId(a.id)}`,
+    gpu: gpuForCategory(a.category),
+    image: `registry.livepeer.org/${slugFromProvider(a.provider)}/${a.id}:1.0.0`,
+    version: "1.0.0",
+    lastDeployedAt: CATALOG_DEPLOYED_AT,
+    createdBy: {
+      name: a.provider,
+      initials: providerInitials(a.provider),
+      color: "var(--color-blue-bright)",
+    },
+    warmOrchestrators: a.orchestrators,
+    calls7d: a.runs7d,
+    p50LatencyMs: a.latency,
+    errorRatePct: Math.max(0, 100 - a.uptime),
+    endpoints: a.realtime ? CATALOG_LIVE_ENDPOINTS : CATALOG_BATCH_ENDPOINTS,
+  };
+  return { ...a, deployment };
+}
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
-export const APPS: App[] = [
+// The third-party catalog models (everything not deployed by the org). Authored
+// without a deployment manifest; `withDerivedDeployment` attaches one below.
+const CATALOG_MODELS: App[] = [
   // ── Managed Services (SLA-backed) ──────────────────────────────────────────
   {
     id: "daydream-video",
@@ -1663,9 +1712,96 @@ High-performance text embedding model with 768 dimensions and 8192 token context
   },
 ];
 
-export function getModelById(id: string): App | undefined {
-  return APPS.find((m) => m.id === id);
+// The ONE unified catalog: third-party models (with a derived deployment) plus
+// the org's own deployed apps (manifest lifted from the legacy literal). Every
+// entry carries a `deployment`.
+export const APPS: App[] = [
+  ...CATALOG_MODELS.map(withDerivedDeployment),
+  ...LEGACY_DEPLOYMENTS.map(legacyToApp),
+];
+
+/** The one id-based lookup. Resolves any app — catalog model or owned app. */
+export function getAppById(id: string): App | undefined {
+  return APPS.find((a) => a.id === id);
 }
+
+/** @deprecated Use `getAppById`. Retained as a thin alias for legacy callers. */
+export function getModelById(id: string): App | undefined {
+  return getAppById(id);
+}
+
+/** @deprecated Use `getAppById`. Retained as a thin alias for legacy callers. */
+export function getCapabilityById(id: string): App | undefined {
+  return getAppById(id);
+}
+
+/** @deprecated Use `getAppById`. Retained as a thin alias for legacy callers. */
+export function getPipelineById(id: string): App | undefined {
+  return getAppById(id);
+}
+
+// ─── App / deployment helpers ─────────────────────────────────────────────────
+// A pipeline's identity is its `deployment.pipelineId`; it can have a deployment
+// in each environment, so the same pipelineId may appear on more than one app
+// (the multi-env "Deployed in" pills). These resolve the deployment set and the
+// publish state across the unified `APPS` array.
+
+/** The org's own deployed apps. */
+export const PIPELINE_APP_IDS: ReadonlySet<string> = new Set(
+  APPS.filter((a) => a.provider === OWNED_APP_PROVIDER).map((a) => a.id),
+);
+
+/** All apps sharing a `pipelineId` — the per-environment deployments. */
+export function deploymentsForPipeline(pipelineId: string): App[] {
+  return APPS.filter((a) => a.deployment?.pipelineId === pipelineId);
+}
+
+// Publish state. A deployment's visibility is whether it is listed in Explore.
+// Seed visibility lives on each app's `deployment`; runtime toggles are
+// persisted as per-id overrides in localStorage so the Apps Settings tab and
+// the Explore grid agree across navigation. Client-only — guarded for SSR.
+const PIPELINE_VISIBILITY_KEY = "livepeer.pipelineVisibility";
+
+function readVisibilityOverrides(): Record<string, PipelineVisibility> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(
+      localStorage.getItem(PIPELINE_VISIBILITY_KEY) || "{}",
+    ) as Record<string, PipelineVisibility>;
+  } catch {
+    return {};
+  }
+}
+
+export function effectiveVisibility(app: App): PipelineVisibility {
+  return readVisibilityOverrides()[app.id] ?? app.deployment?.visibility ?? "private";
+}
+
+export function setPipelineVisibility(
+  id: string,
+  visibility: PipelineVisibility,
+): void {
+  if (typeof window === "undefined") return;
+  const overrides = readVisibilityOverrides();
+  overrides[id] = visibility;
+  localStorage.setItem(PIPELINE_VISIBILITY_KEY, JSON.stringify(overrides));
+}
+
+/** The org's *public* deployed apps — listed in Explore alongside the catalog. */
+export function publicPipelines(): App[] {
+  return APPS.filter(
+    (a) =>
+      a.provider === OWNED_APP_PROVIDER && effectiveVisibility(a) === "public",
+  );
+}
+
+// SSR-safe seed: the org's public apps by their *seed* visibility only (no
+// localStorage). Used as the initial Explore state so server and first client
+// render agree; a useEffect then swaps in the localStorage-aware set.
+export const SEED_PUBLIC_PIPELINE_APPS: App[] = APPS.filter(
+  (a) =>
+    a.provider === OWNED_APP_PROVIDER && a.deployment?.visibility === "public",
+);
 
 // ─── Organizations (publisher profiles) ──────────────────────────────────────────
 // An organization is the publisher namespace behind an app's `provider`. Each gets a
@@ -1695,10 +1831,14 @@ function organizationInitials(name: string): string {
   return raw.toUpperCase();
 }
 
-// The full public catalog: static catalog apps + published pipelines (the same
-// set Explore lists). Organization pages slice this by provider.
+// The full public catalog: third-party catalog models + the org's *published*
+// apps (the same set Explore lists). Private owned apps are excluded.
+// Organization pages slice this by provider.
 function publicCatalog(): App[] {
-  return [...APPS, ...publicPipelines().map(pipelineToExploreApp)];
+  return APPS.filter(
+    (a) =>
+      a.provider !== OWNED_APP_PROVIDER || a.deployment?.visibility === "public",
+  );
 }
 
 export function appsForOrganization(slug: string): App[] {

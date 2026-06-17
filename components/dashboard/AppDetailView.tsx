@@ -23,13 +23,15 @@ import KpiStrip from "@/components/dashboard/KpiStrip";
 import KpiCard from "@/components/dashboard/KpiCard";
 import CopyButton from "@/components/dashboard/CopyButton";
 import {
-  getPipelineById,
+  getAppById,
   effectiveVisibility,
   setPipelineVisibility,
   deploymentsForPipeline,
   getEnvironmentById,
 } from "@/lib/dashboard/mock-data";
+import { formatPrice } from "@/lib/dashboard/utils";
 import type {
+  App,
   Pipeline,
   PipelineStatusKind,
   PipelineVisibility,
@@ -116,17 +118,33 @@ function Card({
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
-export function OverviewTab({ app }: { app: Pipeline }) {
-  const baseUrl =
-    app.kind === "live"
-      ? `wss://api.livepeer.org/live/${app.pipelineId}`
-      : `https://api.livepeer.org/run/${app.pipelineId}`;
+/**
+ * OverviewTab — the app's front page, shown to anyone (consumer or owner).
+ *
+ * It renders from the catalog fields on `app` (which exist for every app, so it
+ * works for the public apps a consumer browses from Explore) and enriches with
+ * the deployment manifest (`app.deployment`) when present — the Deployment +
+ * Schema cards and the per-route endpoint list. Since unification every app
+ * carries a deployment, but the `app.deployment` guards remain for safety.
+ */
+export function OverviewTab({ app }: { app: App }) {
+  const deployment = app.deployment;
+  // Call endpoint — the deployed pipelineId when we have it, else the catalog
+  // slug. Live apps stream over a websocket; batch apps are request/response.
+  const slug = deployment?.pipelineId ?? app.id;
+  const isLive = deployment ? deployment.kind === "live" : Boolean(app.realtime);
+  const baseUrl = isLive
+    ? `wss://api.livepeer.org/live/${slug}`
+    : `https://api.livepeer.org/run/${slug}`;
 
+  // The request schema is derived from the deployment manifest, so it's only
+  // available for deployment-backed apps.
   const schema = useMemo(() => {
-    if (app.kind === "live") {
+    if (!deployment) return null;
+    if (deployment.kind === "live") {
       return JSON.stringify(
         {
-          pipeline_id: app.pipelineId,
+          pipeline_id: deployment.pipelineId,
           transport: "trickle",
           channels: ["video", "events", "data"],
           params: { type: "object", additionalProperties: true },
@@ -137,7 +155,7 @@ export function OverviewTab({ app }: { app: Pipeline }) {
     }
     return JSON.stringify(
       {
-        pipeline_id: app.pipelineId,
+        pipeline_id: deployment.pipelineId,
         input: { type: "object", required: ["input"] },
         output: { type: "object" },
         streaming: app.name.includes("SSE"),
@@ -145,94 +163,106 @@ export function OverviewTab({ app }: { app: Pipeline }) {
       null,
       2,
     );
-  }, [app]);
+  }, [deployment, app.name]);
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Headline stats — from the catalog fields, available for every app.
+          Warm-orchestrator count is a liveness/capacity signal for the caller. */}
       <KpiStrip cols={4}>
-        <KpiCard
-          label="Calls · 7d"
-          value={app.calls7d.toLocaleString()}
-        />
+        <KpiCard label="Calls · 7d" value={app.runs7d.toLocaleString()} />
         <KpiCard
           label="p50 latency"
-          value={app.p50LatencyMs > 0 ? String(app.p50LatencyMs) : "—"}
-          unit={app.p50LatencyMs > 0 ? "ms" : undefined}
+          value={app.latency > 0 ? String(app.latency) : "—"}
+          unit={app.latency > 0 ? "ms" : undefined}
         />
-        <KpiCard
-          label="Error rate"
-          value={app.errorRatePct.toFixed(1)}
-          unit="%"
-        />
+        <KpiCard label="Uptime" value={app.uptime.toFixed(1)} unit="%" />
         <KpiCard
           label="Warm orchestrators"
-          value={String(app.warmOrchestrators)}
+          value={String(app.orchestrators)}
         />
       </KpiStrip>
 
-      <Card title="Deployment" icon={Box}>
-        <MetaRow label="Pipeline ID">
-          <span className="font-mono text-[12.5px]">{app.pipelineId}</span>
-        </MetaRow>
-        <MetaRow label="Entrypoint">
-          <span className="font-mono text-[12.5px]">{app.entrypoint}</span>
-        </MetaRow>
-        <MetaRow label="Image">
-          <span className="font-mono text-[12px] text-fg-muted">
-            {app.image}
-          </span>
-        </MetaRow>
-        <MetaRow label="Version">
-          <span className="font-mono text-[12.5px]">{app.version}</span>
-        </MetaRow>
-        <MetaRow label="GPU">
-          {app.gpu ? (
-            <span className="font-mono text-[12.5px]">{app.gpu}</span>
-          ) : (
-            <span className="text-fg-faint">CPU</span>
-          )}
-        </MetaRow>
-        <MetaRow label="Last deployed">{formatDeployed(app.lastDeployedAt)}</MetaRow>
-        <MetaRow label="Deployed by">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="grid h-4 w-4 place-items-center rounded text-[8.5px] font-semibold text-white"
-              style={{ background: app.createdBy.color }}
-              aria-hidden="true"
-            >
-              {app.createdBy.initials}
+      {deployment ? (
+        <Card title="Deployment" icon={Box}>
+          <MetaRow label="Pipeline ID">
+            <span className="font-mono text-[12.5px]">{deployment.pipelineId}</span>
+          </MetaRow>
+          <MetaRow label="Entrypoint">
+            <span className="font-mono text-[12.5px]">{deployment.entrypoint}</span>
+          </MetaRow>
+          <MetaRow label="Image">
+            <span className="font-mono text-[12px] text-fg-muted">
+              {deployment.image}
             </span>
-            {app.createdBy.name}
-          </span>
-        </MetaRow>
-        <MetaRow label="Environments">
-          <span className="flex flex-wrap items-center gap-1.5">
-            {deploymentsForPipeline(app.pipelineId).map((d) => {
-              const env = getEnvironmentById(d.environmentId);
-              const dotColor =
-                env?.kind === "production"
-                  ? "var(--color-green-bright)"
-                  : "var(--color-blue-bright)";
-              return (
-                <span
-                  key={d.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-2 py-0.5 text-[11.5px] text-fg-strong"
-                >
+          </MetaRow>
+          <MetaRow label="Version">
+            <span className="font-mono text-[12.5px]">{deployment.version}</span>
+          </MetaRow>
+          <MetaRow label="GPU">
+            {deployment.gpu ? (
+              <span className="font-mono text-[12.5px]">{deployment.gpu}</span>
+            ) : (
+              <span className="text-fg-faint">CPU</span>
+            )}
+          </MetaRow>
+          <MetaRow label="Last deployed">
+            {formatDeployed(deployment.lastDeployedAt)}
+          </MetaRow>
+          <MetaRow label="Deployed by">
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="grid h-4 w-4 place-items-center rounded text-[8.5px] font-semibold text-white"
+                style={{ background: deployment.createdBy.color }}
+                aria-hidden="true"
+              >
+                {deployment.createdBy.initials}
+              </span>
+              {deployment.createdBy.name}
+            </span>
+          </MetaRow>
+          <MetaRow label="Environments">
+            <span className="flex flex-wrap items-center gap-1.5">
+              {deploymentsForPipeline(deployment.pipelineId).map((d) => {
+                const env = getEnvironmentById(d.deployment!.environmentId);
+                const dotColor =
+                  env?.kind === "production"
+                    ? "var(--color-green-bright)"
+                    : "var(--color-blue-bright)";
+                return (
                   <span
-                    className="h-[5px] w-[5px] rounded-full"
-                    style={{ background: dotColor }}
-                    aria-hidden="true"
-                  />
-                  {env?.name ?? d.environmentId}
-                </span>
-              );
-            })}
-          </span>
-        </MetaRow>
-      </Card>
+                    key={d.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-2 py-0.5 text-[11.5px] text-fg-strong"
+                  >
+                    <span
+                      className="h-[5px] w-[5px] rounded-full"
+                      style={{ background: dotColor }}
+                      aria-hidden="true"
+                    />
+                    {env?.name ?? d.deployment!.environmentId}
+                  </span>
+                );
+              })}
+            </span>
+          </MetaRow>
+        </Card>
+      ) : (
+        <Card title="Details" icon={ScrollText}>
+          <MetaRow label="Provider">{app.provider}</MetaRow>
+          <MetaRow label="Category">
+            <span className="font-mono text-[12.5px]">{app.category}</span>
+          </MetaRow>
+          <MetaRow label="Type">
+            {isLive ? "Live · streaming" : "Batch · request/response"}
+          </MetaRow>
+          <MetaRow label="Pricing">
+            <span className="font-mono text-[12.5px]">{formatPrice(app)}</span>
+          </MetaRow>
+        </Card>
+      )}
 
       <Card title="Endpoint" icon={Globe}>
-        <div className="border-b border-hairline px-4 py-3">
+        <div className="border-b border-hairline px-4 py-3 last:border-b-0">
           <div className="flex items-center gap-2 rounded-[6px] border border-subtle bg-dark px-3 py-2">
             <span className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[12.5px] text-fg">
               {baseUrl}
@@ -240,35 +270,39 @@ export function OverviewTab({ app }: { app: Pipeline }) {
             <CopyButton value={baseUrl} iconOnly />
           </div>
         </div>
-        <div className="px-1 py-1">
-          {app.endpoints.map((e) => (
-            <div
-              key={`${e.method} ${e.path}`}
-              className="flex items-center gap-3 rounded-[4px] px-3 py-2"
-            >
-              <span className="w-12 shrink-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] text-green-bright">
-                {e.method}
-              </span>
-              <span className="font-mono text-[12.5px] text-fg-strong">
-                {e.path}
-              </span>
-              {e.description && (
-                <span className="ml-auto truncate text-[11.5px] text-fg-faint">
-                  {e.description}
+        {deployment && (
+          <div className="px-1 py-1">
+            {deployment.endpoints.map((e) => (
+              <div
+                key={`${e.method} ${e.path}`}
+                className="flex items-center gap-3 rounded-[4px] px-3 py-2"
+              >
+                <span className="w-12 shrink-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] text-green-bright">
+                  {e.method}
                 </span>
-              )}
-            </div>
-          ))}
-        </div>
+                <span className="font-mono text-[12.5px] text-fg-strong">
+                  {e.path}
+                </span>
+                {e.description && (
+                  <span className="ml-auto truncate text-[11.5px] text-fg-faint">
+                    {e.description}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
-      <Card title="Schema" icon={FileJson}>
-        <div className="px-4 py-3">
-          <pre className="overflow-x-auto rounded-[6px] border border-subtle bg-dark px-3 py-2.5 font-mono text-[12px] leading-[1.6] text-fg-muted">
-            {schema}
-          </pre>
-        </div>
-      </Card>
+      {schema && (
+        <Card title="Schema" icon={FileJson}>
+          <div className="px-4 py-3">
+            <pre className="overflow-x-auto rounded-[6px] border border-subtle bg-dark px-3 py-2.5 font-mono text-[12px] leading-[1.6] text-fg-muted">
+              {schema}
+            </pre>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -278,16 +312,17 @@ export function OverviewTab({ app }: { app: Pipeline }) {
 type LogLine = { t: string; level: "info" | "warn" | "error"; msg: string };
 
 function buildLogs(app: Pipeline): LogLine[] {
-  if (app.status === "building") {
+  const deployment = app.deployment;
+  if (deployment.status === "building") {
     return [
-      { t: "08:55:02", level: "info", msg: `Building image for ${app.pipelineId}…` },
+      { t: "08:55:02", level: "info", msg: `Building image for ${deployment.pipelineId}…` },
       { t: "08:55:04", level: "info", msg: "Resolving python packages" },
       { t: "08:55:39", level: "info", msg: "Running prepare step (caching weights)" },
       { t: "08:56:10", level: "info", msg: "Pushing layers to registry" },
       { t: "08:56:22", level: "warn", msg: "Image is large (4.2 GB) — first cold start may be slow" },
     ];
   }
-  if (app.status === "error") {
+  if (deployment.status === "error") {
     return [
       { t: "22:01:00", level: "info", msg: "Session started — events channel open" },
       { t: "22:01:00", level: "info", msg: `setup() complete · model=whisper-tiny.en` },
@@ -296,7 +331,7 @@ function buildLogs(app: Pipeline): LogLine[] {
       { t: "22:01:09", level: "error", msg: "5 records emitted → 3 delivered" },
     ];
   }
-  if (app.kind === "live") {
+  if (deployment.kind === "live") {
     return [
       { t: "17:30:00", level: "info", msg: "Session started — allocating video track" },
       { t: "17:30:00", level: "info", msg: "heartbeat task started" },
@@ -306,7 +341,7 @@ function buildLogs(app: Pipeline): LogLine[] {
     ];
   }
   return [
-    { t: "14:09:00", level: "info", msg: `POST /predict · 200 · ${app.p50LatencyMs}ms` },
+    { t: "14:09:00", level: "info", msg: `POST /predict · 200 · ${deployment.p50LatencyMs}ms` },
     { t: "14:09:01", level: "info", msg: "POST /predict · 200 · 71ms" },
     { t: "14:09:02", level: "info", msg: "POST /predict · 200 · 59ms" },
     { t: "14:09:03", level: "warn", msg: "POST /predict · 200 · 184ms (slow — orchestrator cold)" },
@@ -328,7 +363,7 @@ export function LogsTab({ app }: { app: Pipeline }) {
           <ScrollText className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
           Logs
         </span>
-        {app.status === "deployed" && (
+        {app.deployment.status === "deployed" && (
           <span className="inline-flex items-center gap-1.5 text-[11.5px] text-fg-faint">
             <StatusDot tone="green" />
             live
@@ -439,7 +474,7 @@ export function SettingsTab({
           <p className="text-[12.5px] text-fg-muted">
             Stopping halts the deployment; deleting removes{" "}
             <span className="font-mono text-[11.5px] text-fg-strong">
-              {app.pipelineId}
+              {app.deployment.pipelineId}
             </span>{" "}
             from this environment.
           </p>
@@ -483,8 +518,8 @@ export function AppDetailHeader({
   coverImage?: string;
   Icon?: React.ElementType;
 }) {
-  const status = STATUS_META[app.status];
-  const deployments = deploymentsForPipeline(app.pipelineId);
+  const status = STATUS_META[app.deployment.status];
+  const deployments = deploymentsForPipeline(app.deployment.pipelineId);
   return (
     <>
       {/* Breadcrumb */}
@@ -527,23 +562,23 @@ export function AppDetailHeader({
           {app.name}
         </h1>
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-          <StatusDot tone={status.tone} static={app.status !== "deployed"} />
+          <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
           {status.label}
         </span>
         <span
           className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
           title={
-            app.kind === "live"
+            app.deployment.kind === "live"
               ? "LivePipeline · trickle transport"
               : "Pipeline · request/response"
           }
         >
-          {app.kind === "live" ? (
+          {app.deployment.kind === "live" ? (
             <Radio className="h-3 w-3 text-blue-bright" aria-hidden="true" />
           ) : (
             <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
           )}
-          {app.kind === "live" ? "Live" : "Batch"}
+          {app.deployment.kind === "live" ? "Live" : "Batch"}
         </span>
         {visibility === "public" && (
           <Link
@@ -577,7 +612,7 @@ export function AppDetailHeader({
             Deployed in
           </span>
           {deployments.map((d) => {
-            const env = getEnvironmentById(d.environmentId);
+            const env = getEnvironmentById(d.deployment!.environmentId);
             const active = d.id === app.id;
             const dotColor =
               env?.kind === "production"
@@ -599,7 +634,7 @@ export function AppDetailHeader({
                   style={{ background: dotColor }}
                   aria-hidden="true"
                 />
-                {env?.name ?? d.environmentId}
+                {env?.name ?? d.deployment!.environmentId}
               </Link>
             );
           })}
@@ -614,10 +649,15 @@ export function AppDetailHeader({
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function AppDetailView({ appId }: { appId: string }) {
-  const app = getPipelineById(appId);
+  // This operator console is only meaningful for a deployment-backed app, so we
+  // narrow to apps that carry a manifest (`Pipeline = App & { deployment }`).
+  const resolved = getAppById(appId);
+  const app: Pipeline | undefined = resolved?.deployment
+    ? (resolved as Pipeline)
+    : undefined;
   const [tab, setTab] = useState<TabKey>("overview");
   const [visibility, setVisibility] = useState<PipelineVisibility>(
-    app?.visibility ?? "private",
+    app?.deployment.visibility ?? "private",
   );
 
   // Hydrate visibility from the persisted override after mount (avoids SSR
@@ -631,10 +671,10 @@ export default function AppDetailView({ appId }: { appId: string }) {
 
   if (!app) return <AppNotFound />;
 
-  const status = STATUS_META[app.status];
+  const status = STATUS_META[app.deployment.status];
 
   // Environments this pipeline is deployed to, for the "Deployed in" pills.
-  const deployments = deploymentsForPipeline(app.pipelineId);
+  const deployments = deploymentsForPipeline(app.deployment.pipelineId);
 
   const toggleVisibility = () => {
     const next: PipelineVisibility =
@@ -667,23 +707,23 @@ export default function AppDetailView({ appId }: { appId: string }) {
             {app.name}
           </h1>
           <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-            <StatusDot tone={status.tone} static={app.status !== "deployed"} />
+            <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
             {status.label}
           </span>
           <span
             className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
             title={
-              app.kind === "live"
+              app.deployment.kind === "live"
                 ? "LivePipeline · trickle transport"
                 : "Pipeline · request/response"
             }
           >
-            {app.kind === "live" ? (
+            {app.deployment.kind === "live" ? (
               <Radio className="h-3 w-3 text-blue-bright" aria-hidden="true" />
             ) : (
               <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
             )}
-            {app.kind === "live" ? "Live" : "Batch"}
+            {app.deployment.kind === "live" ? "Live" : "Batch"}
           </span>
           {visibility === "public" && (
             <Link
@@ -720,7 +760,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
               Deployed in
             </span>
             {deployments.map((d) => {
-              const env = getEnvironmentById(d.environmentId);
+              const env = getEnvironmentById(d.deployment!.environmentId);
               const active = d.id === app.id;
               const dotColor =
                 env?.kind === "production"
@@ -742,7 +782,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
                     style={{ background: dotColor }}
                     aria-hidden="true"
                   />
-                  {env?.name ?? d.environmentId}
+                  {env?.name ?? d.deployment!.environmentId}
                 </Link>
               );
             })}

@@ -18,7 +18,6 @@ import {
 import {
   APPS,
   publicPipelines,
-  pipelineToExploreApp,
   SEED_PUBLIC_PIPELINE_APPS,
   PIPELINE_APP_IDS,
 } from "@/lib/dashboard/mock-data";
@@ -423,20 +422,28 @@ function ExplorePageInner() {
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
 
-  // Public pipelines (user-published apps) are listed in Explore alongside
-  // first-party network models. Seeded SSR-safely, then refreshed from the
-  // localStorage-backed publish state after mount so toggling a pipeline's
+  // The org's public deployed apps are listed in Explore alongside the
+  // third-party catalog models. Seeded SSR-safely, then refreshed from the
+  // localStorage-backed publish state after mount so toggling an app's
   // visibility on its Settings tab is reflected here on next navigation.
   const [pipelineModels, setPipelineModels] = useState<App[]>(
     SEED_PUBLIC_PIPELINE_APPS,
   );
   useEffect(() => {
-    setPipelineModels(publicPipelines().map(pipelineToExploreApp));
+    setPipelineModels(publicPipelines());
   }, []);
 
+  // APPS now carries the org's own apps too (public + private). Take the
+  // third-party catalog from APPS and re-attach only the *public* owned apps so
+  // private deployments never leak into Explore and nothing is duplicated.
+  const catalogModels = useMemo(
+    () => APPS.filter((m) => !PIPELINE_APP_IDS.has(m.id)),
+    [],
+  );
+
   const allModels = useMemo(
-    () => [...APPS, ...pipelineModels],
-    [pipelineModels],
+    () => [...catalogModels, ...pipelineModels],
+    [catalogModels, pipelineModels],
   );
 
   const dataMaxPrice = useMemo(
