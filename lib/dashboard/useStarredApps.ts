@@ -16,7 +16,7 @@ function readStarred(): string[] {
   }
 }
 
-export function useStarredModels() {
+export function useStarredApps() {
   const [starredIds, setStarredIds] = useState<string[]>([]);
 
   useEffect(() => {

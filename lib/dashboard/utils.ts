@@ -8,9 +8,9 @@ import {
   MessageSquare,
   type LucideIcon,
 } from "lucide-react";
-import type { Model, ModelCategory } from "./types";
+import type { App, AppCategory, AccountActivityRow } from "./types";
 
-const CATEGORY_ICONS: Record<ModelCategory, LucideIcon> = {
+const CATEGORY_ICONS: Record<AppCategory, LucideIcon> = {
   "Video Generation": Film,
   "Video Editing": Wand2,
   "Video Understanding": ScanSearch,
@@ -20,7 +20,7 @@ const CATEGORY_ICONS: Record<ModelCategory, LucideIcon> = {
   Language: MessageSquare,
 };
 
-export function getModelIcon(category: ModelCategory): LucideIcon {
+export function getAppIcon(category: AppCategory): LucideIcon {
   return CATEGORY_ICONS[category] ?? MessageSquare;
 }
 
@@ -30,18 +30,51 @@ export function formatRuns(n: number): string {
   return n.toString();
 }
 
-// ─── Job-row formatters ─────────────────────────────────────────────────────
+// ─── Call-row formatters ────────────────────────────────────────────────────
 //
-// Shared by every surface that renders an `AccountActivityRow`: home "Recent
-// jobs" panel, standalone /jobs view, and the model-detail Jobs
-// tab. Centralized here so all three speak the same vocabulary (e.g. "284ms"
-// vs "1.2s", "5m ago" vs "yesterday") instead of three near-duplicate
-// implementations drifting out of sync.
+// Shared by every surface that renders an `AccountActivityRow`: the home
+// "Recent activity" panel, the standalone /calls view, and the app-detail
+// Logs tab. Centralized here so all of them speak the same vocabulary (e.g.
+// "284ms" vs "1.2s", "2m 18s" vs "45s", "5m ago" vs "yesterday").
 
 export function formatRunLatency(ms: number | null): string {
   if (ms == null) return "—";
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
   return `${ms}ms`;
+}
+
+/**
+ * The right "how long" value for a call row:
+ *  - active (live, in progress) → elapsed since it started, ticking
+ *  - completed live            → final session duration
+ *  - batch                     → request latency
+ * Pass `nowMs` (a ticking clock) so active rows update live.
+ */
+export function formatCallMetric(
+  row: AccountActivityRow,
+  nowMs?: number,
+): string {
+  if (row.status === "active") {
+    const startedMs = new Date(row.timestamp).getTime();
+    const elapsed = Math.max(0, (nowMs ?? Date.now()) - startedMs);
+    return formatRunDuration(elapsed);
+  }
+  return row.kind === "live"
+    ? formatRunDuration(row.durationMs)
+    : formatRunLatency(row.latencyMs);
+}
+
+/** Live-session length: "45s", "2m 18s", "1h 4m". "—" when absent. */
+export function formatRunDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  const totalSec = Math.round(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const totalMin = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (totalMin < 60) return s === 0 ? `${totalMin}m` : `${totalMin}m ${s}s`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 export function formatRunRelativeTime(iso: string): string {
@@ -66,7 +99,7 @@ export function isModelNew(model: { releasedAt?: string }): boolean {
   return Date.now() - released < NEW_MODEL_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 }
 
-export function formatPrice(model: Model): string {
+export function formatPrice(model: App): string {
   if (
     model.pricing.inputPrice !== undefined &&
     model.pricing.outputPrice !== undefined
@@ -84,7 +117,7 @@ export function formatPrice(model: Model): string {
 // Returned as a short USD string; "<$0.0001" for tiny amounts so the badge
 // never collapses to "$0.00".
 export function estimateCallCost(
-  model: Model,
+  model: App,
   inferenceTimeSeconds?: number,
 ): string {
   const { amount, unit } = model.pricing;
@@ -135,7 +168,7 @@ export function generateMockUsageData(days: number = 30) {
   return data;
 }
 
-const CATEGORY_GRADIENTS: Record<ModelCategory, string> = {
+const CATEGORY_GRADIENTS: Record<AppCategory, string> = {
   "Video Generation": "linear-gradient(135deg, #0a1628 0%, #0d2137 50%, #0f3460 100%)",
   "Video Editing": "linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #4a1942 100%)",
   "Video Understanding": "linear-gradient(135deg, #0a1a0a 0%, #1a2e1a 50%, #0f3d2e 100%)",
@@ -145,7 +178,7 @@ const CATEGORY_GRADIENTS: Record<ModelCategory, string> = {
   Language: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
 };
 
-export function getCategoryGradient(category: ModelCategory): string {
+export function getCategoryGradient(category: AppCategory): string {
   return CATEGORY_GRADIENTS[category] ?? CATEGORY_GRADIENTS.Language;
 }
 

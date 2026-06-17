@@ -6,6 +6,7 @@ import {
   House,
   Activity,
   BarChart3,
+  Box,
   Globe,
   Key,
   Settings,
@@ -13,24 +14,25 @@ import {
 } from "lucide-react";
 
 /**
- * SignInWall — what a logged-out user sees when they hit a private workspace
+ * SignInWall — what a logged-out user sees when they hit a private organization
  * route (Home / Jobs / Usage / API keys / Settings / Network). Mirrors the
  * Livepeer Dashboard v4 prototype's `wall-shell` block: route-aware icon +
- * eyebrow + title + description, "Sign in" / "Create workspace" CTAs, and an
- * `→ Explore capabilities` escape hatch. The sidebar around it stays in its
+ * eyebrow + title + description, "Sign in" / "Create organization" CTAs, and an
+ * `→ Explore apps` escape hatch. The sidebar around it stays in its
  * logged-out variant so the user keeps their bearings; only the main pane
  * swaps to this block.
  *
  * Copy is intentionally specific per route — the prototype's view was that a
  * generic "please sign in" page is the wrong move, because it doesn't tell
- * the user *why* this route is workspace-only. Each route names the workspace
+ * the user *why* this route is organization-only. Each route names the organization
  * concern (job history, usage limits, keys, etc.) so the sign-in ask feels
  * like a continuation of intent rather than a generic gate.
  */
 
 export type SignInWallRoute =
   | "home"
-  | "jobs"
+  | "apps"
+  | "calls"
   | "usage"
   | "keys"
   | "network"
@@ -45,39 +47,45 @@ interface RouteCopy {
 const ROUTE_COPY: Record<SignInWallRoute, RouteCopy> = {
   home: {
     icon: House,
-    title: "Sign in to your workspace",
+    title: "Sign in to your organization",
     description:
-      "Your dashboard, jobs, usage, and keys live in your workspace. Sign in to pick up where you left off.",
+      "Your dashboard, activity, usage, and keys live in your organization. Sign in to pick up where you left off.",
   },
-  jobs: {
-    icon: Activity,
-    title: "Jobs are workspace-only",
+  apps: {
+    icon: Box,
+    title: "Apps are organization-only",
     description:
-      "Job history, traces, and replay are stored against your workspace. Sign in to see your jobs — or try a capability without an account.",
+      "Your deployed pipelines live in your organization, scoped per environment. Sign in to manage them — or explore apps without an account.",
+  },
+  calls: {
+    icon: Activity,
+    title: "Calls are organization-only",
+    description:
+      "Every call your organization makes — batch and live — is recorded here. Sign in to see them, or try an app without an account.",
   },
   usage: {
     icon: BarChart3,
-    title: "Usage is workspace-only",
+    title: "Usage is organization-only",
     description:
-      "Track jobs, spend, and limits against your free tier. Sign in to view, or skip the workspace and explore capabilities.",
+      "Track activity, spend, and limits against your free tier. Sign in to view, or skip the organization and explore apps.",
   },
   keys: {
     icon: Key,
     title: "Sign in to manage API keys",
     description:
-      "API keys are scoped to a workspace. Create, rotate, and revoke keys after signing in.",
+      "API keys are scoped to an organization. Create, rotate, and revoke keys after signing in.",
   },
   network: {
     icon: Globe,
     title: "Network metrics — sign in",
     description:
-      "Your network performance dashboard is per-workspace. Sign in to see GPU pool health and routing.",
+      "Your network performance dashboard is per-organization. Sign in to see GPU pool health and routing.",
   },
   settings: {
     icon: Settings,
     title: "Settings — sign in",
     description:
-      "Workspace and account settings live behind sign-in.",
+      "Organization and account settings live behind sign-in.",
   },
 };
 
@@ -92,9 +100,9 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
           <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} aria-hidden="true" />
         </div>
 
-        {/* Mono uppercase eyebrow — "WORKSPACE · PRIVATE" */}
+        {/* Mono uppercase eyebrow — "ORGANIZATION · PRIVATE" */}
         <p className="mb-2.5 font-mono text-[10.5px] font-medium uppercase tracking-[0.12em] text-fg-disabled">
-          Workspace · Private
+          Organization · Private
         </p>
 
         {/* Title — large, tight tracking */}
@@ -107,7 +115,7 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
           {description}
         </p>
 
-        {/* CTA pair — theme-aware primary Sign in + bordered Create workspace */}
+        {/* CTA pair — theme-aware primary Sign in + bordered Create organization */}
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
           <Link
             href="/login"
@@ -120,7 +128,7 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
             href="/signup"
             className="inline-flex h-9 items-center justify-center rounded-[6px] border border-hairline bg-dark-card px-4 text-[13px] text-fg-strong transition-colors hover:border-subtle hover:bg-hover hover:text-fg"
           >
-            Create workspace
+            Create organization
           </Link>
         </div>
 
@@ -134,12 +142,12 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
           <span className="h-px flex-1 bg-tint" />
         </div>
 
-        {/* Escape hatch — Explore capabilities */}
+        {/* Escape hatch — Explore apps */}
         <Link
-          href="/"
+          href="/explore"
           className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg"
         >
-          Explore capabilities
+          Explore apps
           <ArrowRight className="h-3 w-3" aria-hidden="true" />
         </Link>
       </div>

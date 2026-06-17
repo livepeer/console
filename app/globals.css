@@ -349,6 +349,23 @@ html[data-theme="light"] .text-tone-amber {
   }
 }
 
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered page-load reveal for the Home console blocks. Honors
+   prefers-reduced-motion via the global reset above (duration → 0). */
+.home-rise {
+  animation: home-rise var(--motion-duration-slow) var(--motion-easing-out) both;
+}
+
 .animate-breathe {
   animation: breathe 2.5s ease-in-out infinite;
 }

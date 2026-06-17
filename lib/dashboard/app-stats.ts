@@ -1,4 +1,4 @@
-import type { Model, ModelCategory } from "./types";
+import type { App, AppCategory } from "./types";
 
 export type StatsPeriod = "24h" | "7d" | "30d";
 
@@ -75,7 +75,7 @@ function mulberry32(seed: number) {
   };
 }
 
-function throughputUnit(category: ModelCategory): {
+function throughputUnit(category: AppCategory): {
   label: string;
   unit: string;
   baseRate: number;
@@ -99,13 +99,13 @@ function throughputUnit(category: ModelCategory): {
   }
 }
 
-function latencyKpiLabel(category: ModelCategory): string {
+function latencyKpiLabel(category: AppCategory): string {
   if (category === "Language") return "Time to First Token";
   if (category === "Live Transcoding") return "Segment Latency";
   return "P90 Latency";
 }
 
-function formatLatency(ms: number, category: ModelCategory): string {
+function formatLatency(ms: number, category: AppCategory): string {
   if (category === "Language") {
     return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`;
   }
@@ -140,7 +140,7 @@ function trend(
 }
 
 export function generateModelStats(
-  model: Model,
+  model: App,
   period: StatsPeriod,
 ): ModelStats {
   const rng = mulberry32(hashString(`${model.id}:${period}`));

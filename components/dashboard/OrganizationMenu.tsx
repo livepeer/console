@@ -19,7 +19,7 @@ interface User {
   initials: string;
 }
 
-interface Workspace {
+interface Organization {
   id: string;
   name: string;
   initials: string;
@@ -28,18 +28,18 @@ interface Workspace {
   active?: boolean;
 }
 
-interface WorkspaceMenuProps {
+interface OrganizationMenuProps {
   user: User;
   disconnect: () => void;
   collapsed: boolean;
 }
 
-// Mock workspaces — until real multi-tenancy lands, the active workspace is
-// "Flipbook" (Zain's company) and a personal workspace is shown as a second
+// Mock organizations — until real multi-tenancy lands, the active organization is
+// "Flipbook" (Zain's company) and a personal organization is shown as a second
 // option. Per the Livepeer Dashboard design (Apr 2026), the dropdown also
-// surfaces workspace-scoped actions (settings, invite, billing) before the
+// surfaces organization-scoped actions (settings, invite, billing) before the
 // account-level sign-out.
-const WORKSPACES: Workspace[] = [
+const ORGANIZATIONS: Organization[] = [
   {
     id: "flipbook",
     name: "Flipbook",
@@ -96,25 +96,25 @@ function WsAvatar({
 }
 
 /**
- * WorkspaceMenu — sidebar workspace switcher.
+ * OrganizationMenu — sidebar organization switcher.
  *
  * Per the Livepeer Dashboard design (Claude Design handoff, Apr 2026):
- * shows the active workspace's avatar + name + chevron. Click to open a
- * dropdown with the list of workspaces, an action to create a new one,
- * and workspace-scoped quick links (Settings, Invite, Billing) before
+ * shows the active organization's avatar + name + chevron. Click to open a
+ * dropdown with the list of organizations, an action to create a new one,
+ * and organization-scoped quick links (Settings, Invite, Billing) before
  * the account-level sign-out.
  *
- * Mock-only — until real multi-tenancy exists, the active workspace is
+ * Mock-only — until real multi-tenancy exists, the active organization is
  * always Flipbook. Switching does nothing yet.
  */
-export default function WorkspaceMenu({
+export default function OrganizationMenu({
   user,
   disconnect,
   collapsed,
-}: WorkspaceMenuProps) {
+}: OrganizationMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(
-    WORKSPACES.find((w) => w.active)?.id ?? WORKSPACES[0].id,
+    ORGANIZATIONS.find((w) => w.active)?.id ?? ORGANIZATIONS[0].id,
   );
   const ref = useRef<HTMLDivElement>(null);
 
@@ -136,13 +136,13 @@ export default function WorkspaceMenu({
     };
   }, [open]);
 
-  const active = WORKSPACES.find((w) => w.id === activeId) ?? WORKSPACES[0];
+  const active = ORGANIZATIONS.find((w) => w.id === activeId) ?? ORGANIZATIONS[0];
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        aria-label={`Workspace menu for ${active.name}`}
+        aria-label={`Organization menu for ${active.name}`}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -189,12 +189,12 @@ export default function WorkspaceMenu({
                 : "left-0 top-full mt-1 origin-top-left"
             }`}
           >
-            {/* Workspaces */}
+            {/* Organizations */}
             <div className="flex flex-col gap-px p-1.5">
               <p className="px-2 pt-1.5 pb-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                Workspaces
+                Organizations
               </p>
-              {WORKSPACES.map((ws) => (
+              {ORGANIZATIONS.map((ws) => (
                 <button
                   key={ws.id}
                   type="button"
@@ -236,13 +236,13 @@ export default function WorkspaceMenu({
                 className="mt-px flex items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-[13px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
               >
                 <Plus className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
-                <span>Create workspace</span>
+                <span>Create organization</span>
               </button>
             </div>
 
             <div className="h-px bg-hairline" />
 
-            {/* Workspace-scoped actions */}
+            {/* Organization-scoped actions */}
             <div className="flex flex-col gap-px p-1.5">
               <Link
                 href="/settings"
@@ -254,7 +254,7 @@ export default function WorkspaceMenu({
                   className="h-3.5 w-3.5 text-fg-faint"
                   aria-hidden="true"
                 />
-                Workspace settings
+                Organization settings
               </Link>
               <button
                 type="button"

@@ -27,7 +27,7 @@ const TONE_BG: Record<Tone, string> = {
  * `animate-ping`. Pair with a static center dot of the same color.
  *
  * Drop-in replacement for the `<span class="relative flex h-1.5 w-1.5">…</span>`
- * pattern used in `NetworkStatusDot`, `ModelCard`, model-detail pill, etc.
+ * pattern used in `NetworkStatusDot`, `AppCard`, model-detail pill, etc.
  */
 export default function StatusDot({
   tone = "green",

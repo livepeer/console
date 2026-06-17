@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { getModelIcon, formatRuns, isModelNew } from "@/lib/dashboard/utils";
+import { getAppIcon, formatRuns, isModelNew } from "@/lib/dashboard/utils";
 import { generateCardBackground } from "@/lib/dashboard/generate-card-visual";
 import StarButton from "@/components/dashboard/StarButton";
 import Pill from "@/components/dashboard/Pill";
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 
 function formatLatency(ms: number): string {
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
@@ -29,7 +29,7 @@ function shortUnit(unit: string): string {
   return map[unit] ?? unit.toLowerCase();
 }
 
-function formatUnitPrice(model: Model): {
+function formatUnitPrice(model: App): {
   amount: string;
   unit: string;
 } {
@@ -41,7 +41,7 @@ function formatUnitPrice(model: Model): {
 }
 
 /**
- * ModelCard — capability card per the Livepeer Dashboard design v3
+ * AppCard — capability card per the Livepeer Dashboard design v3
  * (Apr 2026, `.cap-card-*` in styles.css).
  *
  * Structure: 16:10 thumbnail with a backdrop-blur category chip pinned to the
@@ -53,22 +53,28 @@ function formatUnitPrice(model: Model): {
  * are preserved on top of the v3 chrome since they're working production
  * affordances on this surface.
  */
-export default function ModelCard({
+export default function AppCard({
   model,
   hideNewBadge = false,
+  href,
+  tag,
 }: {
-  model: Model;
+  model: App;
   /** Starred / recently-viewed contexts already imply discovery — the NEW badge reads as noise there. */
   hideNewBadge?: boolean;
+  /** Link target override. Defaults to the model-detail route; published pipelines pass their /apps/[id]. */
+  href?: string;
+  /** Optional small badge on the thumbnail (e.g. "Pipeline" for community-published apps). */
+  tag?: string;
 }) {
-  const Icon = getModelIcon(model.category);
+  const Icon = getAppIcon(model.category);
   const isWarm = model.status === "hot";
   const isNew = isModelNew(model) && !hideNewBadge;
   const price = formatUnitPrice(model);
 
   return (
     <Link
-      href={`/models/${model.id}`}
+      href={href ?? `/apps/${model.id}`}
       className="group flex flex-col overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card transition-[colors,transform] duration-150 ease-out hover:-translate-y-[1px] hover:border-strong"
     >
       {/* Thumbnail */}
@@ -93,8 +99,16 @@ export default function ModelCard({
           </div>
         )}
 
+        {/* Pipeline/community tag — top-left. Marks an Explore card that is a
+            user-published pipeline rather than a first-party network model. */}
+        {tag && (
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md border border-green-bright/30 bg-dark-card/80 px-1.5 py-0.5 text-[10.5px] font-medium text-green-bright backdrop-blur">
+            {tag}
+          </span>
+        )}
+
         {/* NEW badge — top-left, only when the model is fresh */}
-        {isNew && (
+        {!tag && isNew && (
           <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-green-bright px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-950">
             <Sparkles className="h-2.5 w-2.5" strokeWidth={2.25} />
             new
@@ -165,7 +179,7 @@ export default function ModelCard({
               </>
             }
           />
-          <Stat label="7d jobs" value={formatRuns(model.runs7d)} />
+          <Stat label="7d calls" value={formatRuns(model.runs7d)} />
         </div>
       </div>
     </Link>

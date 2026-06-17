@@ -17,6 +17,11 @@ import {
   X,
 } from "lucide-react";
 import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
+import EnvTag from "@/components/dashboard/EnvTag";
+import EnvironmentFilter, {
+  ALL_ENVIRONMENTS,
+} from "@/components/dashboard/EnvironmentFilter";
+import { getEnvironmentById } from "@/lib/dashboard/mock-data";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +29,8 @@ type Scope = "restricted" | "admin";
 
 interface KeyRow {
   id: string;
+  /** Environment this key belongs to. Keys are scoped per environment. */
+  environmentId: string;
   name: string;
   prefix: string;
   suffix: string;
@@ -43,7 +50,7 @@ const SCOPES: Record<
 > = {
   restricted: {
     label: "Restricted",
-    desc: "Run capabilities, read jobs and usage",
+    desc: "Run apps, read activity and usage",
     scopes: "/v1/inference, /v1/runs, /v1/usage",
     color: "#25ABD0",
   },
@@ -61,6 +68,7 @@ const ROTATE_DAYS_THRESHOLD = 90;
 const KEYS: KeyRow[] = [
   {
     id: "k_01",
+    environmentId: "env-production",
     name: "Production · web",
     prefix: "lp_live_x8k2",
     suffix: "m9p3",
@@ -75,6 +83,7 @@ const KEYS: KeyRow[] = [
   },
   {
     id: "k_02",
+    environmentId: "env-production",
     name: "iOS app · TestFlight",
     prefix: "lp_live_q4n7",
     suffix: "b1y8",
@@ -89,6 +98,7 @@ const KEYS: KeyRow[] = [
   },
   {
     id: "k_03",
+    environmentId: "env-development",
     name: "CI · GitHub Actions",
     prefix: "lp_test_a3f1",
     suffix: "d7c2",
@@ -100,6 +110,21 @@ const KEYS: KeyRow[] = [
     created: "Feb 02, 2025",
     createdBy: { name: "Maya", initials: "MK", color: "#7c3aed" },
     daysSinceRotation: 91,
+  },
+  {
+    id: "k_04",
+    environmentId: "env-development",
+    name: "Local dev · laptop",
+    prefix: "lp_test_k2v9",
+    suffix: "p4r1",
+    scope: "restricted",
+    lastUsed: "1h ago",
+    lastUsedHost: "localhost",
+    lastUsedIp: "127.0.0.1",
+    runs7d: 482,
+    created: "Apr 18, 2025",
+    createdBy: { name: "Maya", initials: "MK", color: "#7c3aed" },
+    daysSinceRotation: 11,
   },
 ];
 
@@ -170,6 +195,16 @@ export default function KeysView() {
   const [scopesOpen, setScopesOpen] = useState(false);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [envFilter, setEnvFilter] = useState(ALL_ENVIRONMENTS);
+
+  // Each key belongs to one environment; show all by default, narrow on demand.
+  const allEnvs = envFilter === ALL_ENVIRONMENTS;
+  const keys = allEnvs
+    ? KEYS
+    : KEYS.filter((k) => k.environmentId === envFilter);
+  const scopeLabel = allEnvs
+    ? "all environments"
+    : (getEnvironmentById(envFilter)?.name ?? "all environments");
 
   useEffect(() => {
     if (!openMenu) return;
@@ -195,7 +230,7 @@ export default function KeysView() {
     setRevealedKey(`lp_live_${random()}${random()}a9k2m9p3`);
   };
 
-  const staleKeys = KEYS.filter(
+  const staleKeys = keys.filter(
     (k) => k.daysSinceRotation >= ROTATE_DAYS_THRESHOLD,
   );
   const showAlert = staleKeys.length > 0 && !alertDismissed;
@@ -207,6 +242,7 @@ export default function KeysView() {
         icon={KeyIcon}
         actions={
           <>
+            <EnvironmentFilter value={envFilter} onChange={setEnvFilter} />
             <a
               href="https://docs.livepeer.org"
               target="_blank"
@@ -229,21 +265,20 @@ export default function KeysView() {
       />
 
       <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
-        {/* Title */}
+        {/* Title — scope (Production) is shown by the header chip; the
+            organization lives in the sidebar switcher, so no redundant crumb. */}
         <div className="mb-6">
-          <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-            Workspace · Flipbook · Authentication
-          </p>
-          <h1 className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-fg">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
             API keys
           </h1>
           <p className="mt-2.5 max-w-[640px] text-[13.5px] leading-[1.55] text-fg-muted">
-            Authenticate jobs against{" "}
+            Authenticate inference calls against{" "}
             <span className="font-mono text-[12.5px] text-fg-strong">
               api.livepeer.org
             </span>
             . Pass your key as a Bearer token in the Authorization header. Each
-            key can be scoped and revoked independently.
+            key is scoped to one environment — showing{" "}
+            <span className="font-medium text-fg-strong">{scopeLabel}</span>.
           </p>
         </div>
 
@@ -337,11 +372,18 @@ export default function KeysView() {
             <div>Key</div>
             <div>Scope</div>
             <div className="text-right">Last used</div>
-            <div className="text-right">Jobs · 7d</div>
+            <div className="text-right">Calls · 7d</div>
             <div>Created</div>
             <div />
           </div>
-          {KEYS.map((k) => {
+          {keys.length === 0 && (
+            <div className="px-4 py-12 text-center text-[13px] text-fg-faint">
+              No keys in{" "}
+              <span className="text-fg-strong">{scopeLabel}</span> yet. Create
+              one to start making calls.
+            </div>
+          )}
+          {keys.map((k) => {
             const stale = k.daysSinceRotation >= ROTATE_DAYS_THRESHOLD;
             const isOpen = openMenu === k.id;
             return (
@@ -351,8 +393,9 @@ export default function KeysView() {
               >
                 {/* Key (name + masked token) */}
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-medium text-fg">
-                    {k.name}
+                  <div className="flex items-center gap-2 text-[13.5px] font-medium text-fg">
+                    <span className="truncate">{k.name}</span>
+                    {allEnvs && <EnvTag environmentId={k.environmentId} />}
                     {stale && (
                       <span
                         // `tone-amber` is theme-aware: amber-300 in dark,
@@ -391,10 +434,10 @@ export default function KeysView() {
                   </div>
                 </div>
 
-                {/* Jobs · 7d */}
+                {/* Calls · 7d */}
                 <div className="text-right">
                   <a
-                    href={`/jobs?key=${k.id}`}
+                    href={`/calls?key=${k.id}`}
                     className="font-mono text-[13px] text-fg underline decoration-transparent decoration-1 underline-offset-[3px] transition-colors hover:text-green-bright hover:decoration-current"
                   >
                     {k.runs7d.toLocaleString()}

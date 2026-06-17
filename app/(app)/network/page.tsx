@@ -86,9 +86,9 @@ function NetworkContent() {
   );
 
   // Network is public — orchestrators, payments, and GPU inventory are
-  // network-wide state, not workspace-scoped, so the page renders for
+  // network-wide state, not organization-scoped, so the page renders for
   // signed-out visitors too. (Earlier the route was sign-in-walled to
-  // match the v4 prototype's per-workspace framing; that gate has been
+  // match the v4 prototype's per-organization framing; that gate has been
   // removed because none of the tabs surface user-specific data.)
 
   return (

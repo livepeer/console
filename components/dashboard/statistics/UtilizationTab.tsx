@@ -108,7 +108,7 @@ function LiveJobFeed() {
       <div className="hidden md:block overflow-x-auto">
         <div className="flex min-w-[600px] items-center gap-4 border-b border-hairline px-4 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">
           <span className="flex-1">Pipeline</span>
-          <span className="w-44">Model</span>
+          <span className="w-44">App</span>
           <span className="w-20 text-right">FPS</span>
           <span className="w-14 text-right">Age</span>
           <span className="w-20">Status</span>

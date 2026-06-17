@@ -24,7 +24,7 @@ const STYLES: Record<CostMode, string> = {
 const LABELS: Record<CostMode, string> = {
   free: "Free tier",
   cost: "",
-  test: "Test run",
+  test: "Test call",
 };
 
 /**

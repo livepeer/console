@@ -7,6 +7,11 @@ import StackedAreaChart, {
   genCapSeries,
 } from "@/components/dashboard/StackedAreaChart";
 
+// Usage is an organization-level view: one free-tier pool and one bill span all
+// environments (matching Modal, which keeps "Usage & Billing" at the
+// account/org tier with no environment selector). Per-environment activity
+// lives on the env-scoped Calls page instead.
+
 /**
  * UsageView — full Usage page body per the Livepeer Dashboard design v3
  * (Apr 2026, `usage-view.jsx`). Single horizontal free-tier strip + a stacked
@@ -56,20 +61,22 @@ function fmtSpend(n: number): string {
 // ── Free-tier strip ─────────────────────────────────────────────────────────
 
 function UsageStrip({
+  used,
   forecast,
   willExceed,
   daysToLimit,
   priorPeriodTotal,
   periodDelta,
 }: {
+  used: number;
   forecast: number;
   willExceed: boolean;
   daysToLimit: number;
   priorPeriodTotal: number;
   periodDelta: number;
 }) {
-  const left = FREE_LIMIT - FREE_USED;
-  const pct = Math.min(100, (FREE_USED / FREE_LIMIT) * 100);
+  const left = FREE_LIMIT - used;
+  const pct = Math.min(100, (used / FREE_LIMIT) * 100);
   const forecastPct = Math.min(100, (forecast / FREE_LIMIT) * 100);
 
   return (
@@ -80,9 +87,9 @@ function UsageStrip({
       <div className="flex flex-wrap items-baseline gap-3">
         <span className="font-mono text-[15px] tabular-nums leading-none text-fg-muted">
           <b className="mr-0.5 text-[24px] font-medium tracking-[-0.01em] text-fg">
-            {fmt(FREE_USED)}
+            {fmt(used)}
           </b>
-          <span className="text-fg-faint"> / {fmt(FREE_LIMIT)} jobs</span>
+          <span className="text-fg-faint"> / {fmt(FREE_LIMIT)} calls</span>
         </span>
         <span className="ml-auto font-mono text-[11.5px] text-fg-faint">
           resets {RESETS_AT}
@@ -126,7 +133,7 @@ function UsageStrip({
           </span>
         ) : (
           <span className="font-mono">
-            <b className="font-medium text-fg">{fmt(left)}</b> jobs left ·
+            <b className="font-medium text-fg">{fmt(left)}</b> calls left ·
             pace looks fine.
           </span>
         )}
@@ -142,16 +149,27 @@ function UsageStrip({
 
 // ── Main view ───────────────────────────────────────────────────────────────
 
-export default function UsageView() {
-  // 60-day series so we can split into "this period" + "prior period". Stable
-  // per mount via useMemo — random noise mustn't flicker between renders.
+export default function UsageView({
+  weight = 1,
+  filterName = "all environments",
+}: {
+  /** Consumption scale for the active environment filter (1 = all envs). */
+  weight?: number;
+  /** Display name of the active filter, for the subtitle. */
+  filterName?: string;
+}) {
+  const freeUsed = Math.round(FREE_USED * weight);
+
+  // 60-day series, scaled by the environment filter. Stable per (mount, weight)
+  // via useMemo — random noise mustn't flicker between renders, but the series
+  // re-scales when the filter changes.
   const caps = useMemo(
     () =>
       CAPABILITIES.map((c) => ({
         ...c,
-        data60: genCapSeries(c.base, c.drift, c.noise, 60),
+        data60: genCapSeries(c.base * weight, c.drift, c.noise, 60),
       })),
-    [],
+    [weight],
   );
 
   const sliced = caps.map((c) => ({
@@ -179,15 +197,15 @@ export default function UsageView() {
   );
   const periodDelta =
     priorPeriodTotal > 0
-      ? ((FREE_USED - priorPeriodTotal) / priorPeriodTotal) * 100
+      ? ((freeUsed - priorPeriodTotal) / priorPeriodTotal) * 100
       : 0;
 
   // Forecast: trailing 7-day average × days remaining in period
   const last7Avg =
     totalsByDay.slice(-7).reduce((a, b) => a + b, 0) / 7;
-  const forecast = Math.round(FREE_USED + last7Avg * DAYS_LEFT_IN_PERIOD);
+  const forecast = Math.round(freeUsed + last7Avg * DAYS_LEFT_IN_PERIOD);
   const willExceed = forecast > FREE_LIMIT;
-  const left = FREE_LIMIT - FREE_USED;
+  const left = FREE_LIMIT - freeUsed;
   const daysToLimit =
     left > 0 && last7Avg > 0 ? Math.max(0, Math.floor(left / last7Avg)) : 0;
 
@@ -202,8 +220,8 @@ export default function UsageView() {
     fmt: (v: number) => string;
   }[] = [
     {
-      label: "Jobs / month",
-      used: FREE_USED,
+      label: "Calls / month",
+      used: freeUsed,
       max: FREE_LIMIT,
       fmt: (v) => v.toLocaleString("en-US"),
     },
@@ -229,18 +247,28 @@ export default function UsageView() {
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
-      {/* Title */}
+      {/* Title — scope (Organization) is shown by the header chip. */}
       <div className="mb-6">
-        <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-          Workspace · Flipbook
-        </p>
-        <h1 className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-fg">
+        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
           Usage
         </h1>
+        <p className="mt-1.5 text-[12.5px] text-fg-muted">
+          Free-tier quota and spend
+          {weight === 1 ? " across all environments" : ` in ${filterName}`}. For
+          a per-environment breakdown, see your{" "}
+          <Link
+            href="/calls"
+            className="text-fg-strong underline decoration-transparent underline-offset-2 hover:decoration-current"
+          >
+            calls
+          </Link>
+          .
+        </p>
       </div>
 
       {/* Free-tier strip */}
       <UsageStrip
+        used={freeUsed}
         forecast={forecast}
         willExceed={willExceed}
         daysToLimit={daysToLimit}
@@ -253,10 +281,10 @@ export default function UsageView() {
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
           <div>
             <p className="text-[17px] font-bold text-fg">
-              Jobs by capability
+              Activity by app
             </p>
             <p className="mt-0.5 text-[12px] text-fg-muted">
-              Last {PERIOD_LABEL.toLowerCase()} · {fmt(grandReq)} jobs
+              Last {PERIOD_LABEL.toLowerCase()} · {fmt(grandReq)} calls
             </p>
           </div>
           <div className="flex flex-wrap gap-3.5 justify-end text-[11.5px] text-fg-muted">
@@ -381,8 +409,8 @@ function BreakdownTable({
       <div
         className={`${cols} border-b border-hairline bg-dark py-2.5 font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-disabled`}
       >
-        <div>Capability</div>
-        <div className="justify-self-end">Jobs · trend</div>
+        <div>App</div>
+        <div className="justify-self-end">Calls · trend</div>
         <div className="justify-self-end">Δ vs prior</div>
         <div className="justify-self-end">Share</div>
         <div className="justify-self-end">Unit price</div>
@@ -406,7 +434,7 @@ function BreakdownTable({
                 aria-hidden="true"
               />
               <Link
-                href={`/jobs?capability=${c.id}`}
+                href={`/calls?capability=${c.id}`}
                 className="truncate text-fg underline decoration-transparent decoration-1 underline-offset-[3px] transition-colors hover:text-green-bright hover:decoration-current"
               >
                 {c.name}

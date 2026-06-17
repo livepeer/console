@@ -1,5 +1,8 @@
 import type {
-  Model,
+  Environment,
+  Pipeline,
+  PipelineVisibility,
+  App,
   ApiKey,
   EcosystemApp,
   SolutionProvider,
@@ -18,9 +21,456 @@ import type {
   RoutingSummary,
 } from "./types";
 
+// ─── Environments ─────────────────────────────────────────────────────────────
+//
+// Two ship by default. Production is the default selection; Development is the
+// quieter sandbox a developer points the rate-limited free tier at before
+// promoting traffic. Keys, jobs, and usage are filtered to the active one.
+
+export const ENVIRONMENTS: Environment[] = [
+  {
+    id: "env-production",
+    name: "Production",
+    slug: "production",
+    kind: "production",
+    isDefault: true,
+  },
+  {
+    id: "env-development",
+    name: "Development",
+    slug: "development",
+    kind: "development",
+  },
+];
+
+export function getEnvironmentById(id: string): Environment | undefined {
+  return ENVIRONMENTS.find((e) => e.id === id);
+}
+
+export const DEFAULT_ENVIRONMENT: Environment =
+  ENVIRONMENTS.find((e) => e.isDefault) ?? ENVIRONMENTS[0];
+
+// ─── Apps (Pipelines) ─────────────────────────────────────────────────────────
+//
+// Deployed pipelines, grounded in the Runner SDK examples (hello_world,
+// sentiment, image_upscale, llm, live_grayscale, live_depth, live_transcribe).
+// Spread across environments with a mix of lifecycle states so the list reads
+// like a real deployment surface. `live-transcribe` is in `error` and `llm` is
+// `building` to exercise the non-happy states (matches the SDK doc's ⏳ items).
+
+const BATCH_ENDPOINTS = [
+  { method: "POST", path: "/predict", description: "Request/response inference" },
+  { method: "GET", path: "/health", description: "Health probe" },
+];
+const SSE_ENDPOINTS = [
+  { method: "POST", path: "/predict", description: "Streaming inference (SSE)" },
+  { method: "GET", path: "/health", description: "Health probe" },
+];
+const LIVE_ENDPOINTS = [
+  { method: "POST", path: "/stream/start", description: "Begin a trickle session" },
+  { method: "POST", path: "/stream/params", description: "Update params mid-stream" },
+  { method: "POST", path: "/stream/stop", description: "End the session" },
+  { method: "GET", path: "/health", description: "Health probe" },
+];
+
+const ZAIN = { name: "Zain", initials: "ZM", color: "var(--color-green)" };
+const MAYA = { name: "Maya", initials: "MK", color: "#7c3aed" };
+
+export const PIPELINES: Pipeline[] = [
+  // ── Production ──────────────────────────────────────────────────────────────
+  {
+    id: "app-sentiment",
+    name: "Sentiment",
+    pipelineId: "sentiment",
+    environmentId: "env-production",
+    kind: "batch",
+    status: "deployed",
+    visibility: "public",
+    description:
+      "Text sentiment classification. Returns a label and confidence for a string of input text.",
+    entrypoint: "pipeline:Sentiment",
+    gpu: null,
+    image: "registry.livepeer.org/flipbook/sentiment:1.4.0",
+    version: "1.4.0",
+    lastDeployedAt: "2026-05-21T14:09:00Z",
+    createdBy: ZAIN,
+    warmOrchestrators: 6,
+    calls7d: 38_400,
+    p50LatencyMs: 64,
+    errorRatePct: 0.2,
+    endpoints: BATCH_ENDPOINTS,
+    category: "Language",
+    price: { amount: 0.0008, unit: "Request" },
+  },
+  {
+    id: "app-image-upscale",
+    name: "Image Upscale",
+    pipelineId: "image-upscale",
+    environmentId: "env-production",
+    kind: "batch",
+    status: "deployed",
+    visibility: "private",
+    description:
+      "4× super-resolution upscaler. Takes an image, returns an enhanced higher-resolution image.",
+    entrypoint: "pipeline:ImageUpscale",
+    gpu: "T4",
+    image: "registry.livepeer.org/flipbook/image-upscale:2.1.3",
+    version: "2.1.3",
+    lastDeployedAt: "2026-05-18T09:42:00Z",
+    createdBy: ZAIN,
+    warmOrchestrators: 4,
+    calls7d: 9_120,
+    p50LatencyMs: 820,
+    errorRatePct: 0.6,
+    endpoints: BATCH_ENDPOINTS,
+    category: "Image Generation",
+    price: { amount: 0.004, unit: "Request" },
+  },
+  {
+    id: "app-live-grayscale",
+    name: "Live Grayscale",
+    pipelineId: "live-grayscale",
+    environmentId: "env-production",
+    kind: "live",
+    status: "deployed",
+    visibility: "public",
+    description:
+      "Real-time video-to-video filter that converts a live stream to grayscale frame-by-frame.",
+    entrypoint: "live_pipeline:Grayscale",
+    gpu: null,
+    image: "registry.livepeer.org/flipbook/live-grayscale:0.9.1",
+    version: "0.9.1",
+    lastDeployedAt: "2026-05-24T17:30:00Z",
+    createdBy: MAYA,
+    warmOrchestrators: 9,
+    calls7d: 2_240,
+    p50LatencyMs: 22,
+    errorRatePct: 0.1,
+    endpoints: LIVE_ENDPOINTS,
+    category: "Video Editing",
+    price: { amount: 0.002, unit: "Minute" },
+  },
+  {
+    id: "app-live-depth",
+    name: "Live Depth",
+    pipelineId: "live-depth",
+    environmentId: "env-production",
+    kind: "live",
+    status: "deployed",
+    visibility: "private",
+    description:
+      "Real-time monocular depth estimation over a live video stream. GPU-backed per-frame inference.",
+    entrypoint: "live_pipeline:Depth",
+    gpu: "L4",
+    image: "registry.livepeer.org/flipbook/live-depth:1.0.2",
+    version: "1.0.2",
+    lastDeployedAt: "2026-05-22T11:05:00Z",
+    createdBy: MAYA,
+    warmOrchestrators: 5,
+    calls7d: 1_360,
+    p50LatencyMs: 31,
+    errorRatePct: 0.4,
+    endpoints: LIVE_ENDPOINTS,
+    category: "Video Understanding",
+    price: { amount: 0.003, unit: "Minute" },
+  },
+  // ── Development ─────────────────────────────────────────────────────────────
+  {
+    id: "app-hello-world",
+    name: "Hello World",
+    pipelineId: "hello-world",
+    environmentId: "env-development",
+    kind: "batch",
+    status: "deployed",
+    visibility: "private",
+    description:
+      "The starter pipeline. Echoes a greeting — the first thing you deploy to confirm the path works.",
+    entrypoint: "pipeline:HelloWorld",
+    gpu: null,
+    image: "registry.livepeer.org/flipbook/hello-world:0.1.0",
+    version: "0.1.0",
+    lastDeployedAt: "2026-05-25T19:12:00Z",
+    createdBy: MAYA,
+    warmOrchestrators: 2,
+    calls7d: 240,
+    p50LatencyMs: 18,
+    errorRatePct: 0,
+    endpoints: BATCH_ENDPOINTS,
+    category: "Language",
+    price: { amount: 0.0005, unit: "Request" },
+  },
+  {
+    id: "app-llm",
+    name: "LLM (SSE)",
+    pipelineId: "llm",
+    environmentId: "env-development",
+    kind: "batch",
+    status: "building",
+    visibility: "private",
+    description:
+      "Token-streaming LLM endpoint. `predict()` yields, so responses are framed as server-sent events.",
+    entrypoint: "pipeline:LLM",
+    gpu: "L40",
+    image: "registry.livepeer.org/flipbook/llm:0.3.0",
+    version: "0.3.0",
+    lastDeployedAt: "2026-05-29T08:55:00Z",
+    createdBy: ZAIN,
+    warmOrchestrators: 0,
+    calls7d: 0,
+    p50LatencyMs: 0,
+    errorRatePct: 0,
+    endpoints: SSE_ENDPOINTS,
+    category: "Language",
+    price: { amount: 0.06, unit: "M Tokens" },
+  },
+  {
+    id: "app-live-transcribe",
+    name: "Live Transcribe",
+    pipelineId: "live-transcribe",
+    environmentId: "env-development",
+    kind: "live",
+    status: "error",
+    visibility: "private",
+    description:
+      "Audio-in, transcript-out over trickle. Currently failing — data-channel records dropped before delivery.",
+    entrypoint: "live_pipeline:Transcribe",
+    gpu: "T4",
+    image: "registry.livepeer.org/flipbook/live-transcribe:0.2.4",
+    version: "0.2.4",
+    lastDeployedAt: "2026-05-28T22:01:00Z",
+    createdBy: ZAIN,
+    warmOrchestrators: 1,
+    calls7d: 84,
+    p50LatencyMs: 140,
+    errorRatePct: 41.0,
+    endpoints: LIVE_ENDPOINTS,
+    category: "Speech",
+    price: { amount: 0.002, unit: "Minute" },
+  },
+  // ── Multi-environment deployments ───────────────────────────────────────────
+  // The same pipeline (by pipelineId) deployed into a second environment. These
+  // share `pipelineId` with their production counterparts above but are distinct
+  // per-env deployments: their own version, status, visibility, and metrics. A
+  // dev deployment is typically private (you don't publish your staging build)
+  // and may run a newer release candidate.
+  {
+    id: "app-sentiment-dev",
+    name: "Sentiment",
+    pipelineId: "sentiment",
+    environmentId: "env-development",
+    kind: "batch",
+    status: "deployed",
+    visibility: "private",
+    description:
+      "Text sentiment classification. Returns a label and confidence for a string of input text.",
+    entrypoint: "pipeline:Sentiment",
+    gpu: null,
+    image: "registry.livepeer.org/flipbook/sentiment:1.5.0-rc.2",
+    version: "1.5.0-rc.2",
+    lastDeployedAt: "2026-05-29T16:20:00Z",
+    createdBy: ZAIN,
+    warmOrchestrators: 2,
+    calls7d: 410,
+    p50LatencyMs: 66,
+    errorRatePct: 0.3,
+    endpoints: BATCH_ENDPOINTS,
+    category: "Language",
+    price: { amount: 0.0008, unit: "Request" },
+  },
+  {
+    id: "app-live-grayscale-dev",
+    name: "Live Grayscale",
+    pipelineId: "live-grayscale",
+    environmentId: "env-development",
+    kind: "live",
+    status: "deployed",
+    visibility: "private",
+    description:
+      "Real-time video-to-video filter that converts a live stream to grayscale frame-by-frame.",
+    entrypoint: "live_pipeline:Grayscale",
+    gpu: null,
+    image: "registry.livepeer.org/flipbook/live-grayscale:0.10.0-rc.1",
+    version: "0.10.0-rc.1",
+    lastDeployedAt: "2026-05-27T10:05:00Z",
+    createdBy: MAYA,
+    warmOrchestrators: 3,
+    calls7d: 180,
+    p50LatencyMs: 23,
+    errorRatePct: 0.2,
+    endpoints: LIVE_ENDPOINTS,
+    category: "Video Editing",
+    price: { amount: 0.002, unit: "Minute" },
+  },
+];
+
+export function pipelinesForEnvironment(environmentId: string): Pipeline[] {
+  return PIPELINES.filter((p) => p.environmentId === environmentId);
+}
+
+export function getPipelineById(id: string): Pipeline | undefined {
+  return PIPELINES.find((p) => p.id === id);
+}
+
+// ─── Multi-environment deployment helpers ─────────────────────────────────────
+// A pipeline's identity is its `pipelineId`; it can have a deployment in each
+// environment. These resolve the deployment set for a given pipeline so the app
+// detail can show "Deployed in: prod, dev" and follow the env switcher to the
+// right deployment.
+
+export function deploymentsForPipeline(pipelineId: string): Pipeline[] {
+  return PIPELINES.filter((p) => p.pipelineId === pipelineId);
+}
+
+export function environmentsForPipeline(pipelineId: string): string[] {
+  return deploymentsForPipeline(pipelineId).map((p) => p.environmentId);
+}
+
+export function deploymentInEnvironment(
+  pipelineId: string,
+  environmentId: string,
+): Pipeline | undefined {
+  return PIPELINES.find(
+    (p) => p.pipelineId === pipelineId && p.environmentId === environmentId,
+  );
+}
+
+// Publish state. A pipeline's visibility is whether it is listed in Explore.
+// Seed visibility lives on each Pipeline; runtime toggles are persisted as
+// per-id overrides in localStorage so the Apps Settings tab and the Explore
+// grid agree across navigation. Client-only — guarded for SSR.
+const PIPELINE_VISIBILITY_KEY = "livepeer.pipelineVisibility";
+
+function readVisibilityOverrides(): Record<string, PipelineVisibility> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(
+      localStorage.getItem(PIPELINE_VISIBILITY_KEY) || "{}",
+    ) as Record<string, PipelineVisibility>;
+  } catch {
+    return {};
+  }
+}
+
+export function effectiveVisibility(p: Pipeline): PipelineVisibility {
+  return readVisibilityOverrides()[p.id] ?? p.visibility;
+}
+
+export function setPipelineVisibility(
+  id: string,
+  visibility: PipelineVisibility,
+): void {
+  if (typeof window === "undefined") return;
+  const overrides = readVisibilityOverrides();
+  overrides[id] = visibility;
+  localStorage.setItem(PIPELINE_VISIBILITY_KEY, JSON.stringify(overrides));
+}
+
+export function publicPipelines(): Pipeline[] {
+  return PIPELINES.filter((p) => effectiveVisibility(p) === "public");
+}
+
+// A minimal playground config derived from the pipeline's kind/category, so the
+// consumer face of a published pipeline (its /apps/[id] page) is runnable like
+// any first-party capability.
+function pipelinePlayground(p: Pipeline): import("./types").PlaygroundConfig {
+  const seed = `https://picsum.photos/seed/${p.pipelineId}`;
+  if (p.kind === "live") {
+    return {
+      fields: [],
+      outputType: "video",
+      playgroundVariant: "webcam",
+      mockOutputUrl: `${seed}/640/360`,
+    };
+  }
+  if (p.category === "Image Generation") {
+    return {
+      fields: [
+        {
+          name: "image",
+          label: "Image",
+          type: "file",
+          required: true,
+          description: "Input image for the pipeline.",
+        },
+      ],
+      outputType: "image",
+      mockOutputUrl: `${seed}/1024/1024`,
+    };
+  }
+  // Default: a text-in batch pipeline returning structured JSON.
+  return {
+    fields: [
+      {
+        name: "input",
+        label: "Input",
+        type: "textarea",
+        required: true,
+        placeholder: "Enter input for the pipeline…",
+        description: `Input passed to ${p.pipelineId}.predict().`,
+      },
+    ],
+    outputType: "json",
+    mockOutputJson: {
+      pipeline_id: p.pipelineId,
+      output: { label: "positive", score: 0.97 },
+      metrics: { inference_time: p.p50LatencyMs / 1000 },
+    },
+  };
+}
+
+/**
+ * Map a Pipeline onto the App shape so its consumer face flows through the
+ * existing Explore card / model-detail / playground machinery. The Explore card
+ * and detail page both resolve via this; ownership-aware affordances (Manage)
+ * are layered on at the view level.
+ */
+export function pipelineToExploreApp(p: Pipeline): App {
+  const warm = p.status === "deployed" && p.warmOrchestrators > 0;
+  return {
+    id: p.id,
+    name: p.name,
+    provider: "Flipbook",
+    category: p.category,
+    description: p.description,
+    status: warm ? "hot" : "cold",
+    pricing: { amount: p.price.amount, unit: p.price.unit },
+    latency: p.p50LatencyMs,
+    orchestrators: p.warmOrchestrators,
+    runs7d: p.calls7d,
+    uptime: Math.max(0, 100 - p.errorRatePct),
+    realtime: p.kind === "live",
+    playgroundConfig: pipelinePlayground(p),
+  };
+}
+
+/**
+ * Resolve a capability by id for the consumer detail/playground page — a
+ * first-party model OR a pipeline (the consumer face of a deployed app). All
+ * pipelines resolve here so an owner can preview a private pipeline's
+ * playground; in production this would gate non-owners to public pipelines.
+ */
+export function getCapabilityById(id: string): App | undefined {
+  const model = getModelById(id);
+  if (model) return model;
+  const pipeline = getPipelineById(id);
+  return pipeline ? pipelineToExploreApp(pipeline) : undefined;
+}
+
+// SSR-safe seed: public pipelines by their *seed* visibility only (no
+// localStorage). Used as the initial Explore state so server and first client
+// render agree; a useEffect then swaps in the localStorage-aware set.
+export const SEED_PUBLIC_PIPELINE_APPS: App[] = PIPELINES.filter(
+  (p) => p.visibility === "public",
+).map(pipelineToExploreApp);
+
+/** Ids of pipeline-backed Explore cards — lets Explore route them to /apps/[id]. */
+export const PIPELINE_APP_IDS: ReadonlySet<string> = new Set(
+  PIPELINES.map((p) => p.id),
+);
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
-export const MODELS: Model[] = [
+export const APPS: App[] = [
   // ── Managed Services (SLA-backed) ──────────────────────────────────────────
   {
     id: "daydream-video",
@@ -836,11 +1286,11 @@ mp3, mp4, mpeg, mpga, m4a, wav, webm
         },
         {
           name: "model_size",
-          label: "Model Size",
+          label: "App Size",
           type: "select",
           options: ["small", "base", "large"],
           defaultValue: "base",
-          description: "Model variant. Larger = more accurate, slower.",
+          description: "App variant. Larger = more accurate, slower.",
         },
       ],
       outputType: "image",
@@ -1213,8 +1663,56 @@ High-performance text embedding model with 768 dimensions and 8192 token context
   },
 ];
 
-export function getModelById(id: string): Model | undefined {
-  return MODELS.find((m) => m.id === id);
+export function getModelById(id: string): App | undefined {
+  return APPS.find((m) => m.id === id);
+}
+
+// ─── Organizations (publisher profiles) ──────────────────────────────────────────
+// An organization is the publisher namespace behind an app's `provider`. Each gets a
+// public profile page at /orgs/[slug] listing its published apps — like a GitHub
+// organization page (github.com/openai). In the mock we derive organizations from
+// the distinct providers in the public catalog.
+
+export interface Organization {
+  slug: string;
+  name: string;
+  initials: string;
+}
+
+export function organizationSlug(provider: string): string {
+  return provider
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function organizationInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const raw =
+    parts.length === 1
+      ? parts[0].slice(0, 2)
+      : parts[0][0] + parts[parts.length - 1][0];
+  return raw.toUpperCase();
+}
+
+// The full public catalog: static catalog apps + published pipelines (the same
+// set Explore lists). Organization pages slice this by provider.
+function publicCatalog(): App[] {
+  return [...APPS, ...publicPipelines().map(pipelineToExploreApp)];
+}
+
+export function appsForOrganization(slug: string): App[] {
+  return publicCatalog().filter((a) => organizationSlug(a.provider) === slug);
+}
+
+export function getOrganizationBySlug(slug: string): Organization | undefined {
+  const match = publicCatalog().find((a) => organizationSlug(a.provider) === slug);
+  if (!match) return undefined;
+  return {
+    slug,
+    name: match.provider,
+    initials: organizationInitials(match.provider),
+  };
 }
 
 // ─── Solution Providers ───────────────────────────────────────────────────────
@@ -1821,8 +2319,21 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
     "key-1": "Production",
     "key-2": "Development",
   };
+  // Which environment each token's traffic belongs to. The Production token
+  // routes to production; the Development and free-tier/default tokens route to
+  // the development sandbox — so production carries the bulk of the traffic and
+  // development reads as a quieter, lower-volume environment.
+  const TOKEN_ENV: Record<string, string> = {
+    "key-1": "env-production",
+    "key-2": "env-development",
+    "key-foundation": "env-development",
+  };
 
   const specs: Spec[] = [
+    // Two live sessions streaming right now — no final duration; elapsed ticks
+    // from `minutesAgo` (when they started) and cost is still accruing.
+    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "active", latencyMs: null, costDisplay: "$0.04", minutesAgo: 3 },
+    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "active", latencyMs: null, costDisplay: "$0.21", minutesAgo: 22 },
     { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 234, costDisplay: "$0.006", minutesAgo: 2 },
     { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "success", latencyMs: 156, costDisplay: "$0.005", minutesAgo: 5 },
     { model: "flux/schnell", pipeline: "text-to-image", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 812, costDisplay: "$0.003", minutesAgo: 8 },
@@ -1855,24 +2366,52 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
     { model: "flux/schnell", pipeline: "text-to-image", signer: "ethWallet", tokenId: "key-1", status: "success", latencyMs: 833, costDisplay: "0.0000 ETH", minutesAgo: 184 },
   ];
 
+  // Live (streaming) pipelines invoke as a session; everything else is a
+  // request/response batch call. Live sessions report a duration, not a latency.
+  const LIVE_PIPELINES = new Set([
+    "video-to-video",
+    "live-video-to-video",
+    "live-transcoding",
+  ]);
+
   const now = Date.now();
-  return specs.map((s, i) => ({
-    id: `req-${i + 1}`,
-    timestamp: new Date(now - s.minutesAgo * 60_000).toISOString(),
-    model: s.model,
-    pipeline: s.pipeline,
-    status: s.status,
-    latencyMs: s.latencyMs,
-    signer: s.signer,
-    signerLabel: SIGNER_LABEL[s.signer],
-    tokenId: s.tokenId,
-    tokenName: TOKEN_LABEL[s.tokenId] ?? s.tokenId,
-    costDisplay: s.costDisplay,
-  }));
+  return specs.map((s, i) => {
+    const kind: import("./types").PipelineKind = LIVE_PIPELINES.has(s.pipeline)
+      ? "live"
+      : "batch";
+    // Deterministic 1–11 min session length for successful live calls.
+    const durationMs =
+      kind === "live" && s.status === "success"
+        ? 1000 * (60 + ((i * 71) % 600))
+        : null;
+    return {
+      id: `req-${i + 1}`,
+      environmentId: TOKEN_ENV[s.tokenId] ?? "env-production",
+      timestamp: new Date(now - s.minutesAgo * 60_000).toISOString(),
+      model: s.model,
+      pipeline: s.pipeline,
+      status: s.status,
+      kind,
+      latencyMs: s.latencyMs,
+      durationMs,
+      signer: s.signer,
+      signerLabel: SIGNER_LABEL[s.signer],
+      tokenId: s.tokenId,
+      tokenName: TOKEN_LABEL[s.tokenId] ?? s.tokenId,
+      costDisplay: s.costDisplay,
+    };
+  });
 }
 
 export const MOCK_RECENT_REQUESTS: import("./types").AccountActivityRow[] =
   generateRecentRequests();
+
+/** Recent requests scoped to a single environment. Drives Jobs + Home runs. */
+export function recentRequestsForEnvironment(
+  environmentId: string,
+): import("./types").AccountActivityRow[] {
+  return MOCK_RECENT_REQUESTS.filter((r) => r.environmentId === environmentId);
+}
 
 function generateAccountUsageDaily(): import("./types").AccountUsageDailyPoint[] {
   const data: import("./types").AccountUsageDailyPoint[] = [];

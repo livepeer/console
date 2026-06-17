@@ -1,47 +1,50 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Flame,
-  Snowflake,
   BarChart3,
   Play,
   Code,
   FileText,
-  Clock,
-  Server,
   RotateCcw,
-  Zap,
-  LayoutGrid,
-  Star,
-  Copy,
-  Check,
   Activity,
+  Box,
+  Radio,
+  ArrowUpRight,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import DashboardSubNav from "@/components/dashboard/DashboardSubNav";
 import CostTag from "@/components/dashboard/CostTag";
 import KeyBadge from "@/components/dashboard/KeyBadge";
-import JobsTable from "@/components/dashboard/JobsTable";
+import CallsTable from "@/components/dashboard/CallsTable";
 import StatusDot from "@/components/dashboard/StatusDot";
-import Tooltip from "@/components/design-system/Tooltip";
-import { useStarredModels } from "@/lib/dashboard/useStarredModels";
 import {
-  getModelById,
+  getCapabilityById,
+  getPipelineById,
+  pipelineToExploreApp,
+  effectiveVisibility,
+  setPipelineVisibility,
+  organizationSlug,
+  PIPELINE_APP_IDS,
   SETTINGS_API_KEYS,
   MOCK_RECENT_REQUESTS,
 } from "@/lib/dashboard/mock-data";
-import { getModelIcon, formatRuns, formatPrice } from "@/lib/dashboard/utils";
+import { getAppIcon } from "@/lib/dashboard/utils";
 import PlaygroundForm from "@/components/dashboard/playground/PlaygroundForm";
 import JsonInput from "@/components/dashboard/playground/JsonInput";
 import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput";
 import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
-import ModelAnalytics from "@/components/dashboard/stats/ModelAnalytics";
-import type { Model } from "@/lib/dashboard/types";
+import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
+import {
+  OverviewTab,
+  SettingsTab,
+} from "@/components/dashboard/AppDetailView";
+import type { App, PipelineVisibility } from "@/lib/dashboard/types";
 
 // ─── Tabs ───
 //
@@ -50,7 +53,18 @@ import type { Model } from "@/lib/dashboard/types";
 // specific model so the badge tracks reality (zero for empty, drops the chip
 // entirely so we don't show "Jobs (0)").
 
-type Tab = "playground" | "api" | "readme" | "stats" | "jobs";
+// Everyone sees the consumer tabs (Overview, Playground, API, README, Stats,
+// Logs); the owner additionally gets Settings — same page, one extra tab gated
+// by ownership. This is the GitHub model (everyone sees the repo; owners also
+// see Settings).
+type Tab =
+  | "overview"
+  | "playground"
+  | "api"
+  | "readme"
+  | "stats"
+  | "jobs"
+  | "settings";
 
 type TabSpec = {
   key: Tab;
@@ -59,12 +73,22 @@ type TabSpec = {
   count?: number;
 };
 
+// Overview leads when the app is deployment-backed (so there's something to
+// show). It's a read-only summary — KPIs + deployment metadata — viewable by
+// anyone who can see the app, not just the owner.
+const OVERVIEW_TAB: TabSpec = { key: "overview", label: "Overview", icon: Box };
+
 const TABS: TabSpec[] = [
   { key: "playground", label: "Playground", icon: Play },
   { key: "api", label: "API", icon: Code },
   { key: "readme", label: "README", icon: FileText },
   { key: "stats", label: "Stats", icon: BarChart3 },
-  { key: "jobs", label: "Jobs", icon: Activity },
+  { key: "jobs", label: "Logs", icon: Activity },
+];
+
+// The one ownership-gated tab — the deploy/publish controls trail the set.
+const OWNER_TABS: TabSpec[] = [
+  { key: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 // Match a model's catalog id (e.g. "flux-schnell") against an activity row's
@@ -82,7 +106,7 @@ function modelMatchesRow(catalogId: string, runModel: string): boolean {
 
 // ─── Playground Tab ───
 
-function PlaygroundTab({ model }: { model: Model }) {
+function PlaygroundTab({ model }: { model: App }) {
   const [inputMode, setInputMode] = useState<"form" | "json" | "python" | "node" | "http">("form");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -149,7 +173,7 @@ function PlaygroundTab({ model }: { model: Model }) {
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Play className="h-10 w-10 text-fg-disabled" />
         <p className="mt-3 text-sm text-fg-label">
-          Playground not available for this model
+          Playground not available for this app
         </p>
       </div>
     );
@@ -287,7 +311,7 @@ function PlaygroundTab({ model }: { model: Model }) {
 
 // ─── API Tab ───
 
-function ApiTab({ model }: { model: Model }) {
+function ApiTab({ model }: { model: App }) {
   const baseUrl = model.apiEndpoint ?? "https://gateway.livepeer.org/v1";
   const endpoint =
     model.category === "Language"
@@ -357,7 +381,7 @@ function ApiTab({ model }: { model: Model }) {
 
 // ─── README Tab ───
 
-function ReadmeTab({ model }: { model: Model }) {
+function ReadmeTab({ model }: { model: App }) {
   if (!model.readme) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -530,23 +554,21 @@ function ReadmeTab({ model }: { model: Model }) {
 
 // ─── Stats Tab ───
 
-function StatsTab({ model }: { model: Model }) {
-  return <ModelAnalytics model={model} />;
+function StatsTab({ model }: { model: App }) {
+  return <AppAnalytics model={model} />;
 }
 
 // ─── Jobs Tab ───
 //
-// Reuses the shared `JobsTable` so this surface, the home "Recent jobs" panel,
-// and the standalone `/jobs` view all render identical rows. Empty
-// state is bespoke here because the message ("No jobs yet for {model.name}")
-// is capability-specific and doesn't make sense to push into the shared
-// component.
+// Reuses the shared `CallsTable` so this surface and the standalone `/calls`
+// view render identical rows. Empty state is bespoke here because the message
+// is app-specific and doesn't make sense to push into the shared component.
 
 function JobsTab({
   model,
   runs,
 }: {
-  model: Model;
+  model: App;
   runs: import("@/lib/dashboard/types").AccountActivityRow[];
 }) {
   if (runs.length === 0) {
@@ -554,141 +576,57 @@ function JobsTab({
       <div className="flex flex-col items-center justify-center rounded-md border border-hairline bg-dark-card py-16 text-center">
         <Activity className="h-9 w-9 text-fg-disabled" strokeWidth={1.5} />
         <p className="mt-3 text-[13px] text-fg-faint">
-          No jobs yet for {model.name}
+          No logs yet for {model.name}
         </p>
         <p className="mt-1 text-[11.5px] text-fg-disabled">
-          Calls to this capability from your workspace will show up here.
+          Calls to this app from your organization will show up here.
         </p>
       </div>
     );
   }
 
-  return <JobsTable rows={runs} showHeader />;
-}
-
-// ─── Chrome bar (44px) — multi-segment breadcrumb + Pin + auth CTAs ─────────
-//
-// Mirrors the Livepeer Dashboard v3 `PageHead` for the model detail route.
-// First crumb has the grid icon + "Explore", last crumb is the model name in
-// white. Right side carries `Pin` (toggles Star). When the visitor is signed
-// out, a `Sign in` / `Sign up` pair is appended after a vertical divider —
-// same pattern as `DashboardPageHeader`, so an unauthenticated user landing
-// here from a shared model URL has the auth path one click away.
-
-function ModelChromeBar({ model }: { model: Model }) {
-  const { isStarred, toggleStar } = useStarredModels();
-  const pinned = isStarred(model.id);
-  const { isConnected, isLoading } = useAuth();
-  const pathname = usePathname() ?? "";
-  const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/signup");
-  // Hide auth CTAs while auth state is still resolving (one frame on first
-  // paint) to avoid flashing them in for connected users.
-  const showAuthCTAs = !isLoading && !isConnected && !isAuthRoute;
-
-  return (
-    <div className="flex h-[44px] shrink-0 items-center gap-1 border-b border-hairline bg-dark px-5">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1.5 rounded-[4px] px-1.5 py-1 text-[13px] text-fg-muted transition-colors hover:bg-hover hover:text-fg"
-      >
-        <LayoutGrid
-          className="h-3.5 w-3.5 shrink-0 text-fg-faint"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        />
-        <span>Explore</span>
-      </Link>
-      <span className="px-1 text-fg-disabled" aria-hidden="true">/</span>
-      <span className="px-1.5 py-1 text-[13px] font-medium text-fg truncate">
-        {model.name}
-      </span>
-
-      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => toggleStar(model.id)}
-          aria-pressed={pinned}
-          className={`inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-transparent px-2.5 text-[12.5px] transition-colors hover:border-hairline hover:bg-hover ${
-            pinned
-              ? "text-warm hover:text-warm"
-              : "text-fg-strong hover:text-fg"
-          }`}
-        >
-          <Star
-            className={`h-3 w-3 ${pinned ? "fill-warm" : ""}`}
-            aria-hidden="true"
-          />
-          {pinned ? "Pinned" : "Pin"}
-        </button>
-        {showAuthCTAs && (
-          <>
-            {/* Vertical rule separating page actions from auth CTAs.
-                Matches the recipe used in `DashboardPageHeader`. */}
-            <span
-              aria-hidden="true"
-              className="mx-2 h-5 w-px bg-[color:var(--color-border-strong)]"
-            />
-            <Link
-              href="/login"
-              className="inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="btn-primary inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
-            >
-              Sign up
-            </Link>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Model ID chip — bordered chip with copy-on-click + mono id ─────────────
-
-function ModelIdChip({ modelId }: { modelId: string }) {
-  const [copied, setCopied] = useState(false);
-  const onCopy = () => {
-    navigator.clipboard?.writeText(modelId).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
-  };
-  return (
-    <button
-      type="button"
-      onClick={onCopy}
-      title="Copy capability ID"
-      className={`inline-flex h-[28px] shrink-0 items-center gap-1.5 rounded-[4px] border px-2 font-mono text-[11.5px] transition-colors ${
-        copied
-          ? "border-green-bright/40 bg-green/15 text-green-bright"
-          : "border-hairline bg-dark-card text-fg-faint hover:border-subtle hover:text-fg-strong"
-      }`}
-    >
-      {copied ? (
-        <Check className="h-3 w-3" aria-hidden="true" />
-      ) : (
-        <Copy className="h-3 w-3" aria-hidden="true" />
-      )}
-      {modelId}
-    </button>
-  );
+  return <CallsTable rows={runs} showHeader />;
 }
 
 // ─── Main Page ───
 
-export default function ModelDetailPage() {
+export default function AppDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [activeTab, setActiveTab] = useState<Tab>("playground");
-  const model = getModelById(id);
+  const { isConnected } = useAuth();
 
-  // Jobs filtered to this model — drives both the Jobs panel and the count
-  // chip on the Jobs tab. `model` may be undefined here (404 path below); we
-  // run the hook unconditionally with a stable input to keep hook order intact.
+  // The owned deployment (exists for your apps, public or private) and the
+  // public catalog entry (exists for any listed app). The catalog object is the
+  // render base; for a private app with no catalog listing we derive it from the
+  // pipeline so the same template still works.
+  const pipeline = getPipelineById(id);
+  // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
+  // stacked apps PR. In the consumer base the app detail is view-only for
+  // everyone, so owner mode is gated off here; the stacked PR's revert removes
+  // this flag to re-enable ownership.
+  const OWNER_MODE_ENABLED = false;
+  const isOwner = OWNER_MODE_ENABLED && isConnected && PIPELINE_APP_IDS.has(id);
+  const model =
+    getCapabilityById(id) ??
+    (pipeline ? pipelineToExploreApp(pipeline) : undefined);
+
+  // Visibility (publish state) for the owner Settings tab.
+  const [visibility, setVisibility] = useState<PipelineVisibility>(
+    pipeline?.visibility ?? "private",
+  );
+  useEffect(() => {
+    if (pipeline) setVisibility(effectiveVisibility(pipeline));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  const toggleVisibility = () => {
+    if (!pipeline) return;
+    const next: PipelineVisibility =
+      visibility === "public" ? "private" : "public";
+    setPipelineVisibility(pipeline.id, next);
+    setVisibility(next);
+  };
+
+  // Runs filtered to this app — drives both the Runs panel and the count chip.
+  // `model` may be undefined (404 path below); run the hook unconditionally.
   const filteredRuns = useMemo(() => {
     if (!model) return [];
     return MOCK_RECENT_REQUESTS.filter((r) =>
@@ -696,22 +634,39 @@ export default function ModelDetailPage() {
     );
   }, [model]);
 
-  // Tabs spec is rebuilt per-render so the Jobs count tracks the filtered set.
-  const tabs: TabSpec[] = useMemo(
-    () =>
-      TABS.map((t) =>
-        t.key === "jobs" ? { ...t, count: filteredRuns.length } : t,
-      ),
-    [filteredRuns.length],
-  );
+  // Tab set: Overview (when deployment-backed) + the consumer tabs are shown to
+  // everyone; owners additionally get the Settings trail.
+  const tabs: TabSpec[] = useMemo(() => {
+    const consumer = TABS.map((t) =>
+      t.key === "jobs" ? { ...t, count: filteredRuns.length } : t,
+    );
+    const base = pipeline ? [OVERVIEW_TAB, ...consumer] : consumer;
+    return isOwner ? [...base, ...OWNER_TABS] : base;
+  }, [filteredRuns.length, isOwner, pipeline]);
+
+  // Default landing tab: owners land on Overview (the console chrome); everyone
+  // else on Playground. A `?tab=` param overrides when the viewer has that tab.
+  const defaultTab: Tab = isOwner ? "overview" : "playground";
+  const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get(
+      "tab",
+    ) as Tab | null;
+    setActiveTab(
+      requested && tabs.some((t) => t.key === requested)
+        ? requested
+        : defaultTab,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isOwner]);
 
   if (!model) {
     return (
       <main id="main-content" className="flex flex-1 flex-col bg-dark">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <p className="text-sm text-fg-label">Model not found</p>
+          <p className="text-sm text-fg-label">App not found</p>
           <Link
-            href="/"
+            href="/explore"
             className="mt-3 text-xs text-green-bright hover:underline focus:outline-none rounded"
           >
             Back to Explore
@@ -721,22 +676,72 @@ export default function ModelDetailPage() {
     );
   }
 
-  const Icon = getModelIcon(model.category);
+  const Icon = getAppIcon(model.category);
+
+  // One status indicator: deploy state for owners, runtime liveness for
+  // consumers. One type indicator: Live (streaming) vs Batch (request/response).
+  const statusTone =
+    isOwner && pipeline
+      ? pipeline.status === "deployed"
+        ? "green"
+        : pipeline.status === "error"
+          ? "red"
+          : pipeline.status === "building"
+            ? "amber"
+            : "blue"
+      : model.status === "hot"
+        ? "warm"
+        : "blue";
+  const statusLabel =
+    isOwner && pipeline
+      ? pipeline.status === "deployed"
+        ? "Deployed"
+        : pipeline.status === "building"
+          ? "Building"
+          : pipeline.status === "error"
+            ? "Error"
+            : "Stopped"
+      : model.status === "hot"
+        ? "warm"
+        : "cold";
+  const statusStatic =
+    isOwner && pipeline
+      ? pipeline.status !== "deployed"
+      : model.status !== "hot";
+  const isLive =
+    isOwner && pipeline ? pipeline.kind === "live" : Boolean(model.realtime);
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
-      {/* Chrome bar — full multi-segment breadcrumb on the left,
-          Pin + Docs actions on the right. Per the Livepeer Dashboard v3
-          design (`PageHead` with `crumbs={[{ icon: 'grid', label: 'Explore' }, ...]}`). */}
-      <ModelChromeBar model={model} />
+      {/* Navigation header — full-width bar carrying the organization / app
+          breadcrumb (the app's owning organization for owners, the publisher for
+          consumers). */}
+      <div className="flex h-[44px] shrink-0 items-center border-b border-hairline bg-dark px-5">
+        <nav
+          className="flex items-center gap-1.5 text-[13px]"
+          aria-label="Breadcrumb"
+        >
+          <Link
+            href={`/orgs/${organizationSlug(model.provider)}`}
+            className="text-fg-muted transition-colors hover:text-fg"
+          >
+            {model.provider}
+          </Link>
+          <span className="text-fg-disabled" aria-hidden="true">
+            /
+          </span>
+          <span className="truncate font-medium text-fg">{model.name}</span>
+        </nav>
+      </div>
 
       <div className="flex-1">
         <div className="mx-auto max-w-5xl px-7 pt-7 pb-8">
-          {/* mdv2-head — thumbnail + eyebrow + title + desc, ID chip on the right */}
-          <div className="grid grid-cols-[auto_1fr_auto] items-start gap-5 pb-5">
-            {/* Thumbnail uses the model's coverImage when available; falls back
-                to a bordered icon tile that matches the v3 design glow. */}
-            <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-md border border-subtle bg-dark-card">
+          {/* Identity row — thumbnail · name · status · type · visibility ·
+              Open playground. Identical for every app detail view; dense
+              metrics live in the Overview / Stats tabs. */}
+          <div className="flex items-start gap-4">
+            {/* Thumbnail — cover image, or a bordered icon tile fallback. */}
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-subtle bg-dark-card">
               {model.coverImage ? (
                 <img
                   src={model.coverImage}
@@ -745,10 +750,6 @@ export default function ModelDetailPage() {
                 />
               ) : (
                 <div
-                  // Theme-aware fallback tile: uses the surface ramp tokens so
-                  // the gradient softens to a light-zinc tile in light mode.
-                  // The green halo is a constant brand accent and reads on
-                  // both themes.
                   className="grid h-full w-full place-items-center text-green-bright"
                   style={{
                     background:
@@ -757,115 +758,66 @@ export default function ModelDetailPage() {
                   }}
                   aria-hidden="true"
                 >
-                  <Icon className="h-7 w-7" strokeWidth={1.5} />
+                  <Icon className="h-6 w-6" strokeWidth={1.5} />
                 </div>
               )}
             </div>
 
-            <div className="min-w-0">
-              <p className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-fg-faint">
-                {model.provider}
-              </p>
-              <div className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h1 className="text-[28px] font-medium leading-[1.15] tracking-[-0.015em] text-fg text-balance break-words">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
                   {model.name}
                 </h1>
-                {model.precision && (
-                  <span className="font-mono text-[12px] text-fg-faint">
-                    {model.precision}
-                  </span>
-                )}
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
+                  <StatusDot tone={statusTone} static={statusStatic} />
+                  {statusLabel}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong">
+                  {isLive ? (
+                    <Radio
+                      className="h-3 w-3 text-blue-bright"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
+                  )}
+                  {isLive ? "Live" : "Batch"}
+                </span>
+                {isOwner &&
+                  (visibility === "public" ? (
+                    <Link
+                      href="/explore"
+                      className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
+                      title="Listed in Explore"
+                    >
+                      Public
+                      <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-hairline bg-dark-card px-2 py-px text-[11px] text-fg-faint">
+                      Private
+                    </span>
+                  ))}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("playground")}
+                  className="ml-auto inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-subtle bg-dark-card px-2.5 text-[12px] font-medium text-fg-strong whitespace-nowrap transition-colors hover:border-strong hover:bg-hover hover:text-fg"
+                >
+                  <Play className="h-3 w-3 text-green-bright" aria-hidden="true" />
+                  Open playground
+                </button>
               </div>
-              <p className="mt-2 max-w-[72ch] text-[13.5px] leading-[1.5] text-fg-muted">
+              <p className="mt-2 max-w-[680px] text-[13.5px] leading-[1.5] text-fg-muted">
                 {model.description}
               </p>
             </div>
-
-            {/* ID chip — bordered, with copy icon and the model id in mono.
-                Replaces the previous Star+Copy split since `Pin` now lives in
-                the chrome bar above. */}
-            <ModelIdChip modelId={model.id} />
-          </div>
-
-          {/* mdv2-strip — single bordered metadata row with right-aligned Run sample CTA */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-hairline py-2.5">
-            {model.status === "hot" ? (
-              <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-green-bright/30 bg-green/15 px-2 py-0.5 font-mono text-[10.5px] lowercase tracking-[0.02em] text-green-bright">
-                <StatusDot tone="warm" />
-                warm
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-hairline bg-dark-card px-2 py-0.5 font-mono text-[10.5px] lowercase tracking-[0.02em] text-fg-faint">
-                <Snowflake className="h-2.5 w-2.5" />
-                cold
-              </span>
-            )}
-            {model.realtime && (
-              <Tooltip content="Supports streaming (WebRTC) inference">
-                <Link
-                  href="/?realtime=1"
-                  className="inline-flex items-center gap-1.5 rounded-[3px] border border-green-bright/22 bg-green-bright/8 px-2 py-0.5 font-mono text-[10.5px] lowercase tracking-[0.02em] text-green-bright transition-colors hover:bg-green-bright/15"
-                >
-                  <Zap className="h-2.5 w-2.5" fill="currentColor" />
-                  realtime
-                </Link>
-              </Tooltip>
-            )}
-            <Link
-              href={`/?category=${encodeURIComponent(model.category)}`}
-              // Theme-aware purple pill: tokens flip to a darker purple in
-              // light mode so it reads ~6:1 against zinc-100 instead of the
-              // washed-out lavender the dark-only literals produced.
-              className="inline-flex items-center gap-1.5 rounded-[3px] border px-2 py-0.5 font-mono text-[10.5px] lowercase tracking-[0.02em] transition-colors"
-              style={{
-                color: "var(--token-pill-purple-fg)",
-                borderColor: "var(--token-pill-purple-border)",
-                background: "var(--token-pill-purple-bg)",
-              }}
-            >
-              {model.category}
-            </Link>
-
-            <span
-              className="hidden h-3 w-px shrink-0 sm:block"
-              style={{ background: "var(--color-pop)" }}
-              aria-hidden="true"
-            />
-
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-fg-muted">
-              <Clock className="h-3 w-3 text-fg-disabled" aria-hidden="true" />
-              <b className="font-medium text-fg-strong">{model.latency}ms</b>
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-fg-muted">
-              <Server className="h-3 w-3 text-fg-disabled" aria-hidden="true" />
-              <b className="font-medium text-fg-strong">{model.orchestrators}</b>
-              <span className="text-fg-disabled">GPUs</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-fg-muted">
-              <Flame className="h-3 w-3 text-fg-disabled" aria-hidden="true" />
-              <b className="font-medium text-fg-strong">{formatRuns(model.runs7d)}</b>
-              <span className="text-fg-disabled">jobs</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] text-fg-strong">
-              <b className="font-medium text-fg">{formatPrice(model)}</b>
-            </span>
-
-            <span className="ml-auto" />
-            <button
-              type="button"
-              onClick={() => setActiveTab("playground")}
-              className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-subtle bg-dark-card px-2.5 text-[12px] font-medium text-fg-strong whitespace-nowrap transition-colors hover:border-strong hover:bg-hover hover:text-fg"
-            >
-              <Play className="h-3 w-3 text-green-bright" aria-hidden="true" />
-              Run sample
-            </button>
           </div>
 
           {/* Tabs — flush document-style underline (mdv2-tabs) */}
           <div
             className="mt-6 hidden gap-0 overflow-x-auto border-b border-hairline md:flex"
             role="tablist"
-            aria-label="Model section"
+            aria-label="App section"
             style={{ scrollbarWidth: "none" }}
             onKeyDown={(e) => {
               const i = tabs.findIndex((t) => t.key === activeTab);
@@ -930,7 +882,7 @@ export default function ModelDetailPage() {
           {/* Tabs — mobile scroll strip */}
           <DashboardSubNav
             hideAt="md"
-            ariaLabel="Model section"
+            ariaLabel="App section"
             tabs={tabs}
             activeKey={activeTab}
             onChange={(key) => setActiveTab(key as Tab)}
@@ -944,6 +896,18 @@ export default function ModelDetailPage() {
             id={`tabpanel-${activeTab}`}
             aria-labelledby={`tab-${activeTab}`}
           >
+            {/* Overview (read-only summary, shown to anyone) + Settings (owner
+                only) reuse the deployment-console chrome verbatim. */}
+            {activeTab === "overview" && pipeline && (
+              <OverviewTab app={pipeline} />
+            )}
+            {activeTab === "settings" && pipeline && (
+              <SettingsTab
+                app={pipeline}
+                visibility={visibility}
+                onToggleVisibility={toggleVisibility}
+              />
+            )}
             {activeTab === "playground" && <PlaygroundTab model={model} />}
             {activeTab === "api" && <ApiTab model={model} />}
             {activeTab === "readme" && <ReadmeTab model={model} />}

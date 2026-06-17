@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Download } from "lucide-react";
-import type { Model, PlaygroundOutputType } from "@/lib/dashboard/types";
+import type { App, PlaygroundOutputType } from "@/lib/dashboard/types";
 import {
   estimateCallCost,
   generateMockRequestId,
-  getModelIcon,
+  getAppIcon,
 } from "@/lib/dashboard/utils";
-import type { ModelCategory } from "@/lib/dashboard/types";
+import type { AppCategory } from "@/lib/dashboard/types";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import CopyButton from "@/components/dashboard/CopyButton";
 import CostTag from "@/components/dashboard/CostTag";
@@ -21,15 +21,15 @@ interface PlaygroundOutputProps {
   result: string | null;
   isRunning: boolean;
   inferenceTime?: number;
-  category?: ModelCategory;
+  category?: AppCategory;
   modelName?: string;
-  /** Model-specific response shape for the JSON tab. When provided, replaces
+  /** App-specific response shape for the JSON tab. When provided, replaces
    *  the generic { status, output, metrics } envelope — gives developers a real
    *  response shape (detection boxes, depth stats, masks) to integrate against. */
   mockOutputJson?: unknown;
   /** When provided alongside `lastRunValues`, the result panel renders a
    *  "Use this in your code" section with snippets that match what was just run. */
-  model?: Model;
+  model?: App;
   lastRunValues?: Record<string, unknown> | null;
 }
 
@@ -139,10 +139,10 @@ function EmptyState({
   modelName,
 }: {
   outputType: PlaygroundOutputType;
-  category?: ModelCategory;
+  category?: AppCategory;
   modelName?: string;
 }) {
-  const Icon = category ? getModelIcon(category) : null;
+  const Icon = category ? getAppIcon(category) : null;
   const label = modelName ? `Run ${modelName} to see output here` : "Fill in the form and click Run";
 
   // Chat-like empty state for LLM outputs — matches Replicate/Chutes convention

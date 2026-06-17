@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import CopyButton from "@/components/dashboard/CopyButton";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { STARTER_API_KEY } from "@/lib/dashboard/mock-data";
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 
 type Lang = "curl" | "python" | "node" | "http";
 
@@ -26,7 +26,7 @@ function makeMockToken(prefix: string): string {
 }
 
 function generateSnippets(
-  model: Model,
+  model: App,
   token: string,
   runValues?: Record<string, unknown>,
 ): Record<Lang, string> {
@@ -170,7 +170,7 @@ export default function CodeSnippets({
   fixedLang,
   runValues,
 }: {
-  model: Model;
+  model: App;
   fixedLang?: Lang;
   /** When provided, snippets bake these values into the request body instead of
    *  the generic example. Used by the Playground's "Copy code for this run". */

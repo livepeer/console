@@ -1,18 +1,34 @@
-// Primary nav for the dashboard sidebar:
-//   Home (G H) → Explore (47) → Jobs (1.2K) → Usage → API keys (3) → Settings ›
+// Primary nav for the dashboard sidebar, grouped into three tiers by scope:
+//   - "home"        → Home (the ungrouped dashboard root)
+//   - "network"     → Explore (the global capability catalog you *consume*) and
+//                     Stats (network-wide orchestrator/GPU/payment health).
+//                     Network-wide, not environment-scoped.
+//   - "environment" → API keys (your call credential, scoped to the active
+//                     environment). The environment switcher heads this group.
+//                     API keys here are the *call* credential (env-scoped,
+//                     Stripe-style).
+//   - "organization"   → Usage, Calls, and Settings (members, billing, plan,
+//                     profile, deploy tokens) — env-agnostic. Usage is one
+//                     free-tier pool / one bill across all environments
+//                     (matching Modal's organization-level "Usage & Billing"),
+//                     so it sits OUTSIDE the environment switcher's scope.
+//                     Calls is the per-request log behind Usage — every call
+//                     this organization made (batch + live).
 // Settings carries a chev-right (rendered by NavLink via `submenu: true`)
 // instead of a count, signaling that it leads into a sub-experience.
 export const PORTAL_NAV_ITEMS = [
-  { label: "Home", href: "/home", icon: "House" as const, kbd: "G H" },
-  { label: "Explore", href: "/", icon: "LayoutGrid" as const },
-  { label: "Jobs", href: "/jobs", icon: "Activity" as const },
-  { label: "Usage", href: "/usage", icon: "BarChart3" as const },
-  { label: "API keys", href: "/keys", icon: "Key" as const },
+  { label: "Home", href: "/home", icon: "House" as const, kbd: "G H", zone: "home" as const },
+  { label: "Explore", href: "/explore", icon: "LayoutGrid" as const, zone: "network" as const },
+  { label: "Stats", href: "/network", icon: "Globe" as const, zone: "network" as const },
+  { label: "API keys", href: "/keys", icon: "Key" as const, zone: "environment" as const },
+  { label: "Usage", href: "/usage", icon: "BarChart3" as const, zone: "organization" as const },
+  { label: "Calls", href: "/calls", icon: "Activity" as const, zone: "organization" as const },
   {
     label: "Settings",
     href: "/settings",
     icon: "Settings" as const,
     submenu: true,
+    zone: "organization" as const,
   },
 ] as const;
 
