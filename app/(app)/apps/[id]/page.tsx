@@ -73,9 +73,10 @@ type TabSpec = {
   count?: number;
 };
 
-// Overview leads when the app is deployment-backed (so there's something to
-// show). It's a read-only summary — KPIs + deployment metadata — viewable by
-// anyone who can see the app, not just the owner.
+// Overview is the app's front page and the default tab for everyone. It's a
+// read-only summary — headline stats + how to call it, plus deployment metadata
+// when the app is deployment-backed — rendered from the catalog model, so it's
+// available for any app, not just the org's own deployments.
 const OVERVIEW_TAB: TabSpec = { key: "overview", label: "Overview", icon: Box };
 
 const TABS: TabSpec[] = [
@@ -634,19 +635,21 @@ export default function AppDetailPage() {
     );
   }, [model]);
 
-  // Tab set: Overview (when deployment-backed) + the consumer tabs are shown to
-  // everyone; owners additionally get the Settings trail.
+  // Tab set: Overview + the consumer tabs are shown to everyone (Overview
+  // renders from the catalog model, so it's there for any app); owners
+  // additionally get the Settings trail.
   const tabs: TabSpec[] = useMemo(() => {
     const consumer = TABS.map((t) =>
       t.key === "jobs" ? { ...t, count: filteredRuns.length } : t,
     );
-    const base = pipeline ? [OVERVIEW_TAB, ...consumer] : consumer;
+    const base = [OVERVIEW_TAB, ...consumer];
     return isOwner ? [...base, ...OWNER_TABS] : base;
-  }, [filteredRuns.length, isOwner, pipeline]);
+  }, [filteredRuns.length, isOwner]);
 
-  // Default landing tab: owners land on Overview (the console chrome); everyone
-  // else on Playground. A `?tab=` param overrides when the viewer has that tab.
-  const defaultTab: Tab = isOwner ? "overview" : "playground";
+  // Default landing tab: Overview — the app's front page (what it is, how it
+  // performs, how to call it). A `?tab=` param overrides when the viewer has
+  // that tab.
+  const defaultTab: Tab = "overview";
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get(
@@ -897,9 +900,11 @@ export default function AppDetailPage() {
             aria-labelledby={`tab-${activeTab}`}
           >
             {/* Overview (read-only summary, shown to anyone) + Settings (owner
-                only) reuse the deployment-console chrome verbatim. */}
-            {activeTab === "overview" && pipeline && (
-              <OverviewTab app={pipeline} />
+                only) reuse the deployment-console chrome verbatim. Overview
+                renders from the catalog model, so it works for any app; the
+                deployment manifest, when present, enriches it. */}
+            {activeTab === "overview" && (
+              <OverviewTab model={model} pipeline={pipeline} />
             )}
             {activeTab === "settings" && pipeline && (
               <SettingsTab

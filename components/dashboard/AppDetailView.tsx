@@ -28,8 +28,11 @@ import {
   setPipelineVisibility,
   deploymentsForPipeline,
   getEnvironmentById,
+  pipelineToExploreApp,
 } from "@/lib/dashboard/mock-data";
+import { formatPrice } from "@/lib/dashboard/utils";
 import type {
+  App,
   Pipeline,
   PipelineStatusKind,
   PipelineVisibility,
@@ -116,17 +119,39 @@ function Card({
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
-export function OverviewTab({ app }: { app: Pipeline }) {
-  const baseUrl =
-    app.kind === "live"
-      ? `wss://api.livepeer.org/live/${app.pipelineId}`
-      : `https://api.livepeer.org/run/${app.pipelineId}`;
+/**
+ * OverviewTab — the app's front page, shown to anyone (consumer or owner).
+ *
+ * It renders from the catalog `model` (App), which exists for every app, so it
+ * works for the public apps a consumer browses from Explore — not just the
+ * org's own deployments. The deployment manifest (`pipeline`) is optional: when
+ * present (the org's deployment-backed apps) it adds the Deployment + Schema
+ * cards and the per-route endpoint list; when absent (a public catalog app) a
+ * lighter Details card stands in so the tab is still useful.
+ */
+export function OverviewTab({
+  model,
+  pipeline,
+}: {
+  model: App;
+  pipeline?: Pipeline;
+}) {
+  // Call endpoint — the deployed pipelineId when we have it, else the catalog
+  // slug. Live apps stream over a websocket; batch apps are request/response.
+  const slug = pipeline?.pipelineId ?? model.id;
+  const isLive = pipeline ? pipeline.kind === "live" : Boolean(model.realtime);
+  const baseUrl = isLive
+    ? `wss://api.livepeer.org/live/${slug}`
+    : `https://api.livepeer.org/run/${slug}`;
 
+  // The request schema is derived from the deployment manifest, so it's only
+  // available for deployment-backed apps.
   const schema = useMemo(() => {
-    if (app.kind === "live") {
+    if (!pipeline) return null;
+    if (pipeline.kind === "live") {
       return JSON.stringify(
         {
-          pipeline_id: app.pipelineId,
+          pipeline_id: pipeline.pipelineId,
           transport: "trickle",
           channels: ["video", "events", "data"],
           params: { type: "object", additionalProperties: true },
@@ -137,102 +162,114 @@ export function OverviewTab({ app }: { app: Pipeline }) {
     }
     return JSON.stringify(
       {
-        pipeline_id: app.pipelineId,
+        pipeline_id: pipeline.pipelineId,
         input: { type: "object", required: ["input"] },
         output: { type: "object" },
-        streaming: app.name.includes("SSE"),
+        streaming: pipeline.name.includes("SSE"),
       },
       null,
       2,
     );
-  }, [app]);
+  }, [pipeline]);
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Headline stats — from the catalog model, available for every app.
+          Warm-orchestrator count is a liveness/capacity signal for the caller. */}
       <KpiStrip cols={4}>
-        <KpiCard
-          label="Calls · 7d"
-          value={app.calls7d.toLocaleString()}
-        />
+        <KpiCard label="Calls · 7d" value={model.runs7d.toLocaleString()} />
         <KpiCard
           label="p50 latency"
-          value={app.p50LatencyMs > 0 ? String(app.p50LatencyMs) : "—"}
-          unit={app.p50LatencyMs > 0 ? "ms" : undefined}
+          value={model.latency > 0 ? String(model.latency) : "—"}
+          unit={model.latency > 0 ? "ms" : undefined}
         />
-        <KpiCard
-          label="Error rate"
-          value={app.errorRatePct.toFixed(1)}
-          unit="%"
-        />
+        <KpiCard label="Uptime" value={model.uptime.toFixed(1)} unit="%" />
         <KpiCard
           label="Warm orchestrators"
-          value={String(app.warmOrchestrators)}
+          value={String(model.orchestrators)}
         />
       </KpiStrip>
 
-      <Card title="Deployment" icon={Box}>
-        <MetaRow label="Pipeline ID">
-          <span className="font-mono text-[12.5px]">{app.pipelineId}</span>
-        </MetaRow>
-        <MetaRow label="Entrypoint">
-          <span className="font-mono text-[12.5px]">{app.entrypoint}</span>
-        </MetaRow>
-        <MetaRow label="Image">
-          <span className="font-mono text-[12px] text-fg-muted">
-            {app.image}
-          </span>
-        </MetaRow>
-        <MetaRow label="Version">
-          <span className="font-mono text-[12.5px]">{app.version}</span>
-        </MetaRow>
-        <MetaRow label="GPU">
-          {app.gpu ? (
-            <span className="font-mono text-[12.5px]">{app.gpu}</span>
-          ) : (
-            <span className="text-fg-faint">CPU</span>
-          )}
-        </MetaRow>
-        <MetaRow label="Last deployed">{formatDeployed(app.lastDeployedAt)}</MetaRow>
-        <MetaRow label="Deployed by">
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              className="grid h-4 w-4 place-items-center rounded text-[8.5px] font-semibold text-white"
-              style={{ background: app.createdBy.color }}
-              aria-hidden="true"
-            >
-              {app.createdBy.initials}
+      {pipeline ? (
+        <Card title="Deployment" icon={Box}>
+          <MetaRow label="Pipeline ID">
+            <span className="font-mono text-[12.5px]">{pipeline.pipelineId}</span>
+          </MetaRow>
+          <MetaRow label="Entrypoint">
+            <span className="font-mono text-[12.5px]">{pipeline.entrypoint}</span>
+          </MetaRow>
+          <MetaRow label="Image">
+            <span className="font-mono text-[12px] text-fg-muted">
+              {pipeline.image}
             </span>
-            {app.createdBy.name}
-          </span>
-        </MetaRow>
-        <MetaRow label="Environments">
-          <span className="flex flex-wrap items-center gap-1.5">
-            {deploymentsForPipeline(app.pipelineId).map((d) => {
-              const env = getEnvironmentById(d.environmentId);
-              const dotColor =
-                env?.kind === "production"
-                  ? "var(--color-green-bright)"
-                  : "var(--color-blue-bright)";
-              return (
-                <span
-                  key={d.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-2 py-0.5 text-[11.5px] text-fg-strong"
-                >
+          </MetaRow>
+          <MetaRow label="Version">
+            <span className="font-mono text-[12.5px]">{pipeline.version}</span>
+          </MetaRow>
+          <MetaRow label="GPU">
+            {pipeline.gpu ? (
+              <span className="font-mono text-[12.5px]">{pipeline.gpu}</span>
+            ) : (
+              <span className="text-fg-faint">CPU</span>
+            )}
+          </MetaRow>
+          <MetaRow label="Last deployed">
+            {formatDeployed(pipeline.lastDeployedAt)}
+          </MetaRow>
+          <MetaRow label="Deployed by">
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="grid h-4 w-4 place-items-center rounded text-[8.5px] font-semibold text-white"
+                style={{ background: pipeline.createdBy.color }}
+                aria-hidden="true"
+              >
+                {pipeline.createdBy.initials}
+              </span>
+              {pipeline.createdBy.name}
+            </span>
+          </MetaRow>
+          <MetaRow label="Environments">
+            <span className="flex flex-wrap items-center gap-1.5">
+              {deploymentsForPipeline(pipeline.pipelineId).map((d) => {
+                const env = getEnvironmentById(d.environmentId);
+                const dotColor =
+                  env?.kind === "production"
+                    ? "var(--color-green-bright)"
+                    : "var(--color-blue-bright)";
+                return (
                   <span
-                    className="h-[5px] w-[5px] rounded-full"
-                    style={{ background: dotColor }}
-                    aria-hidden="true"
-                  />
-                  {env?.name ?? d.environmentId}
-                </span>
-              );
-            })}
-          </span>
-        </MetaRow>
-      </Card>
+                    key={d.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-2 py-0.5 text-[11.5px] text-fg-strong"
+                  >
+                    <span
+                      className="h-[5px] w-[5px] rounded-full"
+                      style={{ background: dotColor }}
+                      aria-hidden="true"
+                    />
+                    {env?.name ?? d.environmentId}
+                  </span>
+                );
+              })}
+            </span>
+          </MetaRow>
+        </Card>
+      ) : (
+        <Card title="Details" icon={ScrollText}>
+          <MetaRow label="Provider">{model.provider}</MetaRow>
+          <MetaRow label="Category">
+            <span className="font-mono text-[12.5px]">{model.category}</span>
+          </MetaRow>
+          <MetaRow label="Type">
+            {isLive ? "Live · streaming" : "Batch · request/response"}
+          </MetaRow>
+          <MetaRow label="Pricing">
+            <span className="font-mono text-[12.5px]">{formatPrice(model)}</span>
+          </MetaRow>
+        </Card>
+      )}
 
       <Card title="Endpoint" icon={Globe}>
-        <div className="border-b border-hairline px-4 py-3">
+        <div className="border-b border-hairline px-4 py-3 last:border-b-0">
           <div className="flex items-center gap-2 rounded-[6px] border border-subtle bg-dark px-3 py-2">
             <span className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[12.5px] text-fg">
               {baseUrl}
@@ -240,35 +277,39 @@ export function OverviewTab({ app }: { app: Pipeline }) {
             <CopyButton value={baseUrl} iconOnly />
           </div>
         </div>
-        <div className="px-1 py-1">
-          {app.endpoints.map((e) => (
-            <div
-              key={`${e.method} ${e.path}`}
-              className="flex items-center gap-3 rounded-[4px] px-3 py-2"
-            >
-              <span className="w-12 shrink-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] text-green-bright">
-                {e.method}
-              </span>
-              <span className="font-mono text-[12.5px] text-fg-strong">
-                {e.path}
-              </span>
-              {e.description && (
-                <span className="ml-auto truncate text-[11.5px] text-fg-faint">
-                  {e.description}
+        {pipeline && (
+          <div className="px-1 py-1">
+            {pipeline.endpoints.map((e) => (
+              <div
+                key={`${e.method} ${e.path}`}
+                className="flex items-center gap-3 rounded-[4px] px-3 py-2"
+              >
+                <span className="w-12 shrink-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.04em] text-green-bright">
+                  {e.method}
                 </span>
-              )}
-            </div>
-          ))}
-        </div>
+                <span className="font-mono text-[12.5px] text-fg-strong">
+                  {e.path}
+                </span>
+                {e.description && (
+                  <span className="ml-auto truncate text-[11.5px] text-fg-faint">
+                    {e.description}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
-      <Card title="Schema" icon={FileJson}>
-        <div className="px-4 py-3">
-          <pre className="overflow-x-auto rounded-[6px] border border-subtle bg-dark px-3 py-2.5 font-mono text-[12px] leading-[1.6] text-fg-muted">
-            {schema}
-          </pre>
-        </div>
-      </Card>
+      {schema && (
+        <Card title="Schema" icon={FileJson}>
+          <div className="px-4 py-3">
+            <pre className="overflow-x-auto rounded-[6px] border border-subtle bg-dark px-3 py-2.5 font-mono text-[12px] leading-[1.6] text-fg-muted">
+              {schema}
+            </pre>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -763,7 +804,9 @@ export default function AppDetailView({ appId }: { appId: string }) {
 
       {/* Tab content */}
       <div className="mx-auto w-full max-w-[1024px] px-7 pb-20 pt-6">
-        {tab === "overview" && <OverviewTab app={app} />}
+        {tab === "overview" && (
+          <OverviewTab model={pipelineToExploreApp(app)} pipeline={app} />
+        )}
         {tab === "logs" && <LogsTab app={app} />}
         {tab === "settings" && (
           <SettingsTab
