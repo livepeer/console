@@ -1,4 +1,4 @@
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 
 const DEFAULT_GATEWAY_BASE = "https://gateway.livepeer.org/v1";
 
@@ -7,7 +7,7 @@ function isHttpUrl(value: string): boolean {
 }
 
 /** Gateway base URL for snippets and docs (never a bare capability id). */
-export function getModelApiBaseUrl(model: Model): string {
+export function getModelApiBaseUrl(model: App): string {
   const candidate = model.apiEndpoint?.trim();
   if (candidate && isHttpUrl(candidate)) {
     return candidate.replace(/\/$/, "");
@@ -16,7 +16,7 @@ export function getModelApiBaseUrl(model: Model): string {
 }
 
 /** POST target for the model's inference API. */
-export function getModelApiPostUrl(model: Model): string {
+export function getModelApiPostUrl(model: App): string {
   const base = getModelApiBaseUrl(model);
   if (model.category === "Language") {
     return `${base}/chat/completions`;
@@ -26,6 +26,6 @@ export function getModelApiPostUrl(model: Model): string {
 }
 
 /** Host header value for raw HTTP examples. */
-export function getModelApiHost(model: Model): string {
+export function getModelApiHost(model: App): string {
   return new URL(getModelApiBaseUrl(model)).host;
 }

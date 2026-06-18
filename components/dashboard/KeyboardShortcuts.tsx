@@ -36,8 +36,8 @@ const GROUPS: Group[] = [
     items: [
       { keys: ["G", "H"], label: "Go to Home" },
       { keys: ["G", "E"], label: "Go to Explore" },
-      { keys: ["G", "J"], label: "Go to Jobs" },
       { keys: ["G", "U"], label: "Go to Usage" },
+      { keys: ["G", "C"], label: "Go to Calls" },
       { keys: ["G", "K"], label: "Go to API keys" },
       { keys: ["G", "S"], label: "Go to Settings" },
     ],
@@ -47,8 +47,8 @@ const GROUPS: Group[] = [
 const NAV_TARGETS: Record<string, string> = {
   h: "/home",
   e: "/",
-  j: "/jobs",
   u: "/usage",
+  c: "/calls",
   k: "/keys",
   s: "/settings",
 };
@@ -177,7 +177,7 @@ export default function KeyboardShortcuts() {
           any time
         </span>
         <span className="ml-auto text-fg-disabled">
-          Livepeer · Flipbook workspace
+          Livepeer · Flipbook organization
         </span>
       </div>
     </Dialog>

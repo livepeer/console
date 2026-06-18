@@ -14,7 +14,7 @@ interface DrawerProps {
   /** aria-label when no title is provided. */
   ariaLabel?: string;
   /** Which edge the drawer slides in from. Defaults to "bottom". */
-  side?: "bottom" | "left";
+  side?: "bottom" | "left" | "right";
   children: ReactNode;
 }
 
@@ -110,9 +110,13 @@ export default function Drawer({
             ? `absolute bottom-0 left-0 top-0 flex w-[min(280px,80vw)] flex-col overflow-hidden rounded-r-2xl border-r border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
                 open ? "translate-x-0" : "-translate-x-full"
               }`
-            : `absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
-                open ? "translate-y-0" : "translate-y-full"
-              }`
+            : side === "right"
+              ? `absolute bottom-0 right-0 top-0 flex w-[min(480px,92vw)] flex-col overflow-hidden rounded-l-2xl border-l border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+                  open ? "translate-x-0" : "translate-x-full"
+                }`
+              : `absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+                  open ? "translate-y-0" : "translate-y-full"
+                }`
         }
       >
         {/* Drag handle — bottom sheet only */}
@@ -140,9 +144,9 @@ export default function Drawer({
         {/* Scrollable content */}
         <div
           className={
-            side === "left"
-              ? "flex-1 overflow-y-auto"
-              : "flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),1rem)]"
+            side === "bottom"
+              ? "flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),1rem)]"
+              : "flex-1 overflow-y-auto"
           }
         >
           {children}

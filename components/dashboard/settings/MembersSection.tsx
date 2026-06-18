@@ -43,7 +43,7 @@ const INVITES: Invite[] = [
 ];
 
 /**
- * Workspace · Members — `?tab=members` per the v7 prototype.
+ * Organization · Members — `?tab=members` per the v7 prototype.
  *
  * Two cards: active members (Name / Role / Joined / row menu) and pending
  * invites (Email / Role / Sent / Resend · Revoke). Header shows the seat
@@ -54,7 +54,7 @@ export default function MembersSection() {
     <>
       <SettingsHeader
         title="Members"
-        sub={`Anyone with workspace access · ${MEMBERS.length} of 5 free seats`}
+        sub={`Anyone with organization access · ${MEMBERS.length} of 5 free seats`}
         action={
           <>
             <IconButton>

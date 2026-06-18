@@ -16,13 +16,13 @@ import NotificationsSection from "@/components/dashboard/settings/NotificationsS
 import SecuritySection from "@/components/dashboard/settings/SecuritySection";
 import AppearanceSection from "@/components/dashboard/settings/AppearanceSection";
 
-// The 8 settings sub-tabs, two groups (Workspace + Account). The sidebar's
+// The 7 settings sub-tabs, two groups (Organization + Account). The sidebar's
 // SettingsRail is the navigation surface — there's no horizontal TabStrip on
 // this page; the rail and the breadcrumb together tell the user where they
 // are. `appearance` is the local-only theme picker (light/dark/system) added
 // in the theme-modes pass.
 type SettingsTab =
-  | "workspace"
+  | "organization"
   | "members"
   | "billing"
   | "usage-limits"
@@ -32,7 +32,7 @@ type SettingsTab =
   | "appearance";
 
 const VALID_TABS: SettingsTab[] = [
-  "workspace",
+  "organization",
   "members",
   "billing",
   "usage-limits",
@@ -43,7 +43,7 @@ const VALID_TABS: SettingsTab[] = [
 ];
 
 const TAB_LABELS: Record<SettingsTab, string> = {
-  workspace: "General",
+  organization: "General",
   members: "Members",
   billing: "Billing",
   "usage-limits": "Limits",
@@ -95,15 +95,15 @@ function SettingsContent() {
     }
   }, [rawTab, router, pathname, searchParams]);
 
-  // Default to "workspace" (General) when no tab param is set.
+  // Default to "organization" (General) when no tab param is set.
   const tab: SettingsTab = VALID_TABS.includes(rawTab as SettingsTab)
     ? (rawTab as SettingsTab)
-    : "workspace";
+    : "organization";
 
   // Wait for auth to hydrate so we don't flash the wrong state.
   if (isLoading) return null;
 
-  // Workspace-only — logged-out users see the sign-in wall.
+  // Organization-only — logged-out users see the sign-in wall.
   if (!isConnected) return <SignInWall route="settings" />;
 
   return (
@@ -135,7 +135,7 @@ function SettingsContent() {
           `.settings-shell-solo` (max-width 880px, padding 4px 28px 80px). */}
       <div className="flex-1">
         <div className="mx-auto w-full max-w-[880px] px-7 pt-6 pb-20">
-          {tab === "workspace" && <GeneralSection />}
+          {tab === "organization" && <GeneralSection />}
           {tab === "members" && <MembersSection />}
           {tab === "billing" && <BillingSection />}
           {tab === "usage-limits" && <LimitsSection />}

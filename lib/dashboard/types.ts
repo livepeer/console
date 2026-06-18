@@ -1,4 +1,98 @@
-export type ModelCategory =
+// ─── Environments ────────────────────────────────────────────────────────────
+//
+// An Environment is an isolation context inside an organization. API keys, jobs,
+// and usage are scoped to one. Two ship by default — Production and Development
+// — mirroring the rate-limited "just try it" → real-production progression the
+// PymtHouse signer enables. The environment is modeled as a *container* so a
+// future Pipeline (the deploy-your-own-capability surface, "App" in Modal terms)
+// can hang off it without restructuring this layer.
+
+export type EnvironmentKind = "production" | "development";
+
+export interface Environment {
+  id: string;
+  /** Display name, e.g. "Production". */
+  name: string;
+  /** URL-safe slug, e.g. "production". */
+  slug: string;
+  kind: EnvironmentKind;
+  /** The environment selected when none is persisted. Exactly one is default. */
+  isDefault?: boolean;
+}
+
+// ─── Apps (deployed pipelines) ──────────────────────────────────────────────
+//
+// There is ONE app type. An app IS a deployed pipeline — the unit a builder
+// pushes with the Runner SDK (`livepeer push` against a `livepeer.yaml`,
+// identified by `pipelineId`). It is the Livepeer analog of a Modal "App": a
+// named, deployed capability that lives inside an Environment. Its deployment /
+// pipeline manifest hangs off `app.deployment` (an `AppDeployment`); the
+// catalog-facing fields (name, provider, pricing, latency, …) live at the top
+// level on `App`. Two transport kinds mirror the SDK's two base classes:
+//   - "batch"  → `Pipeline`      (POST /predict, request/response or SSE)
+//   - "live"   → `LivePipeline`  (trickle, POST /stream/{start,stop,params})
+//
+// Visibility is binary and identical to Explore-presence: a "public" deployment
+// IS listed in the Explore catalog; a "private" one runs only for its own keys.
+
+export type PipelineKind = "batch" | "live";
+
+export type PipelineStatusKind =
+  | "deployed" // running, healthy
+  | "building" // image build / deploy in progress
+  | "stopped" // deployed then halted
+  | "error"; // crashed / failing health checks
+
+export type PipelineVisibility = "private" | "public";
+
+export interface PipelineEndpoint {
+  method: string;
+  path: string;
+  description?: string;
+}
+
+/**
+ * The pipeline/deployment manifest for an app. Holds everything specific to a
+ * single deployed instance — its Runner SDK identity, environment, build, and
+ * live operational metrics. Catalog-facing fields (name, provider, pricing,
+ * latency, …) live on `App` itself; this is the operator-facing manifest.
+ */
+export interface AppDeployment {
+  /** Runner SDK identifier from livepeer.yaml, e.g. "sentiment". */
+  pipelineId: string;
+  /** Environment this deployment lives in. */
+  environmentId: string;
+  kind: PipelineKind;
+  status: PipelineStatusKind;
+  visibility: PipelineVisibility;
+  /** module:class entrypoint from the manifest, e.g. "pipeline:Sentiment". */
+  entrypoint: string;
+  /** GPU class from the manifest, or null for CPU pipelines. */
+  gpu: string | null;
+  /** Built image reference. */
+  image: string;
+  /** Deployed semver-ish version. */
+  version: string;
+  /** ISO-8601 timestamp of the last deploy. */
+  lastDeployedAt: string;
+  createdBy: { name: string; initials: string; color: string };
+  /** Warm orchestrators currently serving this capability. */
+  warmOrchestrators: number;
+  calls7d: number;
+  p50LatencyMs: number;
+  errorRatePct: number;
+  /** HTTP surface the orchestrator hits — drives the Overview "Endpoints" list. */
+  endpoints: PipelineEndpoint[];
+}
+
+/**
+ * Transitional alias: an app that definitely carries its deployment manifest.
+ * Lets the operator components keep their `app: Pipeline` prop types while the
+ * codebase migrates manifest reads to `app.deployment.X`.
+ */
+export type Pipeline = App & { deployment: AppDeployment };
+
+export type AppCategory =
   | "Video Generation"
   | "Video Editing"
   | "Video Understanding"
@@ -7,7 +101,7 @@ export type ModelCategory =
   | "Speech"
   | "Language";
 
-export type ModelStatus = "hot" | "cold";
+export type AppStatus = "hot" | "cold";
 
 export type PricingUnit = "M Tokens" | "Second" | "Request" | "Minute" | "Step";
 
@@ -63,14 +157,14 @@ export interface NetworkStat {
   trend: "up" | "down" | "flat";
 }
 
-export interface Model {
+export interface App {
   id: string;
   name: string;
   provider: string;
-  category: ModelCategory;
+  category: AppCategory;
   description: string;
   coverImage?: string;
-  status: ModelStatus;
+  status: AppStatus;
   pricing: {
     amount: number;
     unit: PricingUnit;
@@ -102,6 +196,9 @@ export interface Model {
   };
   playgroundConfig?: PlaygroundConfig;
   readme?: string;
+  /** The pipeline/deployment manifest. Present once the app is deployed; the
+   *  org's own apps and (in the mock) every catalog app carry one. */
+  deployment?: AppDeployment;
 }
 
 /**
@@ -130,7 +227,7 @@ export interface SolutionProvider {
   provider: string;
   description: string;
   dashboardUrl: string;
-  capabilities: ModelCategory[];
+  capabilities: AppCategory[];
   pricingSummary: string;
   trustBadges: ("Managed" | "SLA" | "Enterprise")[];
 }
@@ -299,17 +396,25 @@ export interface AccountUsageDailyPoint {
   ethWallet: number;
 }
 
-export type AccountActivityStatus = "success" | "failed" | "timeout";
+// "active" = a live session still in progress (streaming now). Batch calls are
+// sub-second, so they're only ever terminal.
+export type AccountActivityStatus = "active" | "success" | "failed" | "timeout";
 
 export interface AccountActivityRow {
   id: string;
+  /** Environment this request ran under. Scopes Jobs + Home runs by env. */
+  environmentId: string;
   /** ISO-8601 timestamp; rendered as relative on Home, absolute on UsageTab. */
   timestamp: string;
   model: string;
   pipeline: string;
   status: AccountActivityStatus;
+  /** Invocation shape: a batch request/response, or a live streaming session. */
+  kind: PipelineKind;
   /** null when status !== "success" */
   latencyMs: number | null;
+  /** Live session length (ms). null for batch calls — they report latency instead. */
+  durationMs: number | null;
   signer: SignerKey;
   signerLabel: string;
   tokenId: string;

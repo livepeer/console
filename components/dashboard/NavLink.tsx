@@ -16,7 +16,7 @@ interface NavLinkProps {
   active?: boolean;
   collapsed?: boolean;
   external?: boolean;
-  /** Locked = workspace-only route shown to a logged-out user. Renders dimmer
+  /** Locked = organization-only route shown to a logged-out user. Renders dimmer
    *  icon/label + a small lock icon on the right (replacing `meta`). The link
    *  still navigates — the destination route is expected to render a sign-in
    *  wall instead of its content, so the lock is purely a visual signal. */

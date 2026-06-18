@@ -1,8 +1,8 @@
-import type { Model, ModelCategory, ModelStatus, PricingUnit } from "@/lib/dashboard/types";
+import type { App, AppCategory, AppStatus, PricingUnit } from "@/lib/dashboard/types";
 import { enrichDiscoveryModelForStreaming } from "@/lib/dashboard/streaming-playground";
 import type { DiscoveryCapabilityEntry, DiscoveryDatasetRow } from "./types";
 
-function inferCategory(capability: string): ModelCategory {
+function inferCategory(capability: string): AppCategory {
   const c = capability.toLowerCase();
 
   if (c.startsWith("video:transcode") || c === "video:live.rtmp") {
@@ -62,7 +62,7 @@ function humanizeCapabilityName(capability: string): string {
 
 function aggregateRows(rows: DiscoveryDatasetRow[]): {
   orchestrators: number;
-  status: ModelStatus;
+  status: AppStatus;
   latency: number;
   price: number;
   realtime: boolean;
@@ -90,7 +90,7 @@ export function mapCapabilityToModel(
   capability: string,
   entry: DiscoveryCapabilityEntry | undefined,
   rows: DiscoveryDatasetRow[],
-): Model {
+): App {
   const stats = aggregateRows(rows);
   const sample = rows[0];
   const provider =

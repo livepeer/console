@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/dashboard/AuthContext";
+import ScopeChip, { type PageScope } from "@/components/dashboard/ScopeChip";
 
 interface DashboardPageHeaderProps {
   /** Primary page title — renders as the last (current) breadcrumb. */
@@ -19,6 +20,10 @@ interface DashboardPageHeaderProps {
   /** Optional content rendered to the right of the breadcrumbs — primary
    *  action, glance stats, controls. Kept compact (icon-buttons, sm primary). */
   actions?: ReactNode;
+  /** Optional scope chip after the title — declares the page's scope
+   *  ("environment" = active env name; "organization" = spans all environments).
+   *  Omit for network-wide pages (Explore, Stats). */
+  scope?: PageScope;
   /** @deprecated — chrome bar always has a hairline border-bottom. Kept for
    *  call-site backward compat. */
   bordered?: boolean;
@@ -45,6 +50,7 @@ export default function DashboardPageHeader({
   icon: Icon,
   description,
   actions,
+  scope,
   className,
 }: DashboardPageHeaderProps) {
   const { isConnected, isLoading } = useAuth();
@@ -74,6 +80,7 @@ export default function DashboardPageHeader({
         <span className="truncate" title={description}>
           {title}
         </span>
+        {scope && <ScopeChip scope={scope} />}
       </div>
       {(actions || showAuthCTAs) && (
         <div className="flex shrink-0 items-center gap-1.5">

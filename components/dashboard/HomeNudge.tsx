@@ -6,7 +6,7 @@ import { useMemo } from "react";
 import {
   ACCOUNT_USAGE_SUMMARY,
   MOCK_RECENT_REQUESTS,
-  MODELS,
+  APPS,
 } from "@/lib/dashboard/mock-data";
 
 /**
@@ -41,17 +41,17 @@ export default function HomeNudge() {
 
     // 2. Realtime — capability nudge for users who haven't tried streaming.
     const usedRealtime = MOCK_RECENT_REQUESTS.some((r) =>
-      MODELS.find((m) => m.name === r.model)?.realtime,
+      APPS.find((m) => m.name === r.model)?.realtime,
     );
     if (!usedRealtime) {
-      const realtimeModel = MODELS.find((m) => m.realtime && m.featured);
+      const realtimeModel = APPS.find((m) => m.realtime && m.featured);
       if (realtimeModel) {
         return {
           eyebrow: "Try this",
           title: "Streaming inference is faster for live applications.",
           body: `Sub-second latency over WebRTC. Start with ${realtimeModel.name}.`,
           cta: "Open playground",
-          href: `/models/${realtimeModel.id}`,
+          href: `/apps/${realtimeModel.id}`,
         };
       }
     }
@@ -59,7 +59,7 @@ export default function HomeNudge() {
     // 3. Single-model usage — surface a different capability.
     const distinctModels = new Set(MOCK_RECENT_REQUESTS.map((r) => r.model));
     if (distinctModels.size <= 2) {
-      const next = MODELS.find(
+      const next = APPS.find(
         (m) => m.featured && !distinctModels.has(m.name),
       );
       if (next) {
@@ -68,7 +68,7 @@ export default function HomeNudge() {
           title: `${next.name} pairs well with what you're building.`,
           body: next.description,
           cta: "Open playground",
-          href: `/models/${next.id}`,
+          href: `/apps/${next.id}`,
         };
       }
     }

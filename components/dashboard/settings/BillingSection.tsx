@@ -13,7 +13,7 @@ import {
 } from "./SettingsPrimitives";
 
 /**
- * Workspace · Billing — `?tab=billing` per the v7 prototype.
+ * Organization · Billing — `?tab=billing` per the v7 prototype.
  *
  * Four blocks:
  *  1. Plan — three plan cards side by side (Free, Pro, Scale)

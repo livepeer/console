@@ -20,6 +20,22 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Catalog renamed: a published app's consumer page moved from
+      // /models/[id] to /apps/[id] (one noun — "app" — for the object across
+      // both the consumer catalog and the operator surfaces).
+      {
+        source: "/models/:id",
+        destination: "/apps/:id",
+        permanent: true,
+      },
+      // The operator console folded into the app page as ownership-gated tabs,
+      // so the separate /manage route is gone. Deep-link the console via
+      // /apps/[id]?tab=overview instead.
+      {
+        source: "/apps/:id/manage",
+        destination: "/apps/:id?tab=overview",
+        permanent: true,
+      },
       // Old livepeer.org routes → new site equivalents
       {
         source: "/lpt",
@@ -29,11 +45,6 @@ const nextConfig: NextConfig = {
       {
         source: "/learn",
         destination: "/primer",
-        permanent: false,
-      },
-      {
-        source: "/network",
-        destination: "https://explorer.livepeer.org",
         permanent: false,
       },
       {
@@ -55,11 +66,6 @@ const nextConfig: NextConfig = {
       {
         source: "/community-hub",
         destination: "https://discord.gg/livepeer",
-        permanent: false,
-      },
-      {
-        source: "/jobs",
-        destination: "/",
         permanent: false,
       },
       {

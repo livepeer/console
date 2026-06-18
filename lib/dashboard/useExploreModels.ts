@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ExploreApiResponse } from "@/lib/discovery/types";
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 import {
   DEFAULT_DISCOVERY_SERVICE_TYPE,
   type DiscoveryServiceType,
@@ -11,9 +11,9 @@ import {
 export type { DiscoveryServiceType } from "@/lib/discovery/constants";
 
 type ExploreState =
-  | { status: "loading"; models: Model[] }
-  | { status: "ready"; models: Model[]; capabilityCount: number; serviceType: string }
-  | { status: "error"; models: Model[]; error: string };
+  | { status: "loading"; models: App[] }
+  | { status: "ready"; models: App[]; capabilityCount: number; serviceType: string }
+  | { status: "error"; models: App[]; error: string };
 
 let exploreCache: {
   key: string;

@@ -1,4 +1,4 @@
-import type { Model, PlaygroundConfig } from "@/lib/dashboard/types";
+import type { App, PlaygroundConfig } from "@/lib/dashboard/types";
 
 /** Discovery capability ids that get the LV2V webcam / gateway playground. */
 export function isLv2vPlaygroundCapability(capability: string): boolean {
@@ -26,7 +26,7 @@ export function resolveGatewayModelId(capability: string): string {
   return id;
 }
 
-export function buildLv2vPlaygroundConfig(capability: string): PlaygroundConfig {
+export function buildLv2vPlaygroundConfig(_capability: string): PlaygroundConfig {
   return {
     fields: [
       {
@@ -60,7 +60,7 @@ export function buildLv2vPlaygroundConfig(capability: string): PlaygroundConfig 
   };
 }
 
-export function enrichDiscoveryModelForStreaming(model: Model): Model {
+export function enrichDiscoveryModelForStreaming(model: App): App {
   if (!isLv2vPlaygroundCapability(model.id)) {
     return model;
   }

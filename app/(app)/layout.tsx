@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
+import { EnvironmentProvider } from "@/components/dashboard/EnvironmentContext";
 import { ThemeProvider } from "@/components/dashboard/ThemeContext";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import KeyboardShortcuts from "@/components/dashboard/KeyboardShortcuts";
@@ -23,7 +24,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||
 export const metadata: Metadata = {
   title: "Developer Dashboard — Livepeer",
   description:
-    "Browse AI capabilities, manage API keys, and monitor usage on the Livepeer network.",
+    "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
 };
 
 // Dashboard runs on Geist (Vercel's open-source font) instead of Favorit Pro —
@@ -59,16 +60,18 @@ export default function DashboardLayout({
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       <ThemeProvider>
         <DashboardProviders>
-          <div
-            className={`flex min-h-screen flex-col bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden ${GeistSans.variable} ${GeistMono.variable}`}
-            style={dashboardOverrides}
-          >
-            <DashboardSidebar />
-            <div className="flex min-w-0 flex-1 flex-col bg-dark border-l border-hairline md:overflow-y-auto">
-              {children}
+          <EnvironmentProvider>
+            <div
+              className={`flex min-h-screen flex-col bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden ${GeistSans.variable} ${GeistMono.variable}`}
+              style={dashboardOverrides}
+            >
+              <DashboardSidebar />
+              <div className="flex min-w-0 flex-1 flex-col bg-dark border-l border-hairline md:overflow-y-auto">
+                {children}
+              </div>
+              <KeyboardShortcuts />
             </div>
-            <KeyboardShortcuts />
-          </div>
+          </EnvironmentProvider>
         </DashboardProviders>
       </ThemeProvider>
     </>

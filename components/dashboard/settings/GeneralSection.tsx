@@ -14,33 +14,33 @@ import {
 } from "./SettingsPrimitives";
 
 /**
- * Workspace · General — `?tab=workspace` per the v7 prototype.
+ * Organization · General — `?tab=organization` per the v7 prototype.
  *
  * Two cards:
- *  1. General — workspace name / URL slug / avatar / default region
- *  2. Danger zone — transfer ownership + delete workspace
+ *  1. General — organization name / URL slug / avatar / default region
+ *  2. Danger zone — transfer ownership + delete organization
  */
 export default function GeneralSection() {
   return (
     <>
       <SettingsHeader
         title="General"
-        sub="Workspace settings · visible to all members"
+        sub="Organization settings · visible to all members"
       />
       <SettingsCard>
         <SettingsField
-          label="Workspace name"
+          label="Organization name"
           hint="Shown in the sidebar and in invoices."
         >
           <SettingsInput defaultValue="Flipbook" />
         </SettingsField>
 
         <SettingsField
-          label="Workspace URL"
+          label="Organization URL"
           hint="Used in API endpoints and invite links."
         >
           <SettingsInputGroup>
-            <InputAffix dim>livepeer.org/w/</InputAffix>
+            <InputAffix dim>livepeer.org/orgs/</InputAffix>
             <GroupInput defaultValue="flipbook" />
           </SettingsInputGroup>
         </SettingsField>
@@ -56,7 +56,7 @@ export default function GeneralSection() {
 
         <SettingsField
           label="Default region"
-          hint="Closest GPU pool for new capabilities."
+          hint="Closest GPU pool for new apps."
         >
           <SettingsSelect defaultValue="auto">
             <option value="auto">Auto · pick lowest p95</option>
@@ -72,15 +72,15 @@ export default function GeneralSection() {
       <SettingsCard danger>
         <SettingsField
           label="Transfer ownership"
-          hint="Move this workspace to another billing owner."
+          hint="Move this organization to another billing owner."
         >
           <IconButton>Transfer…</IconButton>
         </SettingsField>
         <SettingsField
-          label="Delete workspace"
-          hint="All capabilities and jobs will be permanently deleted after 30 days."
+          label="Delete organization"
+          hint="All apps and activity will be permanently deleted after 30 days."
         >
-          <IconButton danger>Delete workspace…</IconButton>
+          <IconButton danger>Delete organization…</IconButton>
         </SettingsField>
       </SettingsCard>
     </>

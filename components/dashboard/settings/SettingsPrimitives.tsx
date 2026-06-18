@@ -58,7 +58,7 @@ export function SettingsSelect({
 
 /**
  * Bordered group containing a prefix/suffix and a flush input — e.g. the
- * `livepeer.org/w/{slug}` workspace URL field, the `$` spend cap field.
+ * `livepeer.org/orgs/{slug}` organization URL field, the `$` spend cap field.
  * Suppresses the inner input's border so the group draws a single perimeter.
  */
 export function SettingsInputGroup({ children }: { children: ReactNode }) {
@@ -135,7 +135,7 @@ export function SettingsHeader({
 
 /**
  * Settings card — bordered, rounded panel that holds `SettingsField` rows.
- * `danger` variant uses a red-tinted border (used for the Delete-workspace
+ * `danger` variant uses a red-tinted border (used for the Delete-organization
  * block).
  */
 export function SettingsCard({

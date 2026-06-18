@@ -1,7 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
-import { useStarredModels } from "@/lib/dashboard/useStarredModels";
+import { useStarredApps } from "@/lib/dashboard/useStarredApps";
 
 type Variant = "overlay" | "inline";
 
@@ -16,7 +16,7 @@ export default function StarButton({
   variant = "overlay",
   className = "",
 }: StarButtonProps) {
-  const { isStarred, toggleStar } = useStarredModels();
+  const { isStarred, toggleStar } = useStarredApps();
   const starred = isStarred(modelId);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -31,7 +31,7 @@ export default function StarButton({
         type="button"
         onClick={handleClick}
         aria-pressed={starred}
-        aria-label={starred ? "Unstar capability" : "Star capability"}
+        aria-label={starred ? "Unstar app" : "Star app"}
         className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-bright/40 ${
           starred
             ? "border-warm/30 bg-warm-subtle text-warm"
@@ -54,7 +54,7 @@ export default function StarButton({
       type="button"
       onClick={handleClick}
       aria-pressed={starred}
-      aria-label={starred ? "Unstar capability" : "Star capability"}
+      aria-label={starred ? "Unstar app" : "Star app"}
       className={`flex h-6 w-6 items-center justify-center rounded-full bg-overlay backdrop-blur-sm transition-opacity duration-200 hover:bg-overlay focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-border-strong)] before:absolute before:-inset-2.5 before:content-[''] ${
         starred
           ? "opacity-100"

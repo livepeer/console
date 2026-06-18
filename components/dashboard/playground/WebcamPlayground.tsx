@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Video, VideoOff, Play, Square, Zap } from "lucide-react";
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 import Select from "@/components/design-system/Select";
 import CodeSnippets from "./CodeSnippets";
 import StatusDot from "@/components/dashboard/StatusDot";
@@ -32,7 +32,7 @@ type InputMode = (typeof INPUT_MODES)[number]["key"];
 
 type Status = "idle" | "starting" | "live" | "applied" | "error";
 
-export default function WebcamPlayground({ model }: { model: Model }) {
+export default function WebcamPlayground({ model }: { model: App }) {
   const cfg = model.playgroundConfig!;
   const [inputMode, setInputMode] = useState<InputMode>("form");
   const [status, setStatus] = useState<Status>("idle");

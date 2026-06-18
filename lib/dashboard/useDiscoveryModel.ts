@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Model } from "@/lib/dashboard/types";
+import type { App } from "@/lib/dashboard/types";
 import { DEFAULT_DISCOVERY_SERVICE_TYPE } from "@/lib/discovery/constants";
 
 type ModelState =
   | { status: "loading" }
-  | { status: "ready"; model: Model }
+  | { status: "ready"; model: App }
   | { status: "not_found" }
   | { status: "error"; message: string };
 
@@ -28,7 +28,7 @@ export function useDiscoveryModel(capabilityId: string | undefined): ModelState 
     void (async () => {
       try {
         const response = await fetch(path);
-        const body = (await response.json()) as { model?: Model; error?: string };
+        const body = (await response.json()) as { model?: App; error?: string };
 
         if (cancelled) return;
 

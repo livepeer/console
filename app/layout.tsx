@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   ),
   title: "Livepeer Developer Dashboard",
   description:
-    "Browse AI capabilities, manage API keys, and monitor usage on the Livepeer network.",
+    "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
 };
 
 // FOUT prevention — runs synchronously before paint so dual-source CSS
