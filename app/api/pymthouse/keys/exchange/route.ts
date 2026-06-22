@@ -10,11 +10,10 @@ function readApiKeyExchangeConfig() {
   if (!issuerUrl || !m2mClientId || !m2mClientSecret || !publicClientId) {
     return null;
   }
-  const issuerOrigin = issuerUrl.replace(/\/api\/v1\/oidc\/?$/, "");
   const signerUrl =
     process.env.PYMTHOUSE_SIGNER_URL?.trim() ||
     process.env.SIGNER_PUBLIC_URL?.trim() ||
-    `${issuerOrigin.replace(/\/+$/, "")}/api/signer`;
+    undefined;
   return {
     issuerUrl,
     m2mClientId,
