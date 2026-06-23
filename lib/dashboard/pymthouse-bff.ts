@@ -1,5 +1,4 @@
-import { PmtHouseError, type PmtHouseClient } from "@pymthouse/builder-sdk";
-import { createPmtHouseClientForPublicApp } from "@/lib/dashboard/device-flow";
+import { PmtHouseClient, PmtHouseError } from "@pymthouse/builder-sdk";
 import {
   dailyRequestSeriesForPipeline,
   utcDateKeysForPeriod,
@@ -50,6 +49,38 @@ export type AccountUsagePayload = {
     pipelineModels: AccountUsagePipelineRow[];
   };
 };
+
+function readPymthouseM2mConfig() {
+  const issuerUrl = process.env.PYMTHOUSE_ISSUER_URL?.trim();
+  const m2mClientId = process.env.PYMTHOUSE_M2M_CLIENT_ID?.trim();
+  const m2mClientSecret = process.env.PYMTHOUSE_M2M_CLIENT_SECRET?.trim();
+  if (!issuerUrl || !m2mClientId || !m2mClientSecret) {
+    return null;
+  }
+  return {
+    issuerUrl,
+    m2mClientId,
+    m2mClientSecret,
+    allowInsecureHttp: process.env.PYMTHOUSE_ALLOW_INSECURE_HTTP === "1",
+  };
+}
+
+export function createPmtHouseClientForPublicApp(publicClientId: string): PmtHouseClient {
+  const config = readPymthouseM2mConfig();
+  if (!config) {
+    throw new PmtHouseError(
+      "Pymthouse is not configured. Set PYMTHOUSE_ISSUER_URL, PYMTHOUSE_M2M_CLIENT_ID, and PYMTHOUSE_M2M_CLIENT_SECRET.",
+      { status: 503, code: "pymthouse_required" },
+    );
+  }
+  return new PmtHouseClient({
+    issuerUrl: config.issuerUrl,
+    publicClientId,
+    m2mClientId: config.m2mClientId,
+    m2mClientSecret: config.m2mClientSecret,
+    allowInsecureHttp: config.allowInsecureHttp,
+  });
+}
 
 function readPublicClientId(): string {
   const id =
