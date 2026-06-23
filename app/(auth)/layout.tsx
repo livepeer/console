@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { DashboardProviders } from "@/components/dashboard/DashboardProviders";
+import { AuthProvider } from "@/components/dashboard/AuthContext";
 
 export const metadata: Metadata = {
   title: "Sign in — Livepeer Developer Dashboard",
@@ -23,13 +23,13 @@ export default function DashboardAuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardProviders>
+    <AuthProvider>
       <div
         className={`min-h-screen bg-dark font-sans ${GeistSans.variable} ${GeistMono.variable}`}
         style={geistOverride}
       >
         {children}
       </div>
-    </DashboardProviders>
+    </AuthProvider>
   );
 }
