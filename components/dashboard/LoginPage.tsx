@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, type AuthProvider } from "@/components/dashboard/AuthContext";
+import { useAuth, type AuthProvider, type MockUser } from "@/components/dashboard/AuthContext";
 import { LivepeerWordmark } from "@/components/design-system/LivepeerLogo";
 
 function getInitials(name: string): string {
@@ -65,7 +65,7 @@ interface LoginPageProps {
   initialMode?: "signin" | "signup";
 }
 
-export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {}) {
+function LoginPageContent({ initialMode = "signin" }: LoginPageProps = {}) {
   // Mode is owned by the route, not by local state — sibling pages
   // `/login` and `/signup` re-mount this component
   // with the appropriate `initialMode`. The footer toggle is a `<Link>`
@@ -75,19 +75,78 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const { connect } = useAuth();
+  const { connect, isConnected, user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const deviceFlow = searchParams.get("flow") === "device";
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [deviceSubmitting, setDeviceSubmitting] = useState(false);
+
+  const finishDeviceFlow = useCallback(
+    async (profile: MockUser) => {
+      setDeviceSubmitting(true);
+      setDeviceError(null);
+      try {
+        const res = await fetch("/api/auth/device/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            externalUserId: profile.email,
+            email: profile.email,
+            name: profile.name,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          redirectTo?: string;
+          error_description?: string;
+          error?: string;
+        };
+        if (!res.ok || !json.success) {
+          throw new Error(
+            json.error_description ||
+              json.error ||
+              "Could not complete device approval with Pymthouse.",
+          );
+        }
+        router.push(json.redirectTo || "/device-approved");
+      } catch (err) {
+        setDeviceError(
+          err instanceof Error ? err.message : "Device approval failed.",
+        );
+        setDeviceSubmitting(false);
+      }
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (deviceFlow && isConnected && user && !deviceSubmitting) {
+      void finishDeviceFlow(user);
+    }
+  }, [deviceFlow, isConnected, user, deviceSubmitting, finishDeviceFlow]);
+
+  async function afterAuth(profile: MockUser) {
+    if (deviceFlow) {
+      setDeviceSubmitting(true);
+    }
+    connect(profile);
+    if (deviceFlow) {
+      await finishDeviceFlow(profile);
+      return;
+    }
+    router.push("/home");
+  }
 
   function handleEmailSubmit(e?: React.FormEvent) {
     e?.preventDefault();
     const displayName = name || email.split("@")[0] || "Demo User";
-    connect({
+    void afterAuth({
       name: displayName,
       email: email || "demo@livepeer.org",
       initials: getInitials(displayName),
       provider: "email",
     });
-    router.push("/home");
   }
 
   function handleOAuthSubmit(provider: AuthProvider) {
@@ -97,13 +156,20 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
       google: { name: "Rick Staa", email: "rick.staa@gmail.com" },
     };
     const profile = mockProfiles[provider as "github" | "google"];
-    connect({
+    void afterAuth({
       name: profile.name,
       email: profile.email,
       initials: getInitials(profile.name),
       provider,
     });
-    router.push("/home");
+  }
+
+  if (deviceFlow && deviceSubmitting) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-dark px-6">
+        <p className="text-sm text-fg-muted">Approving device login…</p>
+      </div>
+    );
   }
 
   // Each surface is built from a tight 3-weight hierarchy:
@@ -153,6 +219,16 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
                 : "Get started with Livepeer"}
             </motion.h1>
           </AnimatePresence>
+
+          {deviceFlow && (
+            <p className="mt-3 text-center text-sm text-fg-muted">
+              Complete sign-in to approve your pending device login.
+            </p>
+          )}
+
+          {deviceError && (
+            <p className="mt-3 text-center text-sm text-red">{deviceError}</p>
+          )}
 
           {/* OAuth — restrained pills, equal hierarchy, no Popular badge clutter */}
           <div className="mt-8 space-y-2">
@@ -343,5 +419,13 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function LoginPage(props: LoginPageProps) {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent {...props} />
+    </Suspense>
   );
 }
