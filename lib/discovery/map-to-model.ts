@@ -97,8 +97,11 @@ export function mapCapabilityToModel(
     entry?.offeringIds?.[0] ??
     (entry?.serviceType === "registry" ? "Registry" : "Livepeer network");
 
+  const runnerAppId = capability.includes("/") ? capability : undefined;
+
   return enrichDiscoveryModelForStreaming({
     id: capability,
+    runnerAppId,
     name: humanizeCapabilityName(capability),
     provider,
     category: inferCategory(capability),

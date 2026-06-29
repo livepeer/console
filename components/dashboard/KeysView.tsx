@@ -405,11 +405,17 @@ export default function KeysView() {
                 exchangeApiKeyForSignerSession
               </span>{" "}
               with your dashboard origin as{" "}
-              <span className="font-mono text-fg-strong">facadeUrl</span>, or call{" "}
+              <span className="font-mono text-fg-strong">facadeUrl</span>, call{" "}
               <span className="font-mono text-fg-strong">
                 POST /api/pymthouse/keys/exchange
               </span>{" "}
-              directly. See{" "}
+              on the dashboard, or exchange directly on the issuer at{" "}
+              <span className="font-mono text-fg-strong">
+                POST …/auth/api-key/signer-session
+              </span>
+              . The response includes{" "}
+              <span className="font-mono text-fg-strong">signer_url</span> for direct
+              remote-signer calls. See{" "}
               <span className="font-mono text-fg-strong">
                 @pymthouse/builder-sdk/examples/stream-with-api-key.mjs
               </span>

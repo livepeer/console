@@ -38,6 +38,15 @@ import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput
 import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
+import {
+  RunnerGatewayProvider,
+  useRunnerGatewayContext,
+} from "@/components/dashboard/playground/RunnerGatewayContext";
+import {
+  buildOpenAIChatPayload,
+  extractAssistantText,
+  runnerGatewayPostUrl,
+} from "@/lib/dashboard/runner-gateway-client";
 import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
 import {
   OverviewTab,
@@ -107,17 +116,29 @@ function modelMatchesRow(catalogId: string, runModel: string): boolean {
 // ─── Playground Tab ───
 
 function PlaygroundTab({ model }: { model: App }) {
+  return (
+    <RunnerGatewayProvider model={model}>
+      <PlaygroundTabContent model={model} />
+    </RunnerGatewayProvider>
+  );
+}
+
+function PlaygroundTabContent({ model }: { model: App }) {
+  const { user } = useAuth();
+  const { canRunLive, state: runnerGatewayState } = useRunnerGatewayContext();
   const [inputMode, setInputMode] = useState<"form" | "json" | "python" | "node" | "http">("form");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [inferenceTime, setInferenceTime] = useState<number | undefined>();
   const [lastRunValues, setLastRunValues] = useState<Record<string, unknown> | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
-  const handleRun = useCallback(
+  const runMock = useCallback(
     (values: Record<string, unknown>) => {
       setLastRunValues(values);
       setIsRunning(true);
       setResult(null);
+      setRunError(null);
       const time = 0.3 + Math.random() * 1.5;
       setTimeout(() => {
         setIsRunning(false);
@@ -155,6 +176,84 @@ function PlaygroundTab({ model }: { model: App }) {
       }, time * 1000);
     },
     [model],
+  );
+
+  const runLive = useCallback(
+    async (values: Record<string, unknown>) => {
+      if (runnerGatewayState.status !== "ready" || !user?.email?.trim()) {
+        runMock(values);
+        return;
+      }
+
+      setLastRunValues(values);
+      setIsRunning(true);
+      setResult(null);
+      setRunError(null);
+      const started = performance.now();
+
+      try {
+        const payload = buildOpenAIChatPayload(model, values);
+        const url = runnerGatewayPostUrl(
+          runnerGatewayState.gatewayBaseUrl,
+          runnerGatewayState.runnerAppId,
+        );
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-external-user-id": user.email.trim(),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!response.ok) {
+          let message = `Gateway error (${response.status})`;
+          try {
+            const errBody = (await response.json()) as { error?: string };
+            if (errBody.error) message = errBody.error;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+
+        if (contentType.includes("text/event-stream") && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let streamed = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            streamed += decoder.decode(value, { stream: true });
+            setResult(streamed);
+          }
+        } else {
+          const data = await response.json();
+          setResult(extractAssistantText(data));
+        }
+
+        setInferenceTime(parseFloat(((performance.now() - started) / 1000).toFixed(1)));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Run failed";
+        setRunError(message);
+        setResult(null);
+      } finally {
+        setIsRunning(false);
+      }
+    },
+    [model, runMock, runnerGatewayState, user?.email],
+  );
+
+  const handleRun = useCallback(
+    (values: Record<string, unknown>) => {
+      if (canRunLive) {
+        void runLive(values);
+        return;
+      }
+      runMock(values);
+    },
+    [canRunLive, runLive, runMock],
   );
 
   // Ctrl+Enter shortcut
@@ -282,7 +381,22 @@ function PlaygroundTab({ model }: { model: App }) {
 
       {/* Right: Output */}
       <div>
-        <h3 className="mb-4 text-sm font-medium text-fg-faint">Output</h3>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium text-fg-faint">Output</h3>
+          {model.runnerAppId && runnerGatewayState.status === "ready" && (
+            <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[10px] font-medium text-green-bright">
+              Live runner
+            </span>
+          )}
+          {model.runnerAppId && runnerGatewayState.status === "loading" && (
+            <span className="text-[10px] text-fg-label">Preparing signer…</span>
+          )}
+        </div>
+        {runError && (
+          <p className="mb-3 rounded-lg border border-red/30 bg-red/10 px-3 py-2 text-xs text-red-400">
+            {runError}
+          </p>
+        )}
         {model.playgroundConfig.playgroundVariant === "transcoding" ? (
           <TranscodingOutput
             result={result}

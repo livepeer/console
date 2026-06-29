@@ -181,6 +181,8 @@ export interface App {
   realtime?: boolean;
   /** LV2V model_id for gateway sessions when different from discovery capability `id`. */
   gatewayModelId?: string;
+  /** Live-runner app id for gateway.py-style HTTP apps, e.g. vllm/qwen2.5-0.5b-instruct */
+  runnerAppId?: string;
   /** ISO-8601 date the model was published on the network. Drives the "NEW" badge and Recently-added sort. */
   releasedAt?: string;
   tags?: string[];
