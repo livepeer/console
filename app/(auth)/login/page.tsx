@@ -1,21 +1,31 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import LoginPage from "@/components/dashboard/LoginPage";
 
-export default function LoginRoute() {
+function LoginRouteInner() {
   const { isConnected } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const deviceFlow = searchParams.get("flow") === "device";
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && !deviceFlow) {
       router.replace("/home");
     }
-  }, [isConnected, router]);
+  }, [isConnected, deviceFlow, router]);
 
-  if (isConnected) return null;
+  if (isConnected && !deviceFlow) return null;
 
   return <LoginPage />;
+}
+
+export default function LoginRoute() {
+  return (
+    <Suspense fallback={null}>
+      <LoginRouteInner />
+    </Suspense>
+  );
 }
