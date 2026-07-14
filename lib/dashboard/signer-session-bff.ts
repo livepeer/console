@@ -115,6 +115,8 @@ export async function getSignerSessionStatus(externalUserId: string): Promise<{
   expiresIn: number;
   balanceUsdMicros: string;
   lifetimeGrantedUsdMicros: string;
+  /** Short-lived signer JWT — embedded hidden in the playground for live runs. */
+  jwt: string;
 }> {
   const context = await getSignerContext(externalUserId);
   const expiresIn = Math.max(1, Math.floor((context.expiresAt - Date.now()) / 1000));
@@ -123,5 +125,6 @@ export async function getSignerSessionStatus(externalUserId: string): Promise<{
     expiresIn,
     balanceUsdMicros: context.balanceUsdMicros,
     lifetimeGrantedUsdMicros: context.lifetimeGrantedUsdMicros,
+    jwt: context.jwt,
   };
 }

@@ -23,8 +23,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (!isRunnerSignerConfigured()) {
+    // Offchain path: no JWT to mint — playground can still hit local runners.
     return NextResponse.json(
-      { ready: true, expiresIn: 0, balanceUsdMicros: "0", lifetimeGrantedUsdMicros: "0" },
+      {
+        ready: true,
+        expiresIn: 0,
+        balanceUsdMicros: "0",
+        lifetimeGrantedUsdMicros: "0",
+        jwt: "",
+      },
       { headers: NO_STORE_HEADERS },
     );
   }

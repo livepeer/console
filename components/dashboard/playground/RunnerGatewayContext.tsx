@@ -14,22 +14,40 @@ import type { App } from "@/lib/dashboard/types";
 export type RunnerGatewayState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; gatewayBaseUrl: string; runnerAppId: string; expiresIn?: number }
+  | {
+      status: "ready";
+      gatewayBaseUrl: string;
+      runnerAppId: string;
+      expiresIn?: number;
+      /** Signer JWT minted for this session — kept in a hidden form field. */
+      jwt?: string;
+    }
   | { status: "unavailable"; reason: string }
   | { status: "error"; message: string };
 
 type RunnerGatewayContextValue = {
   state: RunnerGatewayState;
   canRunLive: boolean;
+  signerJwt: string | undefined;
 };
 
 const RunnerGatewayContext = createContext<RunnerGatewayContextValue>({
   state: { status: "idle" },
   canRunLive: false,
+  signerJwt: undefined,
 });
 
 export function useRunnerGatewayContext() {
   return useContext(RunnerGatewayContext);
+}
+
+function isLiveRunnerPlayground(model: App): boolean {
+  const runnerAppId = model.runnerAppId?.trim() ?? "";
+  if (!runnerAppId) return false;
+  // Form-backed runners (hello-world) advertise a runnerPath; LLM runners use
+  // the Language category + OpenAI chat/completions path by default.
+  if (model.playgroundConfig?.runnerPath) return true;
+  return model.category === "Language";
 }
 
 export function RunnerGatewayProvider({
@@ -43,10 +61,10 @@ export function RunnerGatewayProvider({
   const [state, setState] = useState<RunnerGatewayState>({ status: "idle" });
 
   const runnerAppId = model.runnerAppId?.trim() ?? "";
-  const isRunnerLlm = model.category === "Language" && Boolean(runnerAppId);
+  const isLiveRunner = isLiveRunnerPlayground(model);
 
   useEffect(() => {
-    if (!isRunnerLlm) {
+    if (!isLiveRunner) {
       setState({ status: "idle" });
       return;
     }
@@ -74,6 +92,7 @@ export function RunnerGatewayProvider({
         const data = (await response.json()) as {
           ready?: boolean;
           expiresIn?: number;
+          jwt?: string;
           error?: string;
           error_description?: string;
         };
@@ -90,6 +109,7 @@ export function RunnerGatewayProvider({
           gatewayBaseUrl: "/api/runner-gateway/v1",
           runnerAppId,
           expiresIn: data.expiresIn,
+          jwt: data.jwt,
         });
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -100,11 +120,12 @@ export function RunnerGatewayProvider({
     })();
 
     return () => controller.abort();
-  }, [isConnected, isRunnerLlm, runnerAppId, user?.email]);
+  }, [isConnected, isLiveRunner, runnerAppId, user?.email]);
 
   const value = useMemo<RunnerGatewayContextValue>(() => {
     const canRunLive = state.status === "ready";
-    return { state, canRunLive };
+    const signerJwt = state.status === "ready" ? state.jwt : undefined;
+    return { state, canRunLive, signerJwt };
   }, [state]);
 
   return (

@@ -142,6 +142,10 @@ export interface PlaygroundConfig {
   mockOutputJson?: unknown;
   /** Selects the playground UI. "webcam" mocks live video-in/video-out with the user's camera. "transcoding" shapes the output like a Livepeer HLS stream (playbackId, rendition ladder, copyable URLs). Defaults to "form". */
   playgroundVariant?: "form" | "webcam" | "transcoding";
+  /** Live-runner HTTP path under the reserved session app URL (e.g. "hello").
+   *  When set, playground posts form values as JSON to this path instead of
+   *  OpenAI-style chat/completions. */
+  runnerPath?: string;
 }
 
 export interface UsageDataPoint {

@@ -9,34 +9,61 @@ export type ApiKeysState =
   | { status: "ready"; keys: DashboardApiKeyRow[] }
   | { status: "error"; message: string };
 
+async function readResponseJson<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new Error(`Empty response (${response.status})`);
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Invalid JSON from API keys endpoint (${response.status})`);
+  }
+}
+
 export function useApiKeys(externalUserId: string | undefined) {
   const [state, setState] = useState<ApiKeysState>({ status: "idle" });
 
-  const load = useCallback(async () => {
-    if (!externalUserId?.trim()) {
-      setState({
-        status: "error",
-        message: "Sign in to manage API keys for your account.",
-      });
-      return;
-    }
-
-    setState({ status: "loading" });
-    try {
-      const params = new URLSearchParams({ externalUserId: externalUserId.trim() });
-      const response = await fetch(`/api/pymthouse/keys?${params}`);
-      const body = (await response.json()) as { keys?: DashboardApiKeyRow[]; error?: string };
-      if (!response.ok) {
-        throw new Error(body.error ?? `API keys fetch failed (${response.status})`);
+  const load = useCallback(
+    async (options?: { soft?: boolean }) => {
+      if (!externalUserId?.trim()) {
+        setState({
+          status: "error",
+          message: "Sign in to manage API keys for your account.",
+        });
+        return;
       }
-      setState({ status: "ready", keys: body.keys ?? [] });
-    } catch (error) {
-      setState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to load API keys",
-      });
-    }
-  }, [externalUserId]);
+
+      const soft = options?.soft === true;
+      if (!soft) {
+        setState({ status: "loading" });
+      }
+      try {
+        const params = new URLSearchParams({ externalUserId: externalUserId.trim() });
+        const response = await fetch(`/api/pymthouse/keys?${params}`);
+        const body = await readResponseJson<{
+          keys?: DashboardApiKeyRow[];
+          error?: string;
+        }>(response);
+        if (!response.ok) {
+          throw new Error(body.error ?? `API keys fetch failed (${response.status})`);
+        }
+        setState({ status: "ready", keys: body.keys ?? [] });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to load API keys";
+        setState((prev) => {
+          // Soft reload after create/revoke: keep existing rows instead of
+          // replacing the page with a raw parse error banner.
+          if (soft && prev.status === "ready") {
+            return prev;
+          }
+          return { status: "error", message };
+        });
+      }
+    },
+    [externalUserId],
+  );
 
   useEffect(() => {
     void load();
@@ -55,15 +82,23 @@ export function useApiKeys(externalUserId: string | undefined) {
           label,
         }),
       });
-      const body = (await response.json()) as {
+      const body = await readResponseJson<{
         apiKey?: string;
         row?: DashboardApiKeyRow;
         error?: string;
-      };
-      if (!response.ok || !body.apiKey) {
+      }>(response);
+      if (!response.ok || !body.apiKey || !body.row) {
         throw new Error(body.error ?? `Create failed (${response.status})`);
       }
-      await load();
+      // Show the new row immediately so a soft-list failure cannot blank the table.
+      setState((prev) => {
+        const existing = prev.status === "ready" ? prev.keys : [];
+        return {
+          status: "ready",
+          keys: [body.row!, ...existing.filter((row) => row.id !== body.row!.id)],
+        };
+      });
+      await load({ soft: true });
       return body.apiKey;
     },
     [externalUserId, load],
@@ -81,11 +116,20 @@ export function useApiKeys(externalUserId: string | undefined) {
       const response = await fetch(`/api/pymthouse/keys?${params}`, {
         method: "DELETE",
       });
-      const body = (await response.json()) as { error?: string };
+      const body = await readResponseJson<{ error?: string }>(response);
       if (!response.ok) {
         throw new Error(body.error ?? `Revoke failed (${response.status})`);
       }
-      await load();
+      setState((prev) => {
+        if (prev.status !== "ready") {
+          return prev;
+        }
+        return {
+          status: "ready",
+          keys: prev.keys.filter((row) => row.id !== keyId),
+        };
+      });
+      await load({ soft: true });
     },
     [externalUserId, load],
   );

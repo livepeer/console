@@ -12,14 +12,22 @@ function parseServiceType(value: string | null): DiscoveryServiceType {
   return DEFAULT_DISCOVERY_SERVICE_TYPE;
 }
 
+function capabilityFromSegments(segments: string[]): string {
+  return segments.map((segment) => decodeURIComponent(segment)).join("/");
+}
+
 export async function GET(
   request: Request,
-  context: { params: Promise<{ id: string }> },
+  context: { params: Promise<{ id: string[] }> },
 ): Promise<Response> {
-  const { id } = await context.params;
-  const capability = decodeURIComponent(id);
+  const { id: segments } = await context.params;
+  const capability = capabilityFromSegments(segments ?? []);
   const { searchParams } = new URL(request.url);
   const serviceType = parseServiceType(searchParams.get("serviceType"));
+
+  if (!capability) {
+    return NextResponse.json({ error: "Capability not found" }, { status: 404 });
+  }
 
   try {
     const capabilitiesResponse = await fetchDiscoveryCapabilities(serviceType);

@@ -50,11 +50,34 @@ function userKeysUrl(publicClientId: string, externalUserId: string): string {
   return `${appsOrigin()}/api/v1/apps/${encodeURIComponent(publicClientId)}/users/${encodeURIComponent(externalUserId)}/keys`;
 }
 
+async function readJsonBody<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new PmtHouseError(`Empty response from PymtHouse (${response.status})`, {
+      status: 502,
+      code: "invalid_json",
+    });
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new PmtHouseError(
+      `PymtHouse returned non-JSON (${response.status})`,
+      { status: 502, code: "invalid_json" },
+    );
+  }
+}
+
 async function readErrorMessage(response: Response): Promise<string> {
   try {
-    const body = (await response.json()) as { error?: string; error_description?: string };
+    const body = await readJsonBody<{ error?: string; error_description?: string }>(
+      response,
+    );
     return body.error_description ?? body.error ?? `Request failed (${response.status})`;
-  } catch {
+  } catch (error) {
+    if (error instanceof PmtHouseError) {
+      return error.message;
+    }
     return `Request failed (${response.status})`;
   }
 }
@@ -63,6 +86,10 @@ export async function listDashboardApiKeys(
   externalUserId: string,
 ): Promise<DashboardApiKeyRow[]> {
   const publicClientId = readPublicClientId();
+  // Upsert before list — pymthouse returns 404 "User not found" until the
+  // app user row exists (same as create).
+  await ensureAppUserProvisioned(publicClientId, externalUserId);
+
   const response = await fetch(userKeysUrl(publicClientId, externalUserId), {
     method: "GET",
     headers: {
@@ -79,7 +106,7 @@ export async function listDashboardApiKeys(
     });
   }
 
-  const body = (await response.json()) as { keys?: DashboardApiKeyRow[] };
+  const body = await readJsonBody<{ keys?: DashboardApiKeyRow[] }>(response);
   return (body.keys ?? []).filter((row) => row.status === "active");
 }
 
@@ -101,8 +128,10 @@ export async function ensureAppUserProvisioned(
     }),
     cache: "no-store",
   });
+  // Drain body so the connection can be reused cleanly.
+  await response.text().catch(() => undefined);
   if (!response.ok && response.status !== 409) {
-    throw new PmtHouseError(await readErrorMessage(response), {
+    throw new PmtHouseError(`App user provision failed (${response.status})`, {
       status: response.status,
       code: "app_user_provision_failed",
     });
@@ -134,14 +163,14 @@ export async function createDashboardApiKey(input: {
     });
   }
 
-  const body = (await response.json()) as {
+  const body = await readJsonBody<{
     apiKey: string;
     id: string;
     prefix: string;
     suffix: string;
     label: string | null;
     createdAt: string;
-  };
+  }>(response);
 
   return {
     apiKey: body.apiKey,
@@ -174,8 +203,9 @@ export async function revokeDashboardApiKey(input: {
     cache: "no-store",
   });
 
+  await response.text().catch(() => undefined);
   if (!response.ok) {
-    throw new PmtHouseError(await readErrorMessage(response), {
+    throw new PmtHouseError(`API key revoke failed (${response.status})`, {
       status: response.status,
       code: "api_key_revoke_failed",
     });

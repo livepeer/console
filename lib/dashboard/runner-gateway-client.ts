@@ -33,6 +33,38 @@ export function buildOpenAIChatPayload(
   return payload;
 }
 
+/** Build the JSON body for a live-runner playground call. */
+export function buildLiveRunnerPayload(
+  model: App,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const runnerPath = model.playgroundConfig?.runnerPath?.trim();
+  if (!runnerPath) {
+    return buildOpenAIChatPayload(model, values);
+  }
+
+  // Hello-world and other form-backed runners: send field values as JSON.
+  const payload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined || value === "") continue;
+    payload[key] = value;
+  }
+  if (runnerPath === "hello" && typeof payload.name !== "string") {
+    payload.name = "world";
+  }
+  return payload;
+}
+
+export function extractRunnerResultText(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return JSON.stringify(data, null, 2);
+  }
+  const record = data as Record<string, unknown>;
+  if (typeof record.message === "string") return record.message;
+  return extractAssistantText(data);
+}
+
 export function extractAssistantText(data: unknown): string {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     return typeof data === "string" ? data : JSON.stringify(data, null, 2);

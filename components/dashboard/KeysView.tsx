@@ -402,7 +402,7 @@ export default function KeysView() {
             <p className="text-[12.5px] leading-relaxed text-fg-muted">
               Pass the key to{" "}
               <span className="font-mono text-fg-strong">
-                exchangeApiKeyForSignerSession
+                exchangeApiKeyForSigner
               </span>{" "}
               with your dashboard origin as{" "}
               <span className="font-mono text-fg-strong">facadeUrl</span>, call{" "}
@@ -411,9 +411,11 @@ export default function KeysView() {
               </span>{" "}
               on the dashboard, or exchange directly on the issuer at{" "}
               <span className="font-mono text-fg-strong">
-                POST …/auth/api-key/signer-session
-              </span>
-              . The response includes{" "}
+                POST …/apps/{"{clientId}"}/oidc/token
+              </span>{" "}
+              (RFC 8693,{" "}
+              <span className="font-mono text-fg-strong">subject_token</span> = API
+              key). The response includes{" "}
               <span className="font-mono text-fg-strong">signer_url</span> for direct
               remote-signer calls. See{" "}
               <span className="font-mono text-fg-strong">

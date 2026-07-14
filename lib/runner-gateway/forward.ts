@@ -7,6 +7,7 @@ import {
 } from "@/lib/runner-gateway/call-runner";
 import { stopRunnerSession } from "@/lib/runner-gateway/stop-session";
 import { RunnerGatewayError } from "@/lib/runner-gateway/errors";
+import "@/lib/runner-gateway/tls";
 
 export type ForwardRunnerRequestInput = {
   externalUserId: string;
@@ -64,6 +65,7 @@ export async function forwardRunnerRequest(
         runner: session.runner,
         payload: input.payload,
         signer,
+        capability: input.appId,
       });
       const headers = new Headers(streamResult.response.headers);
       if (!headers.has("Content-Type")) {
@@ -80,6 +82,7 @@ export async function forwardRunnerRequest(
       runner: session.runner,
       payload: input.payload,
       signer,
+      capability: input.appId,
     });
 
     return Response.json(result.data);

@@ -23,7 +23,13 @@ export function useDiscoveryModel(capabilityId: string | undefined): ModelState 
     setState({ status: "loading" });
 
     const params = new URLSearchParams({ serviceType: DEFAULT_DISCOVERY_SERVICE_TYPE });
-    const path = `/api/discovery/models/${encodeURIComponent(capabilityId)}?${params}`;
+    // Keep `/` as path separators so catch-all `[...id]` can rejoin slash-y
+    // capability ids (e.g. livepeer-example/hello-world).
+    const encodedId = capabilityId
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    const path = `/api/discovery/models/${encodedId}?${params}`;
 
     void (async () => {
       try {

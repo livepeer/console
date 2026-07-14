@@ -60,7 +60,39 @@ export function buildLv2vPlaygroundConfig(_capability: string): PlaygroundConfig
   };
 }
 
+/** Live-runner demo apps with a simple request/response playground. */
+export function isHelloWorldCapability(capability: string): boolean {
+  const id = capability.toLowerCase();
+  return id === "livepeer-example/hello-world" || id.endsWith("/hello-world");
+}
+
+export function buildHelloWorldPlaygroundConfig(): PlaygroundConfig {
+  return {
+    fields: [
+      {
+        name: "name",
+        label: "Name",
+        type: "text",
+        required: true,
+        defaultValue: "livepeer",
+        placeholder: "Who should we greet?",
+        description: "Passed as JSON { name } to POST /hello on the runner.",
+      },
+    ],
+    outputType: "text",
+    mockOutputText: "Hello, livepeer!",
+    runnerPath: "hello",
+  };
+}
+
 export function enrichDiscoveryModelForStreaming(model: App): App {
+  if (isHelloWorldCapability(model.id)) {
+    return {
+      ...model,
+      playgroundConfig: model.playgroundConfig ?? buildHelloWorldPlaygroundConfig(),
+    };
+  }
+
   if (!isLv2vPlaygroundCapability(model.id)) {
     return model;
   }

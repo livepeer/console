@@ -114,8 +114,11 @@ function parseRunnerPaymentChallenge(error: RunnerHttpError): RunnerPaymentChall
 async function getRunnerPayment(
   challenge: RunnerPaymentChallenge,
   signer: SignerAuth,
+  attribution?: { capability?: string; modelId?: string },
 ): Promise<{ payment: string; segCreds: string }> {
   const url = signerEndpointUrl(signer.signerUrl, DIRECT_SIGNER_PATHS.generateLivePayment);
+  const capability = attribution?.capability?.trim() || "";
+  const modelId = attribution?.modelId?.trim() || capability;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -127,6 +130,7 @@ async function getRunnerPayment(
       orchestrator: challenge.paymentParams,
       type: "lv2v",
       ManifestID: challenge.manifestId,
+      ...(capability ? { capability, model_id: modelId } : {}),
     }),
     cache: "no-store",
   });
@@ -191,6 +195,8 @@ export async function callRunner(input: {
   payload?: Record<string, unknown>;
   method?: string;
   signer?: SignerAuth | null;
+  /** Live-runner app / capability id for OpenMeter usage attribution. */
+  capability?: string;
   timeoutMs?: number;
   maxPaymentChallengeRetries?: number;
 }): Promise<LiveRunnerCallResult> {
@@ -205,6 +211,9 @@ export async function callRunner(input: {
   const requestPayload = input.payload ?? {};
   const method = (input.method ?? "POST").toUpperCase();
   const signer = input.signer ?? null;
+  const paymentAttribution = input.capability?.trim()
+    ? { capability: input.capability.trim() }
+    : undefined;
   const maxRetries = input.maxPaymentChallengeRetries ?? 3;
   const attempts = (Math.max(0, maxRetries) + 1) * 2;
 
@@ -227,7 +236,7 @@ export async function callRunner(input: {
     }
 
     if (challenge && signer) {
-      const payment = await getRunnerPayment(challenge, signer);
+      const payment = await getRunnerPayment(challenge, signer, paymentAttribution);
       headers["Livepeer-Payment"] = payment.payment;
       headers["Livepeer-Segment"] = payment.segCreds;
       sessionId = challenge.manifestId;
@@ -297,6 +306,8 @@ export async function callRunnerStream(input: {
   payload?: Record<string, unknown>;
   method?: string;
   signer?: SignerAuth | null;
+  /** Live-runner app / capability id for OpenMeter usage attribution. */
+  capability?: string;
   timeoutMs?: number;
   maxPaymentChallengeRetries?: number;
 }): Promise<LiveRunnerStreamResult> {
@@ -311,6 +322,9 @@ export async function callRunnerStream(input: {
   const requestPayload = input.payload ?? {};
   const method = (input.method ?? "POST").toUpperCase();
   const signer = input.signer ?? null;
+  const paymentAttribution = input.capability?.trim()
+    ? { capability: input.capability.trim() }
+    : undefined;
   const maxRetries = input.maxPaymentChallengeRetries ?? 3;
   const attempts = (Math.max(0, maxRetries) + 1) * 2;
 
@@ -333,7 +347,7 @@ export async function callRunnerStream(input: {
     }
 
     if (challenge && signer) {
-      const payment = await getRunnerPayment(challenge, signer);
+      const payment = await getRunnerPayment(challenge, signer, paymentAttribution);
       headers["Livepeer-Payment"] = payment.payment;
       headers["Livepeer-Segment"] = payment.segCreds;
       sessionId = challenge.manifestId;
@@ -423,6 +437,7 @@ export async function reserveSession(input: {
         runner,
         payload: {},
         signer: input.signer,
+        capability: input.app,
         timeoutMs: input.timeoutMs ?? 30_000,
       });
       const sessionId =

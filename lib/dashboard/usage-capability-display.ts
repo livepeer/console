@@ -22,7 +22,9 @@ export type UsageCapabilityRow = AccountUsagePipelineRow & {
 };
 
 function humanizePipelineModel(pipeline: string, modelId: string): string {
-  const segment = modelId && modelId !== "*" ? modelId : pipeline;
+  const normalizedModel =
+    modelId && modelId !== "*" && modelId.toLowerCase() !== "unknown" ? modelId : "";
+  const segment = normalizedModel || pipeline;
   const raw = segment.includes(":") ? segment.split(":").slice(-1)[0]! : segment;
   return raw
     .split(/[-_./|:]+/)

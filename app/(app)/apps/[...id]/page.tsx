@@ -43,8 +43,8 @@ import {
   useRunnerGatewayContext,
 } from "@/components/dashboard/playground/RunnerGatewayContext";
 import {
-  buildOpenAIChatPayload,
-  extractAssistantText,
+  buildLiveRunnerPayload,
+  extractRunnerResultText,
   runnerGatewayPostUrl,
 } from "@/lib/dashboard/runner-gateway-client";
 import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
@@ -125,7 +125,11 @@ function PlaygroundTab({ model }: { model: App }) {
 
 function PlaygroundTabContent({ model }: { model: App }) {
   const { user } = useAuth();
-  const { canRunLive, state: runnerGatewayState } = useRunnerGatewayContext();
+  const {
+    canRunLive,
+    state: runnerGatewayState,
+    signerJwt,
+  } = useRunnerGatewayContext();
   const [inputMode, setInputMode] = useState<"form" | "json" | "python" | "node" | "http">("form");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -192,10 +196,13 @@ function PlaygroundTabContent({ model }: { model: App }) {
       const started = performance.now();
 
       try {
-        const payload = buildOpenAIChatPayload(model, values);
+        const runnerPath =
+          model.playgroundConfig?.runnerPath?.trim() || "chat/completions";
+        const payload = buildLiveRunnerPayload(model, values);
         const url = runnerGatewayPostUrl(
           runnerGatewayState.gatewayBaseUrl,
           runnerGatewayState.runnerAppId,
+          runnerPath,
         );
         const response = await fetch(url, {
           method: "POST",
@@ -230,7 +237,7 @@ function PlaygroundTabContent({ model }: { model: App }) {
           }
         } else {
           const data = await response.json();
-          setResult(extractAssistantText(data));
+          setResult(extractRunnerResultText(data));
         }
 
         setInferenceTime(parseFloat(((performance.now() - started) / 1000).toFixed(1)));
@@ -331,6 +338,7 @@ function PlaygroundTabContent({ model }: { model: App }) {
             config={model.playgroundConfig}
             onRun={handleRun}
             isRunning={isRunning}
+            signerJwt={signerJwt}
           />
         )}
         {inputMode === "json" && (
@@ -344,6 +352,10 @@ function PlaygroundTabContent({ model }: { model: App }) {
           inputMode === "node" ||
           inputMode === "http") && (
           <div className="flex flex-col">
+            {/* Signer JWT is minted server-side and kept off the visible UI. */}
+            {signerJwt ? (
+              <input type="hidden" name="signer-jwt" value={signerJwt} readOnly />
+            ) : null}
             <div className="pb-4">
               <CodeSnippets model={model} fixedLang={inputMode} />
             </div>
@@ -704,12 +716,20 @@ function JobsTab({
 
 // ─── Main Page ───
 
+function capabilityIdFromParams(id: string | string[] | undefined): string {
+  if (Array.isArray(id)) {
+    return id.map((segment) => decodeURIComponent(segment)).join("/");
+  }
+  return id ? decodeURIComponent(id) : "";
+}
+
 export default function AppDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string | string[] }>();
+  const id = capabilityIdFromParams(params.id);
   const { isConnected } = useAuth();
   // The app detail is powered by live Discovery Service data — the capability
   // is resolved by id, with loading/error/not-found states handled below.
-  const discovery = useDiscoveryModel(id);
+  const discovery = useDiscoveryModel(id || undefined);
   const app = discovery.status === "ready" ? discovery.model : undefined;
   // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
   // stacked apps PR. In the consumer base the app detail is view-only for
