@@ -65,11 +65,16 @@ export default function SidebarUsageCard() {
     primaryLimit = 100;
     primaryDisplay = (
       <>
-        <b className="font-medium text-fg">${microsToUsdDisplay(balance.balanceUsdMicros)}</b>
-        <span className="text-fg-faint"> / ${microsToUsdDisplay(balance.lifetimeGrantedUsdMicros)}</span>
+        <b className="font-medium text-fg">
+          ${microsToUsd(balance.consumedUsdMicros).toFixed(2)}
+        </b>
+        <span className="text-fg-faint">
+          {" "}
+          / ${microsToUsd(balance.lifetimeGrantedUsdMicros).toFixed(2)}
+        </span>
       </>
     );
-    footerLeft = "remaining";
+    footerLeft = "used";
   } else {
     // No plan allowance yet — show period spend in dollars (Home MTD uses the
     // same OpenMeter fee total), not a request-count free-tier placeholder.
