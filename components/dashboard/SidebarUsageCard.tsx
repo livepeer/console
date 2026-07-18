@@ -9,15 +9,12 @@ import {
   microsToUsdDisplay,
 } from "@/lib/dashboard/usage-capability-display";
 
-function fmtCompact(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`;
-  return n.toString();
-}
-
 /**
  * SidebarUsageCard — bottom-of-sidebar plan + usage indicator.
  *
  * Data comes from PymtHouse (OpenMeter) via `/api/pymthouse/account-usage`.
+ * Prefer the plan included-discount allowance (USD). If that is unavailable,
+ * show period spend in dollars — never a fake request-count free tier.
  */
 export default function SidebarUsageCard() {
   const { user } = useAuth();
@@ -59,6 +56,7 @@ export default function SidebarUsageCard() {
   let primaryUsed: number;
   let primaryLimit: number | null;
   let primaryDisplay: ReactNode;
+  let footerLeft: string;
 
   if (showUsdAllowance && balance) {
     const granted = BigInt(balance.lifetimeGrantedUsdMicros || "1");
@@ -71,24 +69,25 @@ export default function SidebarUsageCard() {
         <span className="text-fg-faint"> / ${microsToUsdDisplay(balance.lifetimeGrantedUsdMicros)}</span>
       </>
     );
+    footerLeft = "remaining";
   } else {
-    const used = data.current.requestCount;
-    const limit = 10_000;
-    primaryUsed = used;
-    primaryLimit = limit;
+    // No plan allowance yet — show period spend in dollars (Home MTD uses the
+    // same OpenMeter fee total), not a request-count free-tier placeholder.
+    const spendUsd = Number(
+      BigInt(data.current.endUserBillableUsdMicros || data.current.networkFeeUsdMicros || "0"),
+    ) / 1_000_000;
+    primaryUsed = 0;
+    primaryLimit = null;
     primaryDisplay = (
-      <>
-        <b className="font-medium text-fg">{fmtCompact(used)}</b>
-        <span className="text-fg-faint"> / {fmtCompact(limit)}</span>
-      </>
+      <b className="font-medium text-fg">${spendUsd.toFixed(2)}</b>
     );
+    footerLeft = "spent";
   }
 
   const pct =
     primaryLimit && primaryLimit > 0
       ? Math.min(100, (primaryUsed / primaryLimit) * 100)
       : 0;
-  const pctDisplay = pct >= 10 ? pct.toFixed(0) : pct.toFixed(2);
 
   return (
     <Link
@@ -117,7 +116,7 @@ export default function SidebarUsageCard() {
       </div>
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-mono text-[10.5px] tracking-[0.02em] text-fg-faint">
-          {showUsdAllowance ? "remaining" : `${pctDisplay}% used`}
+          {footerLeft}
         </span>
         <span className="font-mono text-[10.5px] tracking-[0.02em] text-fg-faint">
           resets {resetsAt}

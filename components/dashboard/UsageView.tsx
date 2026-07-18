@@ -275,7 +275,7 @@ export default function UsageView() {
 
       <AllowanceStrip
         requestCount={forecastStats.requestCount}
-        requestLimit={grantedMicros ? null : 10_000}
+        requestLimit={null}
         balanceUsdMicros={data.balance?.balanceUsdMicros ?? null}
         grantedUsdMicros={grantedMicros}
         consumedUsdMicros={data.balance?.consumedUsdMicros ?? null}
