@@ -6,7 +6,7 @@ import { useAuth } from "@/components/dashboard/AuthContext";
 import { useAccountUsage } from "@/lib/dashboard/useAccountUsage";
 import {
   formatPeriodResetLabel,
-  microsToUsdDisplay,
+  microsToUsd,
 } from "@/lib/dashboard/usage-capability-display";
 
 /**
