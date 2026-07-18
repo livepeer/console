@@ -9,10 +9,8 @@ import CallDetailDrawer from "@/components/dashboard/CallDetailDrawer";
 import EnvironmentFilter, {
   ALL_ENVIRONMENTS,
 } from "@/components/dashboard/EnvironmentFilter";
-import {
-  recentRequestsForEnvironment,
-  MOCK_RECENT_REQUESTS,
-} from "@/lib/dashboard/mock-data";
+import { useAuth } from "@/components/dashboard/AuthContext";
+import { useAccountRequests } from "@/lib/dashboard/useAccountRequests";
 import type { AccountActivityRow } from "@/lib/dashboard/types";
 
 type KindFilter = "all" | "batch" | "live";
@@ -23,14 +21,13 @@ const KIND_TABS: { key: KindFilter; label: string }[] = [
   { key: "batch", label: "Batch" },
 ];
 
+const EMPTY_ROWS: AccountActivityRow[] = [];
+
 /**
- * CallsView — the standalone /calls list: every call this organization made
- * across the network (what counts toward its usage). A Batch / Live segmented
- * filter splits the two invocation shapes the Runner SDK exposes — batch
- * `predict` request/response vs live streaming `session` — and the table's
- * metric column follows suit (latency for batch, session duration for live).
- * Clicking a row opens the per-call inspector (a right-side drawer) via
- * `?request={id}` — useSearchParams needs the Suspense boundary below.
+ * CallsView — the standalone /calls list: every signed-ticket request this
+ * account made (PymtHouse OpenMeter history). A Batch / Live segmented filter
+ * splits invocation shapes inferred from pipeline. Clicking a row opens the
+ * per-call inspector via `?request={id}`.
  */
 export default function CallsView() {
   return (
@@ -41,18 +38,20 @@ export default function CallsView() {
 }
 
 function CallsViewInner() {
+  const { user } = useAuth();
+  const requests = useAccountRequests(user?.id?.trim());
   const [query, setQuery] = useState("");
   const [envFilter, setEnvFilter] = useState(ALL_ENVIRONMENTS);
   const [kind, setKind] = useState<KindFilter>("all");
 
-  // The open call is URL-addressable (`/calls?request={id}`) so the inspector
-  // is deep-linkable and the back button closes it. `shownRow` is held through
-  // the close transition so the drawer animates out with its content intact.
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = searchParams.get("request");
+
+  const allRows = requests.status === "ready" ? requests.rows : EMPTY_ROWS;
+
   const openCall = requestId
-    ? (MOCK_RECENT_REQUESTS.find((r) => r.id === requestId) ?? null)
+    ? (allRows.find((r) => r.id === requestId) ?? null)
     : null;
   const [shownRow, setShownRow] = useState<AccountActivityRow | null>(null);
   useEffect(() => {
@@ -61,11 +60,10 @@ function CallsViewInner() {
 
   const allEnvs = envFilter === ALL_ENVIRONMENTS;
 
-  // Env-scoped set drives the segmented-filter counts (before the kind filter).
   const envScoped = useMemo(
     () =>
-      allEnvs ? MOCK_RECENT_REQUESTS : recentRequestsForEnvironment(envFilter),
-    [allEnvs, envFilter],
+      allEnvs ? allRows : allRows.filter((r) => r.environmentId === envFilter),
+    [allEnvs, allRows, envFilter],
   );
   const counts = useMemo(
     () => ({
@@ -87,8 +85,6 @@ function CallsViewInner() {
           r.pipeline.toLowerCase().includes(q),
       );
     }
-    // Live, in-progress sessions float to the top — they're happening now.
-    // (Array.sort is stable, so terminal rows keep their newest-first order.)
     return [...scoped].sort(
       (a, b) =>
         (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1),
@@ -114,7 +110,6 @@ function CallsViewInner() {
         }
       />
 
-      {/* Filter bar — Batch / Live segmented control + search. */}
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline bg-dark px-5 py-2.5">
         <div
           className="inline-flex items-center rounded-[5px] border border-hairline bg-dark-card p-0.5"
@@ -158,23 +153,65 @@ function CallsViewInner() {
         </div>
       </div>
 
-      {/* Calls list — shared `CallsTable` (cozy density for the full-bleed view) */}
-      {rows.length === 0 ? (
+      {requests.status === "loading" || requests.status === "idle" ? (
+        <div className="space-y-0 px-5 py-4" aria-hidden="true">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex animate-pulse items-center justify-between border-t border-hairline py-3 first:border-t-0"
+            >
+              <div className="h-4 w-48 rounded bg-tint" />
+              <div className="h-3 w-16 rounded bg-tint" />
+            </div>
+          ))}
+        </div>
+      ) : requests.status === "error" ? (
+        <div className="px-5 py-16 text-center">
+          <p className="text-[13px] text-fg-muted">Could not load signed-ticket requests.</p>
+          <p className="mt-2 font-mono text-[11px] text-fg-faint">{requests.message}</p>
+          <button
+            type="button"
+            onClick={() => void requests.reload()}
+            className="mt-4 font-mono text-[11.5px] uppercase tracking-[0.04em] text-fg-faint transition-colors hover:text-fg"
+          >
+            Retry
+          </button>
+        </div>
+      ) : !requests.openMeterConfigured ? (
+        <div className="px-5 py-16 text-center">
+          <p className="text-[13px] text-fg-faint">
+            OpenMeter is not configured, so per-request history is unavailable.
+          </p>
+        </div>
+      ) : rows.length === 0 ? (
         <div className="px-5 py-16 text-center">
           <p className="text-[13px] text-fg-faint">
             {query
               ? `No calls match “${query}”`
-              : `No ${kind === "all" ? "" : kind + " "}calls in this view`}
+              : `No ${kind === "all" ? "" : kind + " "}signed-ticket requests this billing cycle`}
           </p>
         </div>
       ) : (
-        <CallsTable
-          rows={rows}
-          showHeader
-          bordered={false}
-          density="cozy"
-          showEnvironment={allEnvs}
-        />
+        <>
+          <CallsTable
+            rows={rows}
+            showHeader
+            bordered={false}
+            density="cozy"
+            showEnvironment={allEnvs}
+          />
+          {requests.nextCursor ? (
+            <div className="flex justify-center border-t border-hairline px-5 py-4">
+              <button
+                type="button"
+                onClick={() => void requests.loadMore()}
+                className="font-mono text-[11.5px] uppercase tracking-[0.04em] text-fg-faint transition-colors hover:text-fg"
+              >
+                Load more
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       <CallDetailDrawer

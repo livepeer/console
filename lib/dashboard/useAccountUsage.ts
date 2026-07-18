@@ -9,7 +9,34 @@ export type AccountUsageState =
   | { status: "ready"; data: AccountUsagePayload }
   | { status: "error"; message: string };
 
-export function useAccountUsage(externalUserId: string | undefined, periodDays = 30) {
+export type UseAccountUsageOptions = {
+  periodDays?: number;
+  window?: "rolling" | "mtd";
+  includePrior?: boolean;
+};
+
+function normalizeOptions(
+  periodDaysOrOptions: number | UseAccountUsageOptions = 30,
+): Required<Pick<UseAccountUsageOptions, "periodDays" | "window" | "includePrior">> {
+  if (typeof periodDaysOrOptions === "number") {
+    return {
+      periodDays: periodDaysOrOptions,
+      window: "rolling",
+      includePrior: true,
+    };
+  }
+  return {
+    periodDays: periodDaysOrOptions.periodDays ?? 30,
+    window: periodDaysOrOptions.window ?? "rolling",
+    includePrior: periodDaysOrOptions.includePrior !== false,
+  };
+}
+
+export function useAccountUsage(
+  externalUserId: string | undefined,
+  periodDaysOrOptions: number | UseAccountUsageOptions = 30,
+) {
+  const options = normalizeOptions(periodDaysOrOptions);
   const [state, setState] = useState<AccountUsageState>({ status: "idle" });
 
   const load = useCallback(async () => {
@@ -22,7 +49,9 @@ export function useAccountUsage(externalUserId: string | undefined, periodDays =
     try {
       const params = new URLSearchParams({
         externalUserId: externalUserId.trim(),
-        days: String(periodDays),
+        days: String(options.periodDays),
+        window: options.window,
+        includePrior: options.includePrior ? "1" : "0",
       });
       const response = await fetch(`/api/pymthouse/account-usage?${params}`, {
         cache: "no-store",
@@ -40,7 +69,12 @@ export function useAccountUsage(externalUserId: string | undefined, periodDays =
         message: error instanceof Error ? error.message : "Failed to load usage",
       });
     }
-  }, [externalUserId, periodDays]);
+  }, [
+    externalUserId,
+    options.periodDays,
+    options.window,
+    options.includePrior,
+  ]);
 
   useEffect(() => {
     void load();

@@ -1,4 +1,8 @@
-import { PmtHouseClient, PmtHouseError } from "@pymthouse/builder-sdk";
+import {
+  getUtcCalendarMonthIsoBounds,
+  PmtHouseClient,
+  PmtHouseError,
+} from "@pymthouse/builder-sdk";
 import {
   dailyRequestSeriesForPipeline,
   utcDateKeysForPeriod,
@@ -121,6 +125,26 @@ function rollingPeriodDays(days: number, now = new Date()): {
   };
 }
 
+function mtdPeriodBounds(now = new Date()): {
+  startDate: string;
+  endDate: string;
+  priorStartDate: string;
+  priorEndDate: string;
+} {
+  const { startDate, endDate } = getUtcCalendarMonthIsoBounds(now);
+  const monthStart = new Date(startDate);
+  const priorEnd = new Date(monthStart.getTime() - 1);
+  const priorStart = new Date(
+    Date.UTC(priorEnd.getUTCFullYear(), priorEnd.getUTCMonth(), 1, 0, 0, 0, 0),
+  );
+  return {
+    startDate,
+    endDate,
+    priorStartDate: priorStart.toISOString(),
+    priorEndDate: priorEnd.toISOString(),
+  };
+}
+
 async function fetchUsageBalance(
   client: PmtHouseClient,
   externalUserId: string,
@@ -143,11 +167,17 @@ async function fetchUsageBalance(
 export async function fetchAccountUsageForExternalUser(input: {
   externalUserId: string;
   periodDays?: number;
+  /** `mtd` = UTC calendar month (Home spend · MTD). Default rolling N days. */
+  window?: "rolling" | "mtd";
+  /** When false, skip the prior-period OpenMeter round-trip (Home panel). */
+  includePrior?: boolean;
 }): Promise<AccountUsagePayload> {
   const publicClientId = readPublicClientId();
-  const days = input.periodDays ?? 30;
-  // Rolling window so the chart's last bucket is always UTC today (not month-end).
-  const period = rollingPeriodDays(days);
+  const includePrior = input.includePrior !== false;
+  const period =
+    input.window === "mtd"
+      ? mtdPeriodBounds()
+      : rollingPeriodDays(input.periodDays ?? 30);
 
   const client = createPmtHouseClientForPublicApp(publicClientId);
 
@@ -159,12 +189,14 @@ export async function fetchAccountUsageForExternalUser(input: {
       endDate: period.endDate,
       includeRetail: true,
     }),
-    client.fetchUsageForExternalUser({
-      externalUserId: input.externalUserId,
-      startDate: period.priorStartDate,
-      endDate: period.priorEndDate,
-      includeRetail: true,
-    }),
+    includePrior
+      ? client.fetchUsageForExternalUser({
+          externalUserId: input.externalUserId,
+          startDate: period.priorStartDate,
+          endDate: period.priorEndDate,
+          includeRetail: true,
+        })
+      : Promise.resolve(null),
   ]);
 
   const periodBounds = { start: period.startDate, end: period.endDate };
@@ -179,6 +211,8 @@ export async function fetchAccountUsageForExternalUser(input: {
 
   const mapPipeline = (
     rows: typeof currentScope.currentUser.pipelineModels,
+    seriesDayKeys: string[],
+    seriesDaily: typeof dailyByPipeline,
   ): AccountUsagePipelineRow[] =>
     rows.map((row) => ({
       pipeline: row.pipeline,
@@ -189,8 +223,8 @@ export async function fetchAccountUsageForExternalUser(input: {
       dailyRequests: dailyRequestSeriesForPipeline({
         pipeline: row.pipeline,
         modelId: row.modelId,
-        dayKeys,
-        dailyByPipeline,
+        dayKeys: seriesDayKeys,
+        dailyByPipeline: seriesDaily,
       }),
     }));
 
@@ -204,22 +238,136 @@ export async function fetchAccountUsageForExternalUser(input: {
       requestCount: currentScope.currentUser.requestCount,
       networkFeeUsdMicros: currentScope.currentUser.networkFeeUsdMicros,
       endUserBillableUsdMicros: currentScope.currentUser.endUserBillableUsdMicros,
-      pipelineModels: mapPipeline(currentScope.currentUser.pipelineModels),
+      pipelineModels: mapPipeline(
+        currentScope.currentUser.pipelineModels,
+        dayKeys,
+        dailyByPipeline,
+      ),
       dailyByPipeline,
     },
-    prior: {
-      requestCount: priorScope.currentUser.requestCount,
-      pipelineModels: mapPipeline(
-        priorScope.currentUser.pipelineModels,
-      ).map((row) => ({
-        ...row,
-        dailyRequests: dailyRequestSeriesForPipeline({
-          pipeline: row.pipeline,
-          modelId: row.modelId,
-          dayKeys: utcDateKeysForPeriod(period.priorStartDate, period.priorEndDate),
-          dailyByPipeline: [],
-        }),
-      })),
+    prior: priorScope
+      ? {
+          requestCount: priorScope.currentUser.requestCount,
+          pipelineModels: mapPipeline(
+            priorScope.currentUser.pipelineModels,
+            utcDateKeysForPeriod(period.priorStartDate, period.priorEndDate),
+            [],
+          ),
+        }
+      : {
+          requestCount: 0,
+          pipelineModels: [],
+        },
+  };
+}
+
+export type SignedTicketRequestRow = {
+  time: string;
+  clientId: string;
+  appName?: string;
+  externalUserId: string;
+  gatewayRequestId: string;
+  pipeline: string;
+  modelId: string;
+  networkFeeUsdMicros: string;
+  feeWei?: string;
+  pixels?: string;
+  eventId: string;
+};
+
+export type AccountRequestsPayload = {
+  items: SignedTicketRequestRow[];
+  nextCursor: string | null;
+  openMeterConfigured: boolean;
+  clientId: string;
+  externalUserId: string;
+};
+
+function issuerOriginFromConfig(): string {
+  const config = readPymthouseM2mConfig();
+  if (!config) {
+    throw new PmtHouseError(
+      "Pymthouse is not configured. Set PYMTHOUSE_ISSUER_URL, PYMTHOUSE_M2M_CLIENT_ID, and PYMTHOUSE_M2M_CLIENT_SECRET.",
+      { status: 503, code: "pymthouse_required" },
+    );
+  }
+  return new URL(config.issuerUrl).origin;
+}
+
+async function mintEndUserAccessToken(
+  client: PmtHouseClient,
+  externalUserId: string,
+): Promise<string> {
+  try {
+    const minted = await client.mintUserAccessToken({ externalUserId });
+    return minted.access_token;
+  } catch (error) {
+    if (
+      error instanceof PmtHouseError &&
+      error.status === 404 &&
+      error.code === "not_found"
+    ) {
+      await client.upsertAppUser({ externalUserId });
+      const minted = await client.mintUserAccessToken({ externalUserId });
+      return minted.access_token;
+    }
+    throw error;
+  }
+}
+
+/**
+ * List signed-ticket requests for one external user via end-user Bearer scope
+ * (`GET /api/v1/user/usage/requests`). Subject is forced by the minted JWT.
+ */
+export async function fetchAccountRequestsForExternalUser(input: {
+  externalUserId: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<AccountRequestsPayload> {
+  const publicClientId = readPublicClientId();
+  const client = createPmtHouseClientForPublicApp(publicClientId);
+  const accessToken = await mintEndUserAccessToken(client, input.externalUserId);
+
+  const url = new URL(`${issuerOriginFromConfig()}/api/v1/user/usage/requests`);
+  if (input.cursor) url.searchParams.set("cursor", input.cursor);
+  if (input.limit != null) url.searchParams.set("limit", String(input.limit));
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
     },
+    cache: "no-store",
+  });
+  const raw = await response.text();
+  let body: (AccountRequestsPayload & { error?: string }) | null = null;
+  try {
+    body = raw ? (JSON.parse(raw) as AccountRequestsPayload & { error?: string }) : null;
+  } catch {
+    body = null;
+  }
+
+  if (!response.ok) {
+    const notDeployed =
+      response.status === 404
+        ? " End-user usage/requests is not available on this PymtHouse deployment yet."
+        : "";
+    throw new PmtHouseError(
+      (body?.error ?? `Signed-ticket requests failed (${response.status})`) + notDeployed,
+      {
+        status: response.status,
+        code: "pymthouse_http_error",
+        details: body ?? undefined,
+      },
+    );
+  }
+
+  return {
+    items: body?.items ?? [],
+    nextCursor: body?.nextCursor ?? null,
+    openMeterConfigured: body?.openMeterConfigured !== false,
+    clientId: body?.clientId ?? publicClientId,
+    externalUserId: body?.externalUserId ?? input.externalUserId,
   };
 }

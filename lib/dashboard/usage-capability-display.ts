@@ -21,7 +21,7 @@ export type UsageCapabilityRow = AccountUsagePipelineRow & {
   delta: number;
 };
 
-function humanizePipelineModel(pipeline: string, modelId: string): string {
+export function humanizePipelineModel(pipeline: string, modelId: string): string {
   const normalizedModel =
     modelId && modelId !== "*" && modelId.toLowerCase() !== "unknown" ? modelId : "";
   const segment = normalizedModel || pipeline;
@@ -33,7 +33,7 @@ function humanizePipelineModel(pipeline: string, modelId: string): string {
     .join(" ");
 }
 
-function microsToUsd(micros: string): number {
+export function microsToUsd(micros: string): number {
   try {
     return Number(BigInt(micros)) / 1_000_000;
   } catch {
