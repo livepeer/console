@@ -69,7 +69,7 @@ export function RunnerGatewayProvider({
       return;
     }
 
-    if (!isConnected || !user?.email?.trim()) {
+    if (!isConnected || !user?.id?.trim()) {
       setState({
         status: "unavailable",
         reason: "Sign in to run against the live runner gateway.",
@@ -77,7 +77,7 @@ export function RunnerGatewayProvider({
       return;
     }
 
-    const externalUserId = user.email.trim();
+    const externalUserId = user.id.trim();
     const controller = new AbortController();
     setState({ status: "loading" });
 
@@ -120,7 +120,7 @@ export function RunnerGatewayProvider({
     })();
 
     return () => controller.abort();
-  }, [isConnected, isLiveRunner, runnerAppId, user?.email]);
+  }, [isConnected, isLiveRunner, runnerAppId, user?.id]);
 
   const value = useMemo<RunnerGatewayContextValue>(() => {
     const canRunLive = state.status === "ready";

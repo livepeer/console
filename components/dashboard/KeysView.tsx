@@ -19,7 +19,16 @@ import { useAuth } from "@/components/dashboard/AuthContext";
 import { useApiKeys } from "@/lib/dashboard/useApiKeys";
 import type { DashboardApiKeyRow } from "@/lib/dashboard/pymthouse-keys-bff";
 
-function CopyField({ value }: { value: string }) {
+type CredentialFormat = "bearer" | "token";
+
+function CopyField({
+  value,
+  wrap = false,
+}: {
+  value: string;
+  /** Multi-line wrap for long base64 python-gateway tokens. */
+  wrap?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const onCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -32,20 +41,24 @@ function CopyField({ value }: { value: string }) {
       type="button"
       onClick={onCopy}
       title="Copy"
-      className={`flex w-full items-center gap-2.5 rounded-[4px] border bg-dark px-3 py-2.5 text-left transition-colors ${
+      className={`flex w-full items-start gap-2.5 rounded-[4px] border bg-dark px-3 py-2.5 text-left transition-colors ${
         copied
           ? "border-green-bright bg-green/15"
           : "border-subtle hover:border-green hover:bg-dark-card"
       }`}
     >
       <span
-        className="flex-1 overflow-x-auto whitespace-nowrap font-mono text-[13px] text-fg select-all"
-        style={{ scrollbarWidth: "none" }}
+        className={`flex-1 font-mono text-[13px] text-fg select-all ${
+          wrap
+            ? "max-h-28 overflow-y-auto break-all whitespace-pre-wrap leading-relaxed"
+            : "overflow-x-auto whitespace-nowrap"
+        }`}
+        style={wrap ? undefined : { scrollbarWidth: "none" }}
       >
         {value}
       </span>
       <span
-        className={`grid h-[22px] w-[22px] place-items-center rounded ${
+        className={`grid h-[22px] w-[22px] shrink-0 place-items-center rounded ${
           copied ? "text-green-bright" : "text-fg-faint"
         }`}
         aria-hidden="true"
@@ -53,6 +66,94 @@ function CopyField({ value }: { value: string }) {
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </span>
     </button>
+  );
+}
+
+function FormatSlider({
+  value,
+  onChange,
+}: {
+  value: CredentialFormat;
+  onChange: (next: CredentialFormat) => void;
+}) {
+  return (
+    <fieldset
+      aria-label="Credential format"
+      className="relative m-0 inline-grid w-[8.5rem] min-w-0 grid-cols-2 rounded-[4px] border border-green/40 bg-dark p-px"
+    >
+      <div
+        className={`pointer-events-none absolute top-px bottom-px w-[calc(50%-1px)] rounded-[3px] bg-green shadow-sm transition-[left] duration-200 ease-out motion-reduce:transition-none ${
+          value === "bearer" ? "left-px" : "left-[calc(50%)]"
+        }`}
+        aria-hidden
+      />
+      {(["bearer", "token"] as const).map((option) => {
+        const selected = value === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(option)}
+            className={`relative z-10 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide transition-colors duration-200 motion-reduce:transition-none ${
+              selected ? "text-white" : "text-fg-faint hover:text-fg-strong"
+            }`}
+          >
+            {option === "bearer" ? "Bearer" : "Token"}
+          </button>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+function RevealedCredential({
+  apiKey,
+  sdkToken,
+}: {
+  apiKey: string;
+  sdkToken: string | null;
+}) {
+  const [format, setFormat] = useState<CredentialFormat>(
+    sdkToken ? "token" : "bearer",
+  );
+  const hasToken = Boolean(sdkToken?.trim());
+  const showToken = hasToken && format === "token";
+  const value = showToken ? sdkToken!.trim() : apiKey;
+
+  return (
+    <div className="space-y-2.5">
+      {hasToken ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11.5px] text-fg-muted">
+            {showToken ? (
+              <>
+                <a
+                  href="https://github.com/livepeer/livepeer-python-gateway"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-green-bright underline decoration-green/40 underline-offset-2 transition-colors hover:text-fg hover:decoration-green"
+                >
+                  Python gateway
+                </a>{" "}
+                <code className="rounded bg-dark px-1 py-0.5 font-mono text-[10.5px] text-fg-strong">
+                  --token
+                </code>{" "}
+                (base64)
+              </>
+            ) : (
+              <>
+                Authorization: Bearer{" "}
+                <span className="font-mono text-[11px] text-fg-strong">pmth_*</span>
+              </>
+            )}
+          </p>
+          <FormatSlider value={format} onChange={setFormat} />
+        </div>
+      ) : null}
+      <CopyField value={value} wrap={showToken} />
+    </div>
   );
 }
 
@@ -78,10 +179,16 @@ function daysSince(iso: string): number {
 
 export default function KeysView() {
   const { user } = useAuth();
-  const externalUserId = user?.email?.trim();
-  const { state, createKey, revokeKey, reload } = useApiKeys(externalUserId);
+  const externalUserId = user?.id?.trim();
+  const { state, createKey, revokeKey, reload } = useApiKeys(
+    externalUserId,
+    user?.email,
+  );
 
-  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<{
+    apiKey: string;
+    sdkToken: string | null;
+  } | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [scopesOpen, setScopesOpen] = useState(false);
   const [alertDismissed, setAlertDismissed] = useState(false);
@@ -116,8 +223,8 @@ export default function KeysView() {
     setActionError(null);
     setCreating(true);
     try {
-      const apiKey = await createKey("Dashboard SDK");
-      setRevealedKey(apiKey);
+      const created = await createKey("Dashboard SDK");
+      setRevealed(created);
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : "Could not create API key",
@@ -185,8 +292,18 @@ export default function KeysView() {
           </h1>
           <p className="mt-2.5 max-w-[640px] text-[13.5px] leading-[1.55] text-fg-muted">
             Long-lived <span className="font-mono text-[12.5px] text-fg-strong">pmth_*</span>{" "}
-            bearer tokens for the SDK and CLI. The SDK exchanges your key for a short-lived
-            signer session before streaming — no device login required on every run.
+            bearer tokens for the SDK and CLI, plus a base64{" "}
+            <span className="font-mono text-[12.5px] text-fg-strong">--token</span> for the{" "}
+            <a
+              href="https://github.com/livepeer/livepeer-python-gateway"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-fg-strong underline decoration-hairline underline-offset-2 transition-colors hover:text-green-bright"
+            >
+              Python gateway
+            </a>
+            . The SDK exchanges your key for a short-lived signer session before
+            streaming — no device login required on every run.
           </p>
         </div>
 
@@ -205,7 +322,7 @@ export default function KeysView() {
           </div>
         )}
 
-        {revealedKey && (
+        {revealed && (
           <div className="relative mb-4 flex overflow-hidden rounded-md border border-green bg-gradient-to-b from-green/[0.08] to-green/[0.02]">
             <div
               className="pointer-events-none absolute inset-0"
@@ -236,14 +353,17 @@ export default function KeysView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setRevealedKey(null)}
+                  onClick={() => setRevealed(null)}
                   aria-label="Dismiss"
                   className="grid h-6 w-6 place-items-center rounded text-fg-faint transition-colors hover:bg-hover hover:text-fg"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <CopyField value={revealedKey} />
+              <RevealedCredential
+                apiKey={revealed.apiKey}
+                sdkToken={revealed.sdkToken}
+              />
               <div className="mt-2.5 flex items-center gap-3 text-[11.5px] text-fg-faint">
                 <span className="inline-flex items-center gap-1.5">
                   <Lock className="h-3 w-3" aria-hidden="true" />

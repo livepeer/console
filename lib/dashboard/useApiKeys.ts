@@ -21,7 +21,10 @@ async function readResponseJson<T>(response: Response): Promise<T> {
   }
 }
 
-export function useApiKeys(externalUserId: string | undefined) {
+export function useApiKeys(
+  externalUserId: string | undefined,
+  email?: string | undefined,
+) {
   const [state, setState] = useState<ApiKeysState>({ status: "idle" });
 
   const load = useCallback(
@@ -40,6 +43,7 @@ export function useApiKeys(externalUserId: string | undefined) {
       }
       try {
         const params = new URLSearchParams({ externalUserId: externalUserId.trim() });
+        if (email?.trim()) params.set("email", email.trim());
         const response = await fetch(`/api/pymthouse/keys?${params}`);
         const body = await readResponseJson<{
           keys?: DashboardApiKeyRow[];
@@ -62,7 +66,7 @@ export function useApiKeys(externalUserId: string | undefined) {
         });
       }
     },
-    [externalUserId],
+    [email, externalUserId],
   );
 
   useEffect(() => {
@@ -79,11 +83,13 @@ export function useApiKeys(externalUserId: string | undefined) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           externalUserId: externalUserId.trim(),
+          ...(email?.trim() ? { email: email.trim() } : {}),
           label,
         }),
       });
       const body = await readResponseJson<{
         apiKey?: string;
+        sdkToken?: string | null;
         row?: DashboardApiKeyRow;
         error?: string;
       }>(response);
@@ -99,9 +105,15 @@ export function useApiKeys(externalUserId: string | undefined) {
         };
       });
       await load({ soft: true });
-      return body.apiKey;
+      return {
+        apiKey: body.apiKey,
+        sdkToken:
+          typeof body.sdkToken === "string" && body.sdkToken.trim()
+            ? body.sdkToken.trim()
+            : null,
+      };
     },
-    [externalUserId, load],
+    [email, externalUserId, load],
   );
 
   const revokeKey = useCallback(

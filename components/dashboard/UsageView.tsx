@@ -166,7 +166,7 @@ function AllowanceStrip({
 
 export default function UsageView() {
   const { user } = useAuth();
-  const externalUserId = user?.email?.trim();
+  const externalUserId = user?.id?.trim();
   const usageState = useAccountUsage(externalUserId, PERIOD_DAYS);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);

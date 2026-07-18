@@ -10,6 +10,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const externalUserId = request.nextUrl.searchParams.get("externalUserId")?.trim();
+  const email = request.nextUrl.searchParams.get("email")?.trim() || undefined;
   if (!externalUserId) {
     return NextResponse.json(
       { error: "externalUserId is required" },
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const keys = await listDashboardApiKeys(externalUserId);
+    const keys = await listDashboardApiKeys(externalUserId, email);
     return NextResponse.json({ keys });
   } catch (error) {
     if (error instanceof PmtHouseError) {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { externalUserId?: string; label?: string };
+  let body: { externalUserId?: string; email?: string; label?: string };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
   try {
     const created = await createDashboardApiKey({
       externalUserId,
+      email: body.email?.trim() || undefined,
       label: body.label,
     });
     return NextResponse.json(created, { status: 201 });

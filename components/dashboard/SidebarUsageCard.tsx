@@ -21,7 +21,7 @@ function fmtCompact(n: number): string {
  */
 export default function SidebarUsageCard() {
   const { user } = useAuth();
-  const usage = useAccountUsage(user?.email?.trim(), 30);
+  const usage = useAccountUsage(user?.id?.trim(), 30);
 
   if (usage.status === "loading" || usage.status === "idle") {
     return (

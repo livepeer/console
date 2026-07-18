@@ -11,6 +11,8 @@ import {
 export type AuthProvider = "github" | "google" | "email";
 
 export interface MockUser {
+  /** Persistent machine id used as PymtHouse `externalUserId` (never email). */
+  id: string;
   name: string;
   email: string;
   initials: string;
@@ -22,7 +24,7 @@ interface AuthContextValue {
   isConnected: boolean;
   isLoading: boolean;
   user: MockUser | null;
-  connect: (user: MockUser) => void;
+  connect: (user: Omit<MockUser, "id"> & { id?: string }) => void;
   updateUser: (patch: Partial<MockUser>) => void;
   disconnect: () => void;
 }
@@ -40,6 +42,24 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+function newMachineId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `dash_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function hydrateMockUser(parsed: Partial<MockUser>): MockUser {
+  return {
+    id: typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : newMachineId(),
+    name: parsed.name ?? "Demo User",
+    email: parsed.email ?? "demo@livepeer.org",
+    initials: parsed.initials ?? "DU",
+    provider: (parsed.provider as AuthProvider) ?? "email",
+    avatarUrl: parsed.avatarUrl,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,16 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (stored) {
         try {
           const parsed = JSON.parse(stored) as Partial<MockUser>;
-          // Backfill provider for any pre-existing localStorage entries
-          const hydrated: MockUser = {
-            name: parsed.name ?? "Demo User",
-            email: parsed.email ?? "demo@livepeer.org",
-            initials: parsed.initials ?? "DU",
-            provider: (parsed.provider as AuthProvider) ?? "email",
-            avatarUrl: parsed.avatarUrl,
-          };
+          // Backfill provider + machine id for pre-existing localStorage entries
+          const hydrated = hydrateMockUser(parsed);
           setUser(hydrated);
           setIsConnected(true);
+          localStorage.setItem("dashboard-user", JSON.stringify(hydrated));
         } catch {
           // ignore
         }
@@ -70,16 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const connect = (u: MockUser) => {
-    setUser(u);
+  const connect = (u: Omit<MockUser, "id"> & { id?: string }) => {
+    const next = hydrateMockUser(u);
+    setUser(next);
     setIsConnected(true);
-    localStorage.setItem("dashboard-user", JSON.stringify(u));
+    localStorage.setItem("dashboard-user", JSON.stringify(next));
   };
 
   const updateUser = (patch: Partial<MockUser>) => {
     setUser((prev) => {
       if (!prev) return prev;
-      const next = { ...prev, ...patch };
+      const next = hydrateMockUser({ ...prev, ...patch });
       localStorage.setItem("dashboard-user", JSON.stringify(next));
       return next;
     });

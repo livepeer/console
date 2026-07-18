@@ -1,4 +1,5 @@
 import { PmtHouseError } from "@pymthouse/builder-sdk";
+import { buildGatewayToken } from "@pymthouse/builder-sdk/signer/gateway";
 
 export type DashboardApiKeyRow = {
   id: string;
@@ -9,6 +10,44 @@ export type DashboardApiKeyRow = {
   createdAt: string;
   revokedAt: string | null;
 };
+
+/** Env-driven signer URL used for python-gateway `--token` bundles. */
+function readSignerUrl(): string | undefined {
+  return (
+    process.env.PYMTHOUSE_CLIENT_SIGNER_API_URL?.trim() ||
+    process.env.PYMTHOUSE_SIGNER_URL?.trim() ||
+    process.env.SIGNER_PUBLIC_URL?.trim() ||
+    undefined
+  );
+}
+
+/** Optional discovery URL embedded in python-gateway `--token` bundles. */
+function readDiscoveryUrl(): string | undefined {
+  return (
+    process.env.LIVEPEER_DISCOVERY_SERVICE_URL?.trim() ||
+    process.env.DISCOVERY_URL?.trim() ||
+    undefined
+  );
+}
+
+/**
+ * Build a base64 python-gateway `--token` from a freshly minted API key.
+ * Matches PymtHouse `createLivepeerPythonSdkToken` (Bearer key in signer_headers).
+ */
+function buildPythonGatewayToken(apiKey: string): string | undefined {
+  const signer = readSignerUrl();
+  if (!signer) {
+    return undefined;
+  }
+  return buildGatewayToken({
+    signer,
+    discovery: readDiscoveryUrl(),
+    auth: {
+      kind: "signerJwt",
+      accessToken: apiKey,
+    },
+  });
+}
 
 function readPublicClientId(): string {
   const id =
@@ -84,11 +123,12 @@ async function readErrorMessage(response: Response): Promise<string> {
 
 export async function listDashboardApiKeys(
   externalUserId: string,
+  email?: string,
 ): Promise<DashboardApiKeyRow[]> {
   const publicClientId = readPublicClientId();
   // Upsert before list — pymthouse returns 404 "User not found" until the
   // app user row exists (same as create).
-  await ensureAppUserProvisioned(publicClientId, externalUserId);
+  await ensureAppUserProvisioned(publicClientId, externalUserId, email);
 
   const response = await fetch(userKeysUrl(publicClientId, externalUserId), {
     method: "GET",
@@ -113,6 +153,7 @@ export async function listDashboardApiKeys(
 export async function ensureAppUserProvisioned(
   publicClientId: string,
   externalUserId: string,
+  email?: string,
 ) {
   const response = await fetch(`${appsOrigin()}/api/v1/apps/${encodeURIComponent(publicClientId)}/users`, {
     method: "POST",
@@ -123,7 +164,7 @@ export async function ensureAppUserProvisioned(
     },
     body: JSON.stringify({
       externalUserId,
-      email: externalUserId,
+      ...(email?.trim() ? { email: email.trim() } : {}),
       status: "active",
     }),
     cache: "no-store",
@@ -140,10 +181,15 @@ export async function ensureAppUserProvisioned(
 
 export async function createDashboardApiKey(input: {
   externalUserId: string;
+  email?: string;
   label?: string;
-}): Promise<{ apiKey: string; row: DashboardApiKeyRow }> {
+}): Promise<{ apiKey: string; sdkToken: string | null; row: DashboardApiKeyRow }> {
   const publicClientId = readPublicClientId();
-  await ensureAppUserProvisioned(publicClientId, input.externalUserId);
+  await ensureAppUserProvisioned(
+    publicClientId,
+    input.externalUserId,
+    input.email,
+  );
 
   const response = await fetch(userKeysUrl(publicClientId, input.externalUserId), {
     method: "POST",
@@ -165,6 +211,7 @@ export async function createDashboardApiKey(input: {
 
   const body = await readJsonBody<{
     apiKey: string;
+    sdkToken?: string;
     id: string;
     prefix: string;
     suffix: string;
@@ -172,8 +219,15 @@ export async function createDashboardApiKey(input: {
     createdAt: string;
   }>(response);
 
+  const fromIssuer =
+    typeof body.sdkToken === "string" && body.sdkToken.trim()
+      ? body.sdkToken.trim()
+      : null;
+  const sdkToken = fromIssuer ?? buildPythonGatewayToken(body.apiKey) ?? null;
+
   return {
     apiKey: body.apiKey,
+    sdkToken,
     row: {
       id: body.id,
       label: body.label,

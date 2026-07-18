@@ -184,7 +184,7 @@ function PlaygroundTabContent({ model }: { model: App }) {
 
   const runLive = useCallback(
     async (values: Record<string, unknown>) => {
-      if (runnerGatewayState.status !== "ready" || !user?.email?.trim()) {
+      if (runnerGatewayState.status !== "ready" || !user?.id?.trim()) {
         runMock(values);
         return;
       }
@@ -208,7 +208,7 @@ function PlaygroundTabContent({ model }: { model: App }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-external-user-id": user.email.trim(),
+            "x-external-user-id": user.id.trim(),
           },
           body: JSON.stringify(payload),
         });
@@ -249,7 +249,7 @@ function PlaygroundTabContent({ model }: { model: App }) {
         setIsRunning(false);
       }
     },
-    [model, runMock, runnerGatewayState, user?.email],
+    [model, runMock, runnerGatewayState, user?.id],
   );
 
   const handleRun = useCallback(

@@ -224,9 +224,9 @@ export default function CodeSnippets({
         model,
         token,
         runValues,
-        isConnected ? user?.email?.trim() : undefined,
+        isConnected ? user?.id?.trim() : undefined,
       ),
-    [model, token, runValues, isConnected, user?.email],
+    [model, token, runValues, isConnected, user?.id],
   );
   const activeLang = fixedLang ?? lang;
 
