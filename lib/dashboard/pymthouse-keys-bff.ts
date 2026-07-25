@@ -1,5 +1,6 @@
 import { PmtHouseError } from "@pymthouse/builder-sdk";
 import { buildGatewayToken } from "@pymthouse/builder-sdk/signer/gateway";
+import { readDiscoveryRawUrl } from "@/lib/discovery/config";
 
 export type DashboardApiKeyRow = {
   id: string;
@@ -21,15 +22,6 @@ function readSignerUrl(): string | undefined {
   );
 }
 
-/** Optional discovery URL embedded in python-gateway `--token` bundles. */
-function readDiscoveryUrl(): string | undefined {
-  return (
-    process.env.LIVEPEER_DISCOVERY_SERVICE_URL?.trim() ||
-    process.env.DISCOVERY_URL?.trim() ||
-    undefined
-  );
-}
-
 /**
  * Build a base64 python-gateway `--token` from a freshly minted API key.
  * Matches PymtHouse `createLivepeerPythonSdkToken` (Bearer key in signer_headers).
@@ -41,7 +33,7 @@ function buildPythonGatewayToken(apiKey: string): string | undefined {
   }
   return buildGatewayToken({
     signer,
-    discovery: readDiscoveryUrl(),
+    discovery: readDiscoveryRawUrl(),
     auth: {
       kind: "signerJwt",
       accessToken: apiKey,
