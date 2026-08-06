@@ -13,7 +13,7 @@
     "format:check": "prettier . --check"
   },
   "dependencies": {
-    "@pymthouse/builder-sdk": "0.6.2",
+    "@pymthouse/builder-sdk": "0.6.3",
     "framer-motion": "^11.15.0",
     "geist": "^1.7.0",
     "jmuxer": "^2.1.0",
