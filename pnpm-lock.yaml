@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@pymthouse/builder-sdk':
-        specifier: 0.6.1
-        version: 0.6.1
+        specifier: github:pymthouse/builder-sdk#feat/create-billing-checkout
+        version: https://codeload.github.com/pymthouse/builder-sdk/tar.gz/08f3f4afdf90aa6d641a26b4f93b2fd8c0ced605
       framer-motion:
         specifier: ^11.15.0
         version: 11.18.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -401,8 +401,9 @@ packages:
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
 
-  '@pymthouse/builder-sdk@0.6.1':
-    resolution: {integrity: sha512-ALGluRpNAdnoK0Qk1ugP7TVcTrEPtnkipeIsSx6UX6hD1MN8mtOrgZAi+dhB2VZGEM7OBdWz1YhK6V1yskialw==}
+  '@pymthouse/builder-sdk@https://codeload.github.com/pymthouse/builder-sdk/tar.gz/08f3f4afdf90aa6d641a26b4f93b2fd8c0ced605':
+    resolution: {tarball: https://codeload.github.com/pymthouse/builder-sdk/tar.gz/08f3f4afdf90aa6d641a26b4f93b2fd8c0ced605}
+    version: 0.6.2
     engines: {node: '>=20'}
 
   '@reduxjs/toolkit@2.11.2':
@@ -2331,7 +2332,7 @@ snapshots:
 
   '@nolyfill/is-core-module@1.0.39': {}
 
-  '@pymthouse/builder-sdk@0.6.1':
+  '@pymthouse/builder-sdk@https://codeload.github.com/pymthouse/builder-sdk/tar.gz/08f3f4afdf90aa6d641a26b4f93b2fd8c0ced605':
     dependencies:
       oauth4webapi: 3.8.6
 

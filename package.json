@@ -13,7 +13,7 @@
     "format:check": "prettier . --check"
   },
   "dependencies": {
-    "@pymthouse/builder-sdk": "0.6.1",
+    "@pymthouse/builder-sdk": "github:pymthouse/builder-sdk#feat/create-billing-checkout",
     "framer-motion": "^11.15.0",
     "geist": "^1.7.0",
     "jmuxer": "^2.1.0",
@@ -39,5 +39,10 @@
     "prettier": "^3.8.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@pymthouse/builder-sdk"
+    ]
   }
 }

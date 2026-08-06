@@ -14,6 +14,7 @@ import {
   type UsageCapabilityRow,
 } from "@/lib/dashboard/usage-capability-display";
 import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
+import PlansPanel from "@/components/dashboard/PlansPanel";
 
 const PERIOD_DAYS = 30;
 
@@ -287,6 +288,8 @@ export default function UsageView() {
         periodDelta={forecastStats.periodDelta}
         resetsAt={resetsAt}
       />
+
+      <PlansPanel externalUserId={externalUserId} />
 
       <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
