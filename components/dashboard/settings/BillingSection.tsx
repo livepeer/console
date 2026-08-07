@@ -1,36 +1,140 @@
 "use client";
 
-import { ArrowRight, Box, Check, Download, Plus } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Box, Check, CreditCard, Download, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/components/dashboard/AuthContext";
 import {
   IconButton,
   SettingsCard,
-  SettingsField,
   SettingsHeader,
-  SettingsInput,
-  SettingsTextarea,
   ST_COLS_5,
   ST_HEAD_CLASS,
 } from "./SettingsPrimitives";
+import { useBillingAccount } from "@/lib/dashboard/useBillingAccount";
+
+function formatInvoiceAmount(totalAmount: string, currency: string): string {
+  const n = Number(totalAmount);
+  if (!Number.isFinite(n)) return `${totalAmount} ${currency}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency || "USD",
+  }).format(n);
+}
+
+function formatInvoiceDate(iso: string | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 /**
  * Organization · Billing — `?tab=billing` per the v7 prototype.
  *
- * Four blocks:
- *  1. Plan — three plan cards side by side (Free, Pro, Scale)
- *  2. Payment method — empty state ("No payment method · Add a card…")
- *  3. Billing details — company / email / tax ID / address fields
- *  4. Invoices — table of historical invoices
+ * Plan block is static (subscribe flow is a separate WIP).
+ * Payment method and invoices are live, wired to useBillingAccount.
  */
 export default function BillingSection() {
-  // Billing view is rendered behind a blur with a "Work in progress" notice
-  // on top — reviewers can see the surface area without mistaking it for a
-  // finalized flow. Real treatment is still being designed.
+  const { user } = useAuth();
+  const externalUserId = user?.id?.trim();
+
+  const {
+    state: accountState,
+    reload: reloadAccount,
+    startPaymentMethodCheckout,
+    openInvoice,
+    setDefaultPaymentMethod,
+    removePaymentMethod,
+  } = useBillingAccount(externalUserId);
+
+  const [pmBusy, setPmBusy] = useState(false);
+  const [paymentMethodActionId, setPaymentMethodActionId] = useState<string | null>(null);
+  const [invoiceBusyId, setInvoiceBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onAddCard() {
+    if (!externalUserId) {
+      setError("Sign in to add a payment method.");
+      return;
+    }
+    setError(null);
+    setPmBusy(true);
+    try {
+      const { checkoutUrl } = await startPaymentMethodCheckout({ externalUserId });
+      window.location.assign(checkoutUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment method checkout failed");
+      setPmBusy(false);
+    }
+  }
+
+  async function onOpenInvoice(invoiceId: string, prefer: "hosted" | "pdf") {
+    if (!externalUserId) return;
+    setError(null);
+    setInvoiceBusyId(invoiceId);
+    try {
+      const links = await openInvoice({ externalUserId, invoiceId });
+      const url =
+        prefer === "pdf"
+          ? links.invoicePdf || links.hostedInvoiceUrl
+          : links.hostedInvoiceUrl || links.invoicePdf;
+      if (!url) {
+        throw new Error("No Stripe invoice page for this invoice yet.");
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open invoice");
+    } finally {
+      setInvoiceBusyId(null);
+    }
+  }
+
+  async function onSetDefaultPaymentMethod(paymentMethodId: string) {
+    if (!externalUserId) return;
+    setError(null);
+    setPaymentMethodActionId(paymentMethodId);
+    try {
+      await setDefaultPaymentMethod({ externalUserId, paymentMethodId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not set default payment method");
+    } finally {
+      setPaymentMethodActionId(null);
+    }
+  }
+
+  async function onRemovePaymentMethod(paymentMethodId: string) {
+    if (!externalUserId) return;
+    if (!window.confirm("Remove this payment method?")) return;
+    setError(null);
+    setPaymentMethodActionId(paymentMethodId);
+    try {
+      await removePaymentMethod({ externalUserId, paymentMethodId });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove payment method");
+    } finally {
+      setPaymentMethodActionId(null);
+    }
+  }
+
+  const accountLoading =
+    accountState.status === "loading" || accountState.status === "idle";
+  const paymentMethods =
+    accountState.status === "ready" ? accountState.paymentMethods : [];
+  const invoices =
+    accountState.status === "ready" ? accountState.invoices : [];
+
   return (
-    <div className="relative">
-      <div
-        className="pointer-events-none select-none blur-sm"
-        aria-hidden="true"
-      >
+    <div>
+      {error ? (
+        <p className="mb-4 text-[13px] text-red-400" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <SettingsHeader
         title="Plan"
         sub="You're on the free tier · 10,000 jobs/month"
@@ -38,11 +142,7 @@ export default function BillingSection() {
 
       <SettingsCard>
         <div className="grid grid-cols-1 md:grid-cols-3">
-          {/* Free — current plan: 2px accent rail on the left + a vertical
-              `rgba(64,191,134,0.06) → transparent` wash, per the v7
-              prototype's `.plan-active` rule. The gradient subtly tints the
-              top of the card so the "current plan" reads at a glance even
-              before the eyebrow is parsed. */}
+          {/* Free — current plan */}
           <div
             className="relative border-b border-hairline p-[18px] md:border-b-0 md:border-r"
             style={{
@@ -85,7 +185,6 @@ export default function BillingSection() {
             </ul>
           </div>
 
-          {/* Pro — upgrade option */}
           <PlanCard
             name="Pro"
             price="$29"
@@ -99,7 +198,6 @@ export default function BillingSection() {
             cta="Upgrade to Pro"
           />
 
-          {/* Scale — enterprise */}
           <PlanCard
             name="Scale"
             price="Custom"
@@ -119,146 +217,170 @@ export default function BillingSection() {
 
       <SettingsHeader
         title="Payment method"
-        sub="Card on file for usage above the free tier"
+        sub="Card on file for subscription and usage charges"
         action={
-          <IconButton primary>
+          <IconButton primary onClick={() => void onAddCard()} disabled={pmBusy || !externalUserId}>
             <Plus className="h-3 w-3" aria-hidden="true" />
-            Add card
+            {pmBusy ? "Starting…" : "Add card"}
           </IconButton>
         }
       />
       <SettingsCard>
-        <div className="px-5 py-9 text-center">
-          <Box
-            className="mx-auto h-[22px] w-[22px] text-fg-disabled"
-            strokeWidth={1.5}
-            aria-hidden="true"
-          />
-          <p className="mt-2 text-[13.5px] font-medium text-fg">
-            No payment method
-          </p>
-          <p className="mt-1 text-[12.5px] text-fg-faint">
-            Add a card to keep capabilities running past the free quota.
-          </p>
-        </div>
-      </SettingsCard>
-
-      <SettingsHeader
-        title="Billing details"
-        sub="Used on invoices and receipts"
-      />
-      <SettingsCard>
-        <SettingsField
-          label="Company name"
-          hint="Optional — appears on invoices."
-        >
-          <SettingsInput defaultValue="Flipbook, Inc." />
-        </SettingsField>
-        <SettingsField label="Billing email">
-          <SettingsInput defaultValue="billing@flipbook.page" />
-        </SettingsField>
-        <SettingsField
-          label="Tax ID"
-          hint="VAT, GST, ABN — formatting depends on country."
-        >
-          <SettingsInput placeholder="Add tax ID" />
-        </SettingsField>
-        <SettingsField
-          label="Billing address"
-          hint="Used for tax calculation."
-        >
-          <SettingsTextarea
-            rows={3}
-            defaultValue={"2261 Market St #4090\nSan Francisco, CA 94114\nUnited States"}
-          />
-        </SettingsField>
-      </SettingsCard>
-
-      <SettingsHeader
-        title="Invoices"
-        action={
-          <IconButton>
-            <Download className="h-3 w-3" aria-hidden="true" />
-            Download all
-          </IconButton>
-        }
-      />
-      <SettingsCard>
-        <div className={`${ST_COLS_5} ${ST_HEAD_CLASS}`}>
-          <span>Invoice</span>
-          <span>Date</span>
-          <span>Amount</span>
-          <span>Description</span>
-          <span aria-hidden="true" />
-        </div>
-        {[
-          {
-            id: "INV-2024-04",
-            date: "Apr 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 9,127 jobs",
-          },
-          {
-            id: "INV-2024-03",
-            date: "Mar 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 4,820 jobs",
-          },
-          {
-            id: "INV-2024-02",
-            date: "Feb 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 1,602 jobs",
-          },
-        ].map((inv) => (
-          <div
-            key={inv.id}
-            className={`${ST_COLS_5} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
-          >
-            <div className="font-mono text-[12.5px] text-fg">{inv.id}</div>
-            <div className="text-[12.5px] text-fg-faint">{inv.date}</div>
-            <div className="font-mono text-[12.5px] text-fg">{inv.amount}</div>
-            <div className="text-[12px] text-fg-faint">{inv.desc}</div>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                className="text-[12px] text-fg-strong transition-colors hover:text-fg"
-              >
-                View
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg"
-              >
-                <Download className="h-3 w-3" aria-hidden="true" />
-                PDF
-              </button>
-            </div>
+        {accountLoading ? (
+          <div className="animate-pulse px-5 py-9">
+            <div className="mx-auto h-5 w-40 rounded bg-white/5" />
           </div>
-        ))}
+        ) : accountState.status === "error" ? (
+          <div className="px-5 py-6 text-center">
+            <p className="text-[13px] text-fg-muted">
+              Could not load payment methods.
+            </p>
+            <button
+              type="button"
+              className="mt-2 text-[12.5px] text-fg-strong underline"
+              onClick={() => void reloadAccount()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : paymentMethods.length === 0 ? (
+          <div className="px-5 py-9 text-center">
+            <Box
+              className="mx-auto h-[22px] w-[22px] text-fg-disabled"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <p className="mt-2 text-[13.5px] font-medium text-fg">
+              No payment method
+            </p>
+            <p className="mt-1 text-[12.5px] text-fg-faint">
+              Add a card via Stripe Checkout. Completing Checkout updates your
+              card on file even if you do not return to this page.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {paymentMethods.map((pm) => {
+              const isBusy = paymentMethodActionId === pm.id;
+              return (
+                <li
+                  key={pm.id}
+                  className="flex items-center gap-3 px-5 py-3.5"
+                >
+                  <CreditCard
+                    className="h-4 w-4 shrink-0 text-fg-faint"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13.5px] font-medium text-fg">
+                      {(pm.brand || pm.type || "Card").toUpperCase()}
+                      {pm.last4 ? ` ···· ${pm.last4}` : ""}
+                    </p>
+                    <p className="text-[12px] text-fg-faint">
+                      {pm.expMonth && pm.expYear
+                        ? `Expires ${String(pm.expMonth).padStart(2, "0")}/${pm.expYear}`
+                        : pm.type}
+                      {pm.isDefault ? " · Default" : ""}
+                    </p>
+                  </div>
+                  {!pm.isDefault ? (
+                    <button
+                      type="button"
+                      className="text-[12px] text-green-bright transition-colors hover:text-fg disabled:opacity-50"
+                      disabled={paymentMethodActionId !== null}
+                      onClick={() => void onSetDefaultPaymentMethod(pm.id)}
+                    >
+                      {isBusy ? "Saving…" : "Set default"}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-fg-faint transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
+                    disabled={paymentMethodActionId !== null}
+                    onClick={() => void onRemovePaymentMethod(pm.id)}
+                    aria-label={`Remove ${(pm.brand || pm.type || "payment method").toLowerCase()} ending ${pm.last4 ?? ""}`}
+                    title="Remove payment method"
+                  >
+                    {isBusy ? "…" : <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </SettingsCard>
-      </div>
 
-      {/* WIP overlay — sits above the blurred content. Pointer-events-none
-          on the wrapper so the blur layer below stays inert; the notice
-          itself re-enables pointer-events so it's selectable text. */}
-      <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-24">
-        <div
-          role="status"
-          className="pointer-events-auto max-w-md rounded-md border border-subtle bg-dark-lighter px-6 py-5 text-center shadow-popover"
-        >
-          <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-faint">
-            Work in progress
-          </p>
-          <p className="mt-2 text-[15px] font-semibold tracking-[-0.005em] text-fg">
-            Billing UX is not finalized
-          </p>
-          <p className="mt-1.5 text-[13px] leading-[1.5] text-fg-muted">
-            This view is still in flux while we settle on the
-            payment-provider model.
-          </p>
-        </div>
-      </div>
+      <SettingsHeader title="Invoices" sub="Stripe invoices for this account" />
+      <SettingsCard>
+        {accountLoading ? (
+          <div className="animate-pulse p-5">
+            <div className="h-4 w-full rounded bg-white/5" />
+          </div>
+        ) : accountState.status === "error" ? (
+          <div className="px-5 py-6 text-center">
+            <p className="text-[13px] text-fg-muted">Could not load invoices.</p>
+            <button
+              type="button"
+              className="mt-2 text-[12.5px] text-fg-strong underline"
+              onClick={() => void reloadAccount()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="px-5 py-9 text-center">
+            <p className="text-[13.5px] text-fg-muted">No invoices yet.</p>
+          </div>
+        ) : (
+          <>
+            <div className={`${ST_COLS_5} ${ST_HEAD_CLASS}`}>
+              <span>Invoice</span>
+              <span>Date</span>
+              <span>Amount</span>
+              <span>Status</span>
+              <span aria-hidden="true" />
+            </div>
+            {invoices.map((inv) => (
+              <div
+                key={inv.id}
+                className={`${ST_COLS_5} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
+              >
+                <div className="font-mono text-[12.5px] text-fg">
+                  {inv.number?.trim() || inv.id}
+                </div>
+                <div className="text-[12.5px] text-fg-faint">
+                  {formatInvoiceDate(inv.issuedAt || inv.periodStart)}
+                </div>
+                <div className="font-mono text-[12.5px] text-fg">
+                  {formatInvoiceAmount(inv.totalAmount, inv.currency)}
+                </div>
+                <div className="text-[12px] capitalize text-fg-faint">
+                  {inv.status}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="text-[12px] text-fg-strong transition-colors hover:text-fg disabled:opacity-50"
+                    disabled={invoiceBusyId === inv.id}
+                    onClick={() => void onOpenInvoice(inv.id, "hosted")}
+                  >
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg disabled:opacity-50"
+                    disabled={invoiceBusyId === inv.id}
+                    onClick={() => void onOpenInvoice(inv.id, "pdf")}
+                  >
+                    <Download className="h-3 w-3" aria-hidden="true" />
+                    PDF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </SettingsCard>
     </div>
   );
 }
