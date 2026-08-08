@@ -26,7 +26,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const origin = request.nextUrl.origin;
+  // Prefer an explicit public HTTPS origin (Stripe rejects most http return
+  // URLs). Fall back to the request origin; for local http://localhost Next
+  // can be started with `next dev --experimental-https`.
+  const configuredOrigin = (
+    process.env.DASHBOARD_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+  let origin = configuredOrigin || request.nextUrl.origin;
+  try {
+    const parsed = new URL(origin);
+    if (
+      parsed.protocol === "http:" &&
+      parsed.hostname !== "localhost" &&
+      parsed.hostname !== "127.0.0.1"
+    ) {
+      parsed.protocol = "https:";
+      origin = parsed.origin;
+    } else {
+      origin = parsed.origin;
+    }
+  } catch {
+    origin = request.nextUrl.origin;
+  }
   const successUrl =
     body.successUrl?.trim() || `${origin}/usage?checkout=success`;
   const cancelUrl =

@@ -18,6 +18,22 @@ async function readResponseJson<T>(response: Response): Promise<T> {
   }
 }
 
+/** Map missing/unroutable upstream billing APIs to an actionable message. */
+function billingUpstreamMessage(
+  surface: "payment methods" | "invoices",
+  status: number,
+  upstreamError?: string,
+): string {
+  if (status === 404 || status === 405) {
+    return (
+      `PymtHouse end-user ${surface} API is unavailable (${status}). ` +
+      "Deploy the /users/{id}/payment-methods and /users/{id}/invoices routes " +
+      "(pymthouse PR #386) to this environment."
+    );
+  }
+  return upstreamError ?? `${surface} failed (${status})`;
+}
+
 export type BillingAccountState =
   | { status: "idle" }
   | { status: "loading" }
@@ -53,20 +69,30 @@ export function useBillingAccount(externalUserId: string | undefined) {
       const pmBody = await readResponseJson<{
         paymentMethods?: DashboardPaymentMethod[];
         error?: string;
+        code?: string;
       }>(pmResponse);
       if (!pmResponse.ok) {
         throw new Error(
-          pmBody.error ?? `Payment methods failed (${pmResponse.status})`,
+          billingUpstreamMessage(
+            "payment methods",
+            pmResponse.status,
+            pmBody.error,
+          ),
         );
       }
 
       const invBody = await readResponseJson<{
         items?: DashboardInvoice[];
         error?: string;
+        code?: string;
       }>(invResponse);
       if (!invResponse.ok) {
         throw new Error(
-          invBody.error ?? `Invoices failed (${invResponse.status})`,
+          billingUpstreamMessage(
+            "invoices",
+            invResponse.status,
+            invBody.error,
+          ),
         );
       }
 

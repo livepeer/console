@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
   DashboardBillingPlan,
+  DashboardScheduledChangeConflict,
   DashboardUserSubscription,
 } from "@/lib/dashboard/pymthouse-billing-bff";
 
@@ -15,6 +16,34 @@ export type BillingPlansState =
       subscription: DashboardUserSubscription | null;
     }
   | { status: "error"; message: string };
+
+export class ResumeSubscriptionError extends Error {
+  readonly status: number;
+  /** Upstream machine-readable code, forwarded by the resume route. */
+  readonly code: string | undefined;
+
+  constructor(
+    message: string,
+    status: number,
+    code: string | undefined
+  ) {
+    super(message);
+    this.name = "ResumeSubscriptionError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export class ScheduledChangeConflictError extends Error {
+  readonly code = "scheduled_change_exists" as const;
+  readonly conflict: DashboardScheduledChangeConflict;
+
+  constructor(conflict: DashboardScheduledChangeConflict) {
+    super(conflict.error || "A plan change is already scheduled");
+    this.name = "ScheduledChangeConflictError";
+    this.conflict = conflict;
+  }
+}
 
 async function readResponseJson<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -112,6 +141,9 @@ export function useBillingPlans(externalUserId: string | undefined) {
       externalUserId: string;
       successUrl?: string;
       cancelUrl?: string;
+      timing?: string;
+      effectiveAt?: string;
+      confirmReplaceScheduled?: boolean;
     }) => {
       const response = await fetch("/api/pymthouse/subscription/change", {
         method: "POST",
@@ -122,7 +154,22 @@ export function useBillingPlans(externalUserId: string | undefined) {
         checkoutUrl?: string;
         subscriptionId?: string;
         error?: string;
+        code?: string;
+        timingOptions?: DashboardScheduledChangeConflict["timingOptions"];
+        scheduledSubscriptionId?: string | null;
+        scheduledPlanKey?: string | null;
+        scheduledActiveFrom?: string | null;
       }>(response);
+      if (response.status === 409 && body.code === "scheduled_change_exists") {
+        throw new ScheduledChangeConflictError({
+          code: "scheduled_change_exists",
+          error: body.error ?? "A plan change is already scheduled",
+          timingOptions: body.timingOptions ?? null,
+          scheduledSubscriptionId: body.scheduledSubscriptionId ?? null,
+          scheduledPlanKey: body.scheduledPlanKey ?? null,
+          scheduledActiveFrom: body.scheduledActiveFrom ?? null,
+        });
+      }
       if (!response.ok) {
         throw new Error(
           body.error ?? `Plan change failed (${response.status})`
@@ -136,5 +183,52 @@ export function useBillingPlans(externalUserId: string | undefined) {
     []
   );
 
-  return { state, reload: load, subscribe, changePlan };
+  const cancelSubscription = useCallback(
+    async (
+      externalUserId: string,
+      opts?: { timing?: string; effectiveAt?: string }
+    ) => {
+      const response = await fetch("/api/pymthouse/subscription/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          externalUserId,
+          ...(opts?.timing ? { timing: opts.timing } : {}),
+          ...(opts?.effectiveAt ? { effectiveAt: opts.effectiveAt } : {}),
+        }),
+      });
+      const body = await readResponseJson<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(body.error ?? `Cancel failed (${response.status})`);
+      }
+    },
+    []
+  );
+
+  const resumeSubscription = useCallback(async (externalUserId: string) => {
+    const response = await fetch("/api/pymthouse/subscription/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ externalUserId }),
+    });
+    const body = await readResponseJson<{ error?: string; code?: string }>(
+      response
+    );
+    if (!response.ok) {
+      throw new ResumeSubscriptionError(
+        body.error ?? `Resume failed (${response.status})`,
+        response.status,
+        body.code
+      );
+    }
+  }, []);
+
+  return {
+    state,
+    reload: load,
+    subscribe,
+    changePlan,
+    cancelSubscription,
+    resumeSubscription,
+  };
 }

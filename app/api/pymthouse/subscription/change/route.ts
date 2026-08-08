@@ -10,6 +10,9 @@ export async function POST(request: NextRequest) {
     externalUserId?: string;
     successUrl?: string;
     cancelUrl?: string;
+    timing?: string;
+    effectiveAt?: string;
+    confirmReplaceScheduled?: boolean;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -32,12 +35,21 @@ export async function POST(request: NextRequest) {
       externalUserId,
       successUrl: body.successUrl?.trim(),
       cancelUrl: body.cancelUrl?.trim(),
+      timing: body.timing?.trim(),
+      effectiveAt: body.effectiveAt?.trim(),
+      confirmReplaceScheduled: body.confirmReplaceScheduled === true,
     });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof PmtHouseError) {
       return NextResponse.json(
-        { error: error.message, code: error.code },
+        {
+          error: error.message,
+          code: error.code,
+          ...(error.details && typeof error.details === "object"
+            ? (error.details as Record<string, unknown>)
+            : {}),
+        },
         { status: error.status }
       );
     }

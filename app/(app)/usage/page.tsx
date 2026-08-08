@@ -36,7 +36,7 @@ function UsageContent() {
       <DashboardPageHeader
         title="Usage"
         icon={BarChart3}
-        description="Signed requests, network cost, and Starter allowance from PymtHouse OpenMeter."
+        description="Signed requests, network cost, and prepaid balance usage from PymtHouse OpenMeter."
         actions={
           <>
             <button

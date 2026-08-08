@@ -15,6 +15,7 @@ import {
 } from "@/lib/dashboard/usage-capability-display";
 import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
 import PlansPanel from "@/components/dashboard/PlansPanel";
+import WalletPanel from "@/components/dashboard/WalletPanel";
 
 const PERIOD_DAYS = 30;
 
@@ -84,7 +85,7 @@ function AllowanceStrip({
     <div className="flex flex-col gap-3 rounded-md border border-hairline bg-dark-lighter shadow-card px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-          {showUsdAllowance ? "Starter allowance" : "Usage this period"}
+          {showUsdAllowance ? "Prepaid allowance" : "Usage this period"}
         </p>
         {showUsdAllowance && !hasAccess && (
           <span className="rounded-[3px] border border-warm/30 bg-warm/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warm">
@@ -288,6 +289,8 @@ export default function UsageView() {
         periodDelta={forecastStats.periodDelta}
         resetsAt={resetsAt}
       />
+
+      <WalletPanel />
 
       <PlansPanel externalUserId={externalUserId} />
 
@@ -519,7 +522,7 @@ function LimitsPanel({
   const limits = balance
     ? [
         {
-          label: "Included allowance",
+          label: "Prepaid allowance",
           used: microsToUsdDisplay(balance.consumedUsdMicros),
           max: `$${microsToUsdDisplay(balance.lifetimeGrantedUsdMicros)}`,
           pct:

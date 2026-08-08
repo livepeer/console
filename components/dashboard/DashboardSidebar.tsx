@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   House,
   LayoutGrid,
@@ -418,15 +418,17 @@ function SettingsRail({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
+  // useSearchParams (not window.location) so SSR and the client agree —
+  // reading `window` only on the client marked General active during SSR
+  // and Billing after hydrate when `?tab=billing`.
+  const searchParams = useSearchParams();
 
   // Read the active sub-tab from `?tab=<id>` on the current URL. Default to
   // "organization" when on `/settings` with no tab param — matches the
   // prototype's fallback (`route === 'settings' ? 'organization' : ...`).
   let activeTab = "organization";
   if (pathname === "/settings" || pathname.startsWith("/settings")) {
-    const search = typeof window !== "undefined" ? window.location.search : "";
-    const params = new URLSearchParams(search);
-    const t = params.get("tab");
+    const t = searchParams.get("tab");
     if (t) activeTab = t;
   }
 
@@ -647,7 +649,9 @@ function SidebarContent({
           NETWORK destinations get their own labeled section below. On /settings
           the whole list is replaced by the SettingsRail. */}
       {pathname.startsWith("/settings") ? (
-        <SettingsRail pathname={pathname} padX={padX} onNavigate={onNavigate} />
+        <Suspense fallback={<div className={`pb-1 ${padX}`} aria-hidden="true" />}>
+          <SettingsRail pathname={pathname} padX={padX} onNavigate={onNavigate} />
+        </Suspense>
       ) : (
         <>
           {/* Primary — your organization resources. Environment is a per-page

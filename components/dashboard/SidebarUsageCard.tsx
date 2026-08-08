@@ -51,7 +51,7 @@ export default function SidebarUsageCard() {
     balance && BigInt(balance.lifetimeGrantedUsdMicros || "0") > BigInt(0);
 
   const resetsAt = formatPeriodResetLabel(data.period.end);
-  const planLabel = showUsdAllowance ? "Starter" : "Usage";
+  const planLabel = showUsdAllowance ? "Prepaid" : "Usage";
 
   let primaryUsed: number;
   let primaryLimit: number | null;

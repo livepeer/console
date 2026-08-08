@@ -294,6 +294,24 @@ function issuerOriginFromConfig(): string {
   return new URL(config.issuerUrl).origin;
 }
 
+/**
+ * Pymthouse signals user-not-found with two envelopes: the REST shape
+ * (`{ error: <prose>, code: "not_found" }`) and the OAuth shape used by the
+ * mint-token route (`{ error: "not_found" }`, no `code` — the SDK then reports
+ * `code` as `pymthouse_http_error`). Accept both, matching the SDK's own
+ * `isUserNotFoundError`.
+ */
+export function isUserNotFoundError(error: unknown): boolean {
+  if (!(error instanceof PmtHouseError) || error.status !== 404) {
+    return false;
+  }
+  if (error.code === "not_found") {
+    return true;
+  }
+  const details = error.details as { error?: unknown } | null | undefined;
+  return details?.error === "not_found";
+}
+
 async function mintEndUserAccessToken(
   client: PmtHouseClient,
   externalUserId: string,
@@ -302,11 +320,7 @@ async function mintEndUserAccessToken(
     const minted = await client.mintUserAccessToken({ externalUserId });
     return minted.access_token;
   } catch (error) {
-    if (
-      error instanceof PmtHouseError &&
-      error.status === 404 &&
-      error.code === "not_found"
-    ) {
+    if (isUserNotFoundError(error)) {
       await client.upsertAppUser({ externalUserId });
       const minted = await client.mintUserAccessToken({ externalUserId });
       return minted.access_token;
