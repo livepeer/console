@@ -16,6 +16,15 @@ export type SignerContext = {
   expiresAt: number;
 };
 
+const SIGNER_ROUTING_TTL_MS = 5 * 60 * 1000;
+
+type CachedSignerRouting = {
+  signerUrl: string;
+  fetchedAt: number;
+};
+
+const signerRoutingByClient = new Map<string, CachedSignerRouting>();
+
 function readPublicClientId(): string {
   const id =
     process.env.PYMTHOUSE_PUBLIC_CLIENT_ID?.trim() ||
@@ -27,15 +36,6 @@ function readPublicClientId(): string {
     );
   }
   return id;
-}
-
-function readSignerUrl(): string | undefined {
-  return (
-    process.env.PYMTHOUSE_CLIENT_SIGNER_API_URL?.trim() ||
-    process.env.PYMTHOUSE_SIGNER_URL?.trim() ||
-    process.env.SIGNER_PUBLIC_URL?.trim() ||
-    undefined
-  );
 }
 
 function readM2mMintConfig() {
@@ -55,6 +55,30 @@ function readM2mMintConfig() {
 
 function isPymthouseConfigured(): boolean {
   return readM2mMintConfig() !== null && Boolean(readPublicClientId());
+}
+
+/**
+ * Resolve the public signer DMZ URL from issuer app routing
+ * (`GET …/apps/{clientId}/signer/routing`) — not from dashboard env.
+ */
+async function resolveSignerUrl(publicClientId: string): Promise<string | undefined> {
+  const now = Date.now();
+  const cached = signerRoutingByClient.get(publicClientId);
+  if (cached && now - cached.fetchedAt < SIGNER_ROUTING_TTL_MS) {
+    return cached.signerUrl;
+  }
+
+  const client = createPmtHouseClientForPublicApp(publicClientId);
+  const routing = await client.getSignerRouting();
+  const signerUrl =
+    routing.routing?.signerApiUrl?.trim() ||
+    routing.patterns?.directDmz?.signerApiUrl?.trim() ||
+    "";
+  if (!signerUrl) {
+    return undefined;
+  }
+  signerRoutingByClient.set(publicClientId, { signerUrl, fetchedAt: now });
+  return signerUrl;
 }
 
 const tokenManager = createSignerTokenManager({
@@ -78,10 +102,13 @@ const tokenManager = createSignerTokenManager({
   },
 });
 
-function toSignerContext(token: CachedSignerToken): SignerContext {
+function toSignerContext(
+  token: CachedSignerToken,
+  signerUrl: string | undefined,
+): SignerContext {
   return {
     jwt: token.jwt,
-    signerUrl: readSignerUrl(),
+    signerUrl,
     balanceUsdMicros: token.balanceUsdMicros,
     lifetimeGrantedUsdMicros: token.lifetimeGrantedUsdMicros,
     expiresAt: token.expiresAt,
@@ -104,10 +131,13 @@ export async function getSignerContext(
     });
   }
   const publicClientId = readPublicClientId();
-  const token = await tokenManager.getToken(publicClientId, trimmed, {
-    forceRefresh: options?.forceRefresh,
-  });
-  return toSignerContext(token);
+  const [token, signerUrl] = await Promise.all([
+    tokenManager.getToken(publicClientId, trimmed, {
+      forceRefresh: options?.forceRefresh,
+    }),
+    resolveSignerUrl(publicClientId),
+  ]);
+  return toSignerContext(token, signerUrl);
 }
 
 export async function getSignerSessionStatus(externalUserId: string): Promise<{

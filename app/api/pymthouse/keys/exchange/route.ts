@@ -12,7 +12,6 @@ type ExchangeConfig = {
   publicClientId: string;
   m2mClientId: string;
   m2mClientSecret: string;
-  signerUrl: string | undefined;
 };
 
 /** Thin BFF; canonical issuer route is POST …/apps/{clientId}/oidc/token (RFC 8693). */
@@ -24,17 +23,11 @@ function readApiKeyExchangeConfig(): ExchangeConfig | null {
   if (!issuerUrl || !publicClientId) {
     return null;
   }
-  const signerUrl =
-    process.env.PYMTHOUSE_CLIENT_SIGNER_API_URL?.trim() ||
-    process.env.PYMTHOUSE_SIGNER_URL?.trim() ||
-    process.env.SIGNER_PUBLIC_URL?.trim() ||
-    undefined;
   return {
     issuerUrl,
     publicClientId,
     m2mClientId: process.env.PYMTHOUSE_M2M_CLIENT_ID?.trim() ?? "",
     m2mClientSecret: process.env.PYMTHOUSE_M2M_CLIENT_SECRET?.trim() ?? "",
-    signerUrl,
   };
 }
 
@@ -114,8 +107,8 @@ async function exchangeApiKeyViaOidcToken(input: {
     });
   }
 
-  const signerUrl =
-    readStringField(parsed, "signer_url") || config.signerUrl || undefined;
+  // signer_url comes from the issuer exchange response (app signer routing).
+  const signerUrl = readStringField(parsed, "signer_url");
 
   const expiresIn =
     typeof parsed.expires_in === "number" && Number.isFinite(parsed.expires_in)

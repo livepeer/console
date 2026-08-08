@@ -96,25 +96,30 @@ export function useApiKeys(
       if (!response.ok || !body.apiKey || !body.row) {
         throw new Error(body.error ?? `Create failed (${response.status})`);
       }
-      // Show the new row immediately so a soft-list failure cannot blank the table.
-      setState((prev) => {
-        const existing = prev.status === "ready" ? prev.keys : [];
-        return {
-          status: "ready",
-          keys: [body.row!, ...existing.filter((row) => row.id !== body.row!.id)],
-        };
-      });
-      await load({ soft: true });
+      // Caller inserts the row in the same paint as the reveal banner, then
+      // soft-refreshes — keep create itself free of list mutations.
       return {
         apiKey: body.apiKey,
+        id: body.row.id,
+        row: body.row,
         sdkToken:
           typeof body.sdkToken === "string" && body.sdkToken.trim()
             ? body.sdkToken.trim()
             : null,
       };
     },
-    [email, externalUserId, load],
+    [email, externalUserId],
   );
+
+  const insertKey = useCallback((row: DashboardApiKeyRow) => {
+    setState((prev) => {
+      const existing = prev.status === "ready" ? prev.keys : [];
+      return {
+        status: "ready",
+        keys: [row, ...existing.filter((existingRow) => existingRow.id !== row.id)],
+      };
+    });
+  }, []);
 
   const revokeKey = useCallback(
     async (keyId: string) => {
@@ -146,5 +151,5 @@ export function useApiKeys(
     [externalUserId, load],
   );
 
-  return { state, reload: load, createKey, revokeKey };
+  return { state, reload: load, createKey, insertKey, revokeKey };
 }

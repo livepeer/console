@@ -157,6 +157,43 @@ function RevealedCredential({
   );
 }
 
+/** Masked table token — single mono string so prefix/ellipsis/suffix never drift. */
+function MaskedToken({
+  prefix,
+  suffix,
+}: {
+  prefix: string;
+  suffix: string;
+}) {
+  const masked = `${prefix}…${suffix}`;
+  return (
+    <div
+      className="mt-1 truncate font-mono text-[11.5px] tracking-tight text-fg-faint"
+      title={masked}
+    >
+      {masked}
+    </div>
+  );
+}
+
+function KeysTableSkeletonRow() {
+  return (
+    <div
+      className="grid grid-cols-[2.4fr_1.1fr_1.2fr_36px] items-center gap-3 border-b border-hairline px-4 py-3.5"
+      aria-busy="true"
+      aria-label="Creating API key"
+    >
+      <div className="min-w-0 space-y-1.5">
+        <div className="h-3.5 w-[7.5rem] animate-pulse rounded bg-hover" />
+        <div className="h-3 w-[11rem] animate-pulse rounded bg-hover/70 font-mono" />
+      </div>
+      <div className="h-5 w-[4.25rem] animate-pulse rounded-full bg-hover" />
+      <div className="h-3.5 w-[5.5rem] animate-pulse rounded bg-hover" />
+      <div />
+    </div>
+  );
+}
+
 function formatCreatedAt(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -180,13 +217,14 @@ function daysSince(iso: string): number {
 export default function KeysView() {
   const { user } = useAuth();
   const externalUserId = user?.id?.trim();
-  const { state, createKey, revokeKey, reload } = useApiKeys(
+  const { state, createKey, insertKey, revokeKey, reload } = useApiKeys(
     externalUserId,
     user?.email,
   );
 
   const [revealed, setRevealed] = useState<{
     apiKey: string;
+    id: string;
     sdkToken: string | null;
   } | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -195,6 +233,7 @@ export default function KeysView() {
   const [creating, setCreating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const revealRef = useRef<HTMLDivElement>(null);
 
   const keys: DashboardApiKeyRow[] = state.status === "ready" ? state.keys : [];
   const ROTATE_DAYS_THRESHOLD = 90;
@@ -224,13 +263,23 @@ export default function KeysView() {
     setCreating(true);
     try {
       const created = await createKey("Dashboard SDK");
-      setRevealed(created);
+      // Same paint: drop skeleton, insert row, show full-key banner.
+      insertKey(created.row);
+      setRevealed({
+        apiKey: created.apiKey,
+        id: created.id,
+        sdkToken: created.sdkToken,
+      });
+      setCreating(false);
+      void reload({ soft: true });
+      queueMicrotask(() => {
+        revealRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
     } catch (error) {
+      setCreating(false);
       setActionError(
         error instanceof Error ? error.message : "Could not create API key",
       );
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -323,7 +372,12 @@ export default function KeysView() {
         )}
 
         {revealed && (
-          <div className="relative mb-4 flex overflow-hidden rounded-md border border-green bg-gradient-to-b from-green/[0.08] to-green/[0.02]">
+          <div
+            ref={revealRef}
+            role="status"
+            aria-live="polite"
+            className="relative mb-4 flex overflow-hidden rounded-md border border-green bg-gradient-to-b from-green/[0.08] to-green/[0.02]"
+          >
             <div
               className="pointer-events-none absolute inset-0"
               style={{
@@ -421,21 +475,28 @@ export default function KeysView() {
             </div>
           )}
 
-          {!loading && keys.length === 0 && (
+          {!loading && keys.length === 0 && !creating && (
             <div className="px-4 py-12 text-center text-[13px] text-fg-muted">
               No API keys yet. Create one to use with the SDK.
             </div>
           )}
 
+          {!loading && creating && <KeysTableSkeletonRow />}
+
           {!loading &&
             keys.map((k) => {
               const stale = daysSince(k.createdAt) >= ROTATE_DAYS_THRESHOLD;
               const isOpen = openMenu === k.id;
+              const isJustCreated = revealed?.id === k.id;
               const displayName = k.label?.trim() || "SDK key";
               return (
                 <div
                   key={k.id}
-                  className="relative grid grid-cols-[2.4fr_1.1fr_1.2fr_36px] items-center gap-3 border-b border-hairline px-4 py-3.5 last:border-b-0 hover:bg-zebra"
+                  className={`relative grid grid-cols-[2.4fr_1.1fr_1.2fr_36px] items-center gap-3 border-b border-hairline px-4 py-3.5 last:border-b-0 ${
+                    isJustCreated
+                      ? "bg-green/[0.06] ring-1 ring-inset ring-green/25"
+                      : "hover:bg-zebra"
+                  }`}
                 >
                   <div className="min-w-0">
                     <div className="text-[13.5px] font-medium text-fg">
@@ -450,11 +511,7 @@ export default function KeysView() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 font-mono text-[11.5px] text-fg-faint">
-                      {k.prefix}
-                      <span className="px-0.5 text-fg-disabled">…</span>
-                      {k.suffix}
-                    </div>
+                    <MaskedToken prefix={k.prefix} suffix={k.suffix} />
                   </div>
 
                   <div>

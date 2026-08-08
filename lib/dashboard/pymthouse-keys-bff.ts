@@ -1,6 +1,4 @@
 import { PmtHouseError } from "@pymthouse/builder-sdk";
-import { buildGatewayToken } from "@pymthouse/builder-sdk/signer/gateway";
-import { readDiscoveryRawUrl } from "@/lib/discovery/config";
 
 export type DashboardApiKeyRow = {
   id: string;
@@ -11,35 +9,6 @@ export type DashboardApiKeyRow = {
   createdAt: string;
   revokedAt: string | null;
 };
-
-/** Env-driven signer URL used for python-gateway `--token` bundles. */
-function readSignerUrl(): string | undefined {
-  return (
-    process.env.PYMTHOUSE_CLIENT_SIGNER_API_URL?.trim() ||
-    process.env.PYMTHOUSE_SIGNER_URL?.trim() ||
-    process.env.SIGNER_PUBLIC_URL?.trim() ||
-    undefined
-  );
-}
-
-/**
- * Build a base64 python-gateway `--token` from a freshly minted API key.
- * Matches PymtHouse `createLivepeerPythonSdkToken` (Bearer key in signer_headers).
- */
-function buildPythonGatewayToken(apiKey: string): string | undefined {
-  const signer = readSignerUrl();
-  if (!signer) {
-    return undefined;
-  }
-  return buildGatewayToken({
-    signer,
-    discovery: readDiscoveryRawUrl(),
-    auth: {
-      kind: "signerJwt",
-      accessToken: apiKey,
-    },
-  });
-}
 
 function readPublicClientId(): string {
   const id =
@@ -211,11 +180,11 @@ export async function createDashboardApiKey(input: {
     createdAt: string;
   }>(response);
 
-  const fromIssuer =
+  // Issuer builds the python-gateway --token (includes signer routing).
+  const sdkToken =
     typeof body.sdkToken === "string" && body.sdkToken.trim()
       ? body.sdkToken.trim()
       : null;
-  const sdkToken = fromIssuer ?? buildPythonGatewayToken(body.apiKey) ?? null;
 
   return {
     apiKey: body.apiKey,
