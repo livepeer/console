@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  errorMessageFromBody,
+  isAccountUsagePayload,
+} from "@/lib/dashboard/account-usage-payload";
 import type { AccountUsagePayload } from "@/lib/dashboard/pymthouse-bff";
 
 export type AccountUsageState =
@@ -56,11 +60,14 @@ export function useAccountUsage(
       const response = await fetch(`/api/pymthouse/account-usage?${params}`, {
         cache: "no-store",
       });
-      const body = (await response.json()) as AccountUsagePayload & {
-        error?: string;
-      };
+      const body: unknown = await response.json();
       if (!response.ok) {
-        throw new Error(body.error ?? `Usage fetch failed (${response.status})`);
+        throw new Error(
+          errorMessageFromBody(body) ?? `Usage fetch failed (${response.status})`,
+        );
+      }
+      if (!isAccountUsagePayload(body)) {
+        throw new Error("Usage response was malformed.");
       }
       setState({ status: "ready", data: body });
     } catch (error) {
