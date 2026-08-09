@@ -142,6 +142,10 @@ export interface PlaygroundConfig {
   mockOutputJson?: unknown;
   /** Selects the playground UI. "webcam" mocks live video-in/video-out with the user's camera. "transcoding" shapes the output like a Livepeer HLS stream (playbackId, rendition ladder, copyable URLs). Defaults to "form". */
   playgroundVariant?: "form" | "webcam" | "transcoding";
+  /** Live-runner HTTP path under the reserved session app URL (e.g. "hello").
+   *  When set, playground posts form values as JSON to this path instead of
+   *  OpenAI-style chat/completions. */
+  runnerPath?: string;
 }
 
 export interface UsageDataPoint {
@@ -179,6 +183,10 @@ export interface App {
   featured?: boolean;
   /** Supports streaming (WebRTC) inference in addition to request/response. The differentiator on the network — flagged as a capability pill and filterable on Explore. */
   realtime?: boolean;
+  /** LV2V model_id for gateway sessions when different from discovery capability `id`. */
+  gatewayModelId?: string;
+  /** Live-runner app id for gateway.py-style HTTP apps, e.g. vllm/qwen2.5-0.5b-instruct */
+  runnerAppId?: string;
   /** ISO-8601 date the model was published on the network. Drives the "NEW" badge and Recently-added sort. */
   releasedAt?: string;
   tags?: string[];

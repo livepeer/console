@@ -22,7 +22,6 @@ import KeyBadge from "@/components/dashboard/KeyBadge";
 import CallsTable from "@/components/dashboard/CallsTable";
 import StatusDot from "@/components/dashboard/StatusDot";
 import {
-  getAppById,
   effectiveVisibility,
   setPipelineVisibility,
   organizationSlug,
@@ -30,6 +29,8 @@ import {
   SETTINGS_API_KEYS,
   MOCK_RECENT_REQUESTS,
 } from "@/lib/dashboard/mock-data";
+import { useDiscoveryModel } from "@/lib/dashboard/useDiscoveryModel";
+import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
 import { getAppIcon } from "@/lib/dashboard/utils";
 import PlaygroundForm from "@/components/dashboard/playground/PlaygroundForm";
 import JsonInput from "@/components/dashboard/playground/JsonInput";
@@ -37,6 +38,15 @@ import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput
 import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
 import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
 import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
+import {
+  RunnerGatewayProvider,
+  useRunnerGatewayContext,
+} from "@/components/dashboard/playground/RunnerGatewayContext";
+import {
+  buildLiveRunnerPayload,
+  extractRunnerResultText,
+  runnerGatewayPostUrl,
+} from "@/lib/dashboard/runner-gateway-client";
 import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
 import {
   OverviewTab,
@@ -106,17 +116,33 @@ function modelMatchesRow(catalogId: string, runModel: string): boolean {
 // ─── Playground Tab ───
 
 function PlaygroundTab({ model }: { model: App }) {
+  return (
+    <RunnerGatewayProvider model={model}>
+      <PlaygroundTabContent model={model} />
+    </RunnerGatewayProvider>
+  );
+}
+
+function PlaygroundTabContent({ model }: { model: App }) {
+  const { user } = useAuth();
+  const {
+    canRunLive,
+    state: runnerGatewayState,
+    signerJwt,
+  } = useRunnerGatewayContext();
   const [inputMode, setInputMode] = useState<"form" | "json" | "python" | "node" | "http">("form");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [inferenceTime, setInferenceTime] = useState<number | undefined>();
   const [lastRunValues, setLastRunValues] = useState<Record<string, unknown> | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
-  const handleRun = useCallback(
+  const runMock = useCallback(
     (values: Record<string, unknown>) => {
       setLastRunValues(values);
       setIsRunning(true);
       setResult(null);
+      setRunError(null);
       const time = 0.3 + Math.random() * 1.5;
       setTimeout(() => {
         setIsRunning(false);
@@ -154,6 +180,87 @@ function PlaygroundTab({ model }: { model: App }) {
       }, time * 1000);
     },
     [model],
+  );
+
+  const runLive = useCallback(
+    async (values: Record<string, unknown>) => {
+      if (runnerGatewayState.status !== "ready" || !user?.id?.trim()) {
+        runMock(values);
+        return;
+      }
+
+      setLastRunValues(values);
+      setIsRunning(true);
+      setResult(null);
+      setRunError(null);
+      const started = performance.now();
+
+      try {
+        const runnerPath =
+          model.playgroundConfig?.runnerPath?.trim() || "chat/completions";
+        const payload = buildLiveRunnerPayload(model, values);
+        const url = runnerGatewayPostUrl(
+          runnerGatewayState.gatewayBaseUrl,
+          runnerGatewayState.runnerAppId,
+          runnerPath,
+        );
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-external-user-id": user.id.trim(),
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!response.ok) {
+          let message = `Gateway error (${response.status})`;
+          try {
+            const errBody = (await response.json()) as { error?: string };
+            if (errBody.error) message = errBody.error;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+
+        if (contentType.includes("text/event-stream") && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let streamed = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            streamed += decoder.decode(value, { stream: true });
+            setResult(streamed);
+          }
+        } else {
+          const data = await response.json();
+          setResult(extractRunnerResultText(data));
+        }
+
+        setInferenceTime(parseFloat(((performance.now() - started) / 1000).toFixed(1)));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Run failed";
+        setRunError(message);
+        setResult(null);
+      } finally {
+        setIsRunning(false);
+      }
+    },
+    [model, runMock, runnerGatewayState, user?.id],
+  );
+
+  const handleRun = useCallback(
+    (values: Record<string, unknown>) => {
+      if (canRunLive) {
+        void runLive(values);
+        return;
+      }
+      runMock(values);
+    },
+    [canRunLive, runLive, runMock],
   );
 
   // Ctrl+Enter shortcut
@@ -231,6 +338,7 @@ function PlaygroundTab({ model }: { model: App }) {
             config={model.playgroundConfig}
             onRun={handleRun}
             isRunning={isRunning}
+            signerJwt={signerJwt}
           />
         )}
         {inputMode === "json" && (
@@ -244,6 +352,10 @@ function PlaygroundTab({ model }: { model: App }) {
           inputMode === "node" ||
           inputMode === "http") && (
           <div className="flex flex-col">
+            {/* Signer JWT is minted server-side and kept off the visible UI. */}
+            {signerJwt ? (
+              <input type="hidden" name="signer-jwt" value={signerJwt} readOnly />
+            ) : null}
             <div className="pb-4">
               <CodeSnippets model={model} fixedLang={inputMode} />
             </div>
@@ -281,7 +393,22 @@ function PlaygroundTab({ model }: { model: App }) {
 
       {/* Right: Output */}
       <div>
-        <h3 className="mb-4 text-sm font-medium text-fg-faint">Output</h3>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium text-fg-faint">Output</h3>
+          {model.runnerAppId && runnerGatewayState.status === "ready" && (
+            <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[10px] font-medium text-green-bright">
+              Live runner
+            </span>
+          )}
+          {model.runnerAppId && runnerGatewayState.status === "loading" && (
+            <span className="text-[10px] text-fg-label">Preparing signer…</span>
+          )}
+        </div>
+        {runError && (
+          <p className="mb-3 rounded-lg border border-red/30 bg-red/10 px-3 py-2 text-xs text-red-400">
+            {runError}
+          </p>
+        )}
         {model.playgroundConfig.playgroundVariant === "transcoding" ? (
           <TranscodingOutput
             result={result}
@@ -589,14 +716,21 @@ function JobsTab({
 
 // ─── Main Page ───
 
-export default function AppDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const { isConnected } = useAuth();
+function capabilityIdFromParams(id: string | string[] | undefined): string {
+  if (Array.isArray(id)) {
+    return id.map((segment) => decodeURIComponent(segment)).join("/");
+  }
+  return id ? decodeURIComponent(id) : "";
+}
 
-  // The unified app — its catalog face and (always, since unification) its
-  // deployment manifest under `app.deployment`. One id-based lookup resolves
-  // both the org's own apps and the third-party catalog models.
-  const app = getAppById(id);
+export default function AppDetailPage() {
+  const params = useParams<{ id: string | string[] }>();
+  const id = capabilityIdFromParams(params.id);
+  const { isConnected } = useAuth();
+  // The app detail is powered by live Discovery Service data — the capability
+  // is resolved by id, with loading/error/not-found states handled below.
+  const discovery = useDiscoveryModel(id || undefined);
+  const app = discovery.status === "ready" ? discovery.model : undefined;
   // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
   // stacked apps PR. In the consumer base the app detail is view-only for
   // everyone, so owner mode is gated off here; the stacked PR's revert removes
@@ -656,6 +790,31 @@ export default function AppDetailPage() {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner]);
+
+  if (discovery.status === "loading") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageSkeleton maxWidth="5xl" withTabs kpiCount={0} withChart={false} />
+      </main>
+    );
+  }
+
+  if (discovery.status === "error") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 text-center">
+          <p className="text-sm text-fg-muted">Could not load capability from Discovery Service.</p>
+          <p className="mt-2 max-w-md font-mono text-xs text-fg-faint">{discovery.message}</p>
+          <Link
+            href="/explore"
+            className="mt-6 text-xs text-green-bright hover:underline focus:outline-none rounded"
+          >
+            Back to Explore
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!app) {
     return (

@@ -13,13 +13,17 @@
     "format:check": "prettier . --check"
   },
   "dependencies": {
+    "@pymthouse/builder-sdk": "0.6.3",
     "framer-motion": "^11.15.0",
     "geist": "^1.7.0",
+    "jmuxer": "^2.1.0",
     "lucide-react": "^1.6.0",
+    "mux.js": "^6.3.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
+    "server-only": "^0.0.1",
     "wavesurfer.js": "^7.12.6"
   },
   "devDependencies": {

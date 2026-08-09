@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useMemo, useEffect } from "react";
+import { Suspense, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -15,12 +15,7 @@ import {
   Star,
   Search,
 } from "lucide-react";
-import {
-  APPS,
-  publicPipelines,
-  SEED_PUBLIC_PIPELINE_APPS,
-  PIPELINE_APP_IDS,
-} from "@/lib/dashboard/mock-data";
+import { useExploreModels } from "@/lib/dashboard/useExploreModels";
 import Button from "@/components/design-system/Button";
 import Drawer from "@/components/design-system/Drawer";
 import { getAppIcon, formatRuns } from "@/lib/dashboard/utils";
@@ -401,7 +396,27 @@ export default function ExploreView() {
   );
 }
 
+function ExploreLoadError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center">
+      <p className="text-sm text-fg-muted">Could not load capabilities from Discovery Service.</p>
+      <p className="mt-2 max-w-md font-mono text-xs text-fg-faint">{message}</p>
+      <Button className="mt-6" variant="secondary" size="sm" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}
+
 function ExplorePageInner() {
+  const exploreState = useExploreModels();
+  const { status, models, reload } = exploreState;
   const searchParams = useSearchParams();
   const initialCategory = (() => {
     const qp = searchParams.get("category");
@@ -422,37 +437,13 @@ function ExplorePageInner() {
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
 
-  // The org's public deployed apps are listed in Explore alongside the
-  // third-party catalog models. Seeded SSR-safely, then refreshed from the
-  // localStorage-backed publish state after mount so toggling an app's
-  // visibility on its Settings tab is reflected here on next navigation.
-  const [pipelineModels, setPipelineModels] = useState<App[]>(
-    SEED_PUBLIC_PIPELINE_APPS,
-  );
-  useEffect(() => {
-    setPipelineModels(publicPipelines());
-  }, []);
-
-  // APPS now carries the org's own apps too (public + private). Take the
-  // third-party catalog from APPS and re-attach only the *public* owned apps so
-  // private deployments never leak into Explore and nothing is duplicated.
-  const catalogModels = useMemo(
-    () => APPS.filter((m) => !PIPELINE_APP_IDS.has(m.id)),
-    [],
-  );
-
-  const allModels = useMemo(
-    () => [...catalogModels, ...pipelineModels],
-    [catalogModels, pipelineModels],
-  );
-
   const dataMaxPrice = useMemo(
-    () => Math.max(...allModels.map((m) => m.pricing.amount), 0.01),
-    [allModels],
+    () => Math.max(...models.map((m) => m.pricing.amount), 0.01),
+    [models],
   );
 
   const filtered = useMemo(() => {
-    const result = allModels.filter((m) => {
+    const result = models.filter((m) => {
       if (availabilityFilter === "warm" && m.status !== "hot") return false;
       if (availabilityFilter === "cold" && m.status !== "cold") return false;
       if (favoritesOnly && !isStarred(m.id)) return false;
@@ -478,7 +469,28 @@ function ExplorePageInner() {
     });
 
     return result;
-  }, [allModels, search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+  }, [models, search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+
+  if (status === "loading" && models.length === 0) {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageHeader title="Explore" icon={LayoutGrid} />
+        <DashboardPageSkeleton maxWidth="7xl" withTabs kpiCount={0} withChart={false} />
+      </main>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <main id="main-content" className="flex flex-1 flex-col bg-dark">
+        <DashboardPageHeader title="Explore" icon={LayoutGrid} />
+        <ExploreLoadError
+          message={exploreState.status === "error" ? exploreState.error : "Unknown error"}
+          onRetry={reload}
+        />
+      </main>
+    );
+  }
 
   const activeFilters = [
     ...(category
@@ -664,20 +676,9 @@ function ExplorePageInner() {
           </div>
         ) : view === "grid" ? (
           <div className="grid grid-cols-1 gap-3 px-5 pt-4 pb-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {filtered.map((model) => {
-              const isPipeline = PIPELINE_APP_IDS.has(model.id);
-              // Pipeline cards open the consumer/playground face (/apps/[id]);
-              // owners reach the operator console from a "Manage app" affordance
-              // there. The catalog is a consume surface, so a card never drops a
-              // caller straight into someone's operator view.
-              return (
-                <AppCard
-                  key={model.id}
-                  model={model}
-                  tag={isPipeline ? "Pipeline" : undefined}
-                />
-              );
-            })}
+            {filtered.map((model) => (
+              <AppCard key={model.id} model={model} />
+            ))}
           </div>
         ) : (
           <div className="px-5 pb-8">
@@ -763,7 +764,7 @@ function ExplorePageInner() {
             min={priceMin}
             max={priceMax}
             onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }}
-            models={allModels}
+            models={models}
           />
         </div>
 
