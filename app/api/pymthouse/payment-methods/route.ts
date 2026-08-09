@@ -3,6 +3,7 @@ import { PmtHouseError } from "@pymthouse/builder-sdk";
 import {
   listDashboardUserPaymentMethods,
   removeDashboardUserPaymentMethod,
+  ensureDashboardUserDefaultPaymentMethod,
   setDashboardUserDefaultPaymentMethod,
   startDashboardPaymentMethodCheckout,
 } from "@/lib/dashboard/pymthouse-billing-bff";
@@ -134,15 +135,48 @@ async function readPaymentMethodMutation(request: NextRequest): Promise<
 }
 
 export async function PATCH(request: NextRequest) {
-  const input = await readPaymentMethodMutation(request);
-  if (input instanceof NextResponse) {
-    return input;
+  let body: {
+    externalUserId?: string;
+    paymentMethodId?: string;
+    ensureDefault?: boolean;
+  };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
+
+  const externalUserId = body.externalUserId?.trim();
+  if (!externalUserId) {
+    return NextResponse.json(
+      { error: "externalUserId is required" },
+      { status: 400 },
+    );
+  }
+
+  if (body.ensureDefault === true) {
+    try {
+      return NextResponse.json(
+        await ensureDashboardUserDefaultPaymentMethod(externalUserId),
+      );
+    } catch (error) {
+      return billingErrorResponse(error, "Failed to ensure default payment method");
+    }
+  }
+
+  const paymentMethodId = body.paymentMethodId?.trim();
+  if (!paymentMethodId) {
+    return NextResponse.json(
+      { error: "paymentMethodId is required" },
+      { status: 400 },
+    );
+  }
+
   try {
     return NextResponse.json(
       await setDashboardUserDefaultPaymentMethod(
-        input.externalUserId,
-        input.paymentMethodId,
+        externalUserId,
+        paymentMethodId,
       ),
     );
   } catch (error) {

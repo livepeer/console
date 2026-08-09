@@ -51,34 +51,13 @@ function isUsagePlan(plan: Pick<DashboardBillingPlan, "type">): boolean {
   return plan.type.trim().toLowerCase() === "usage";
 }
 
-function formatUsdMicrosAsCurrency(usdMicros: string): string {
-  try {
-    const amount = Number(BigInt(usdMicros)) / 1_000_000;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return "$0.00";
-  }
-}
-
 function resolvedPayPerUseBehavior(plan: DashboardBillingPlan): string {
   const resolved = plan.resolvedBehavior?.trim();
   if (resolved) {
     return resolved;
   }
 
-  const threshold = plan.chargeThresholdUsdMicros?.trim();
-  if (threshold) {
-    return `Pay-per-use — charged at every ${formatUsdMicrosAsCurrency(
-      threshold
-    )} of usage (credits first).`;
-  }
-
-  return "Pay-per-use — usage settles against prepaid credits first, then auto-debits your default payment method.";
+  return "Pay-per-use — usage draws down prepaid credits first, then is invoiced automatically as it accrues.";
 }
 
 function formatPlanPrice(
@@ -260,6 +239,7 @@ export default function BillingSection() {
     startPaymentMethodCheckout,
     openInvoice,
     setDefaultPaymentMethod,
+    ensureDefaultPaymentMethod,
     removePaymentMethod,
   } = useBillingAccount(externalUserId);
 
@@ -293,10 +273,24 @@ export default function BillingSection() {
     setFlash(next);
     clearCheckoutQueryParam();
     if (next === "success") {
-      void reloadPlans();
-      void reloadAccount();
+      void (async () => {
+        if (externalUserId) {
+          try {
+            await ensureDefaultPaymentMethod({ externalUserId });
+          } catch {
+            // Webhook may already have promoted; list/UI still refreshes.
+          }
+        }
+        void reloadPlans();
+        void reloadAccount();
+      })();
     }
-  }, [reloadPlans, reloadAccount]);
+  }, [
+    externalUserId,
+    ensureDefaultPaymentMethod,
+    reloadPlans,
+    reloadAccount,
+  ]);
 
   async function ensurePaymentMethodForUsagePlan(planId: string) {
     if (!externalUserId) return;
@@ -545,7 +539,11 @@ export default function BillingSection() {
           ? links.invoicePdf || links.hostedInvoiceUrl
           : links.hostedInvoiceUrl || links.invoicePdf;
       if (!url) {
-        throw new Error("No Stripe invoice page for this invoice yet.");
+        throw new Error(
+          invoiceId.startsWith("pi_")
+            ? "No Stripe receipt for this top-up yet."
+            : "No Stripe invoice page for this invoice yet.",
+        );
       }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
@@ -868,7 +866,10 @@ export default function BillingSection() {
         )}
       </SettingsCard>
 
-      <SettingsHeader title="Invoices" sub="Stripe invoices for this account" />
+      <SettingsHeader
+        title="Billing history"
+        sub="Stripe invoices and auto top-ups for this account"
+      />
       <SettingsCard>
         {accountLoading ? (
           <div className="animate-pulse p-5">
@@ -877,7 +878,7 @@ export default function BillingSection() {
         ) : accountState.status === "error" ? (
           <div className="px-5 py-6 text-center">
             <p className="text-[13px] text-fg-muted">
-              Could not load invoices.
+              Could not load billing history.
             </p>
             <p className="mt-1 font-mono text-[12px] text-fg-faint">
               {accountState.message}
@@ -892,18 +893,22 @@ export default function BillingSection() {
           </div>
         ) : invoices.length === 0 ? (
           <div className="px-5 py-9 text-center">
-            <p className="text-[13.5px] text-fg-muted">No invoices yet.</p>
+            <p className="text-[13.5px] text-fg-muted">
+              No invoices or top-ups yet.
+            </p>
           </div>
         ) : (
           <>
             <div className={`${ST_COLS_5} ${ST_HEAD_CLASS}`}>
-              <span>Invoice</span>
+              <span>Item</span>
               <span>Date</span>
               <span>Amount</span>
               <span>Status</span>
               <span aria-hidden="true" />
             </div>
-            {invoices.map((inv) => (
+            {invoices.map((inv) => {
+              const isAutoTopUp = inv.invoiceType === "auto_topup";
+              return (
               <div
                 key={inv.id}
                 className={`${ST_COLS_5} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
@@ -918,7 +923,7 @@ export default function BillingSection() {
                   {formatInvoiceAmount(inv.totalAmount, inv.currency)}
                 </div>
                 <div className="text-[12px] capitalize text-fg-faint">
-                  {inv.status}
+                  {isAutoTopUp ? "Top-up" : inv.status}
                 </div>
                 <div className="flex justify-end gap-3">
                   <button
@@ -927,8 +932,9 @@ export default function BillingSection() {
                     disabled={invoiceBusyId === inv.id}
                     onClick={() => void onOpenInvoice(inv.id, "hosted")}
                   >
-                    View
+                    {isAutoTopUp ? "Receipt" : "View"}
                   </button>
+                  {isAutoTopUp ? null : (
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg disabled:opacity-50"
@@ -938,9 +944,11 @@ export default function BillingSection() {
                     <Download className="h-3 w-3" aria-hidden="true" />
                     PDF
                   </button>
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </>
         )}
       </SettingsCard>

@@ -176,6 +176,28 @@ export function useBillingAccount(externalUserId: string | undefined) {
     [load],
   );
 
+  const ensureDefaultPaymentMethod = useCallback(
+    async (input: { externalUserId: string }) => {
+      const response = await fetch("/api/pymthouse/payment-methods", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          externalUserId: input.externalUserId,
+          ensureDefault: true,
+        }),
+      });
+      const body = await readResponseJson<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(
+          body.error ??
+            `Ensure default payment method failed (${response.status})`,
+        );
+      }
+      await load();
+    },
+    [load],
+  );
+
   const removePaymentMethod = useCallback(
     async (input: { externalUserId: string; paymentMethodId: string }) => {
       const response = await fetch("/api/pymthouse/payment-methods", {
@@ -200,6 +222,7 @@ export function useBillingAccount(externalUserId: string | undefined) {
     startPaymentMethodCheckout,
     openInvoice,
     setDefaultPaymentMethod,
+    ensureDefaultPaymentMethod,
     removePaymentMethod,
   };
 }

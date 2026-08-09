@@ -42,21 +42,26 @@ export type OwnerWalletState =
     }
   | { status: "error"; message: string };
 
-export function useOwnerWallet(enabled: boolean) {
+export function useOwnerWallet(
+  enabled: boolean,
+  externalUserId: string | undefined,
+) {
   const [state, setState] = useState<OwnerWalletState>({ status: "idle" });
+  const trimmedUserId = externalUserId?.trim() || "";
 
   const load = useCallback(async () => {
-    if (!enabled) {
+    if (!enabled || !trimmedUserId) {
       setState({ status: "idle" });
       return;
     }
 
     setState({ status: "loading" });
     try {
+      const qs = `externalUserId=${encodeURIComponent(trimmedUserId)}`;
       const [walletResponse, pmResponse, invResponse] = await Promise.all([
-        fetch("/api/pymthouse/wallet"),
-        fetch("/api/pymthouse/wallet/payment-methods"),
-        fetch("/api/pymthouse/wallet/invoices?pageSize=20"),
+        fetch(`/api/pymthouse/wallet?${qs}`),
+        fetch(`/api/pymthouse/wallet/payment-methods?${qs}`),
+        fetch(`/api/pymthouse/wallet/invoices?${qs}&pageSize=20`),
       ]);
 
       const walletBody = await readResponseJson<
@@ -99,37 +104,48 @@ export function useOwnerWallet(enabled: boolean) {
           error instanceof Error ? error.message : "Failed to load wallet",
       });
     }
-  }, [enabled]);
+  }, [enabled, trimmedUserId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const startTopUp = useCallback(async (input: { amountUsd: string }) => {
-    const response = await fetch("/api/pymthouse/wallet/top-up", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amountUsd: input.amountUsd,
-        successUrl: `${window.location.origin}/usage?topup=succeeded`,
-        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
-      }),
-    });
-    const body = await readResponseJson<{
-      checkoutUrl?: string;
-      error?: string;
-    }>(response);
-    if (!response.ok || !body.checkoutUrl) {
-      throw new Error(body.error ?? `Top-up failed (${response.status})`);
-    }
-    return { checkoutUrl: body.checkoutUrl };
-  }, []);
+  const startTopUp = useCallback(
+    async (input: { amountUsd: string }) => {
+      if (!trimmedUserId) {
+        throw new Error("externalUserId is required");
+      }
+      const response = await fetch("/api/pymthouse/wallet/top-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          externalUserId: trimmedUserId,
+          amountUsd: input.amountUsd,
+          successUrl: `${window.location.origin}/usage?topup=succeeded`,
+          cancelUrl: `${window.location.origin}/usage?topup=canceled`,
+        }),
+      });
+      const body = await readResponseJson<{
+        checkoutUrl?: string;
+        error?: string;
+      }>(response);
+      if (!response.ok || !body.checkoutUrl) {
+        throw new Error(body.error ?? `Top-up failed (${response.status})`);
+      }
+      return { checkoutUrl: body.checkoutUrl };
+    },
+    [trimmedUserId],
+  );
 
   const startPaymentMethodCheckout = useCallback(async () => {
+    if (!trimmedUserId) {
+      throw new Error("externalUserId is required");
+    }
     const response = await fetch("/api/pymthouse/wallet/payment-methods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        externalUserId: trimmedUserId,
         successUrl: `${window.location.origin}/usage?topup=pm-saved`,
         cancelUrl: `${window.location.origin}/usage?topup=canceled`,
       }),
@@ -144,12 +160,35 @@ export function useOwnerWallet(enabled: boolean) {
       );
     }
     return { checkoutUrl: body.checkoutUrl };
-  }, []);
+  }, [trimmedUserId]);
+
+  const ensureDefaultPaymentMethod = useCallback(async () => {
+    if (!trimmedUserId) {
+      throw new Error("externalUserId is required");
+    }
+    const response = await fetch("/api/pymthouse/wallet/payment-methods", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        externalUserId: trimmedUserId,
+        ensureDefault: true,
+      }),
+    });
+    const body = await readResponseJson<{ error?: string }>(response);
+    if (!response.ok) {
+      throw new Error(
+        body.error ??
+          `Ensure default payment method failed (${response.status})`,
+      );
+    }
+    await load();
+  }, [trimmedUserId, load]);
 
   return {
     state,
     reload: load,
     startTopUp,
     startPaymentMethodCheckout,
+    ensureDefaultPaymentMethod,
   };
 }

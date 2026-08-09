@@ -9,20 +9,6 @@ function isUsagePlan(plan: Pick<DashboardBillingPlan, "type">): boolean {
   return plan.type.trim().toLowerCase() === "usage";
 }
 
-function formatUsdMicrosAsCurrency(usdMicros: string): string {
-  try {
-    const amount = Number(BigInt(usdMicros)) / 1_000_000;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return "$0.00";
-  }
-}
-
 function formatPrice(plan: DashboardBillingPlan): string {
   const n = Number(plan.priceAmount);
   const money = Number.isFinite(n)
@@ -44,14 +30,7 @@ function resolvedPayPerUseBehavior(plan: DashboardBillingPlan): string {
   const resolved = plan.resolvedBehavior?.trim();
   if (resolved) return resolved;
 
-  const threshold = plan.chargeThresholdUsdMicros?.trim();
-  if (threshold) {
-    return `Charged at every ${formatUsdMicrosAsCurrency(
-      threshold
-    )} of usage (credits first).`;
-  }
-
-  return "Usage settles from prepaid credits first, then auto-debits your default payment method.";
+  return "Usage draws down prepaid credits first, then is invoiced automatically as it accrues.";
 }
 
 function readCheckoutFlash(): "success" | "cancel" | null {

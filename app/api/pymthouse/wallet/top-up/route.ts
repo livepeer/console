@@ -8,11 +8,24 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  let body: { amountUsd?: string | number; successUrl?: string; cancelUrl?: string };
+  let body: {
+    amountUsd?: string | number;
+    externalUserId?: string;
+    successUrl?: string;
+    cancelUrl?: string;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  const externalUserId = body.externalUserId?.trim();
+  if (!externalUserId) {
+    return NextResponse.json(
+      { error: "externalUserId is required" },
+      { status: 400 },
+    );
   }
 
   const amountUsd =
@@ -34,6 +47,7 @@ export async function POST(request: NextRequest) {
   try {
     const result = await startDashboardWalletTopUp({
       amountUsd,
+      externalUserId,
       successUrl,
       cancelUrl,
     });

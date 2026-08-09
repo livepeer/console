@@ -85,7 +85,7 @@ function AllowanceStrip({
     <div className="flex flex-col gap-3 rounded-md border border-hairline bg-dark-lighter shadow-card px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-          {showUsdAllowance ? "Prepaid allowance" : "Usage this period"}
+          {showUsdAllowance ? "Included this period" : "Usage this period"}
         </p>
         {showUsdAllowance && !hasAccess && (
           <span className="rounded-[3px] border border-warm/30 bg-warm/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warm">
@@ -290,7 +290,14 @@ export default function UsageView() {
         resetsAt={resetsAt}
       />
 
-      <WalletPanel />
+      <WalletPanel
+        externalUserId={externalUserId}
+        periodBillableUsdMicros={
+          data.current.endUserBillableUsdMicros ||
+          data.current.networkFeeUsdMicros ||
+          null
+        }
+      />
 
       <PlansPanel externalUserId={externalUserId} />
 

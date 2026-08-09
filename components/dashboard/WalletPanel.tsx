@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
 import { useOwnerWallet } from "@/lib/dashboard/useOwnerWallet";
+import {
+  collectionSchedule,
+  formatWalletUsd,
+  overageBufferMeter,
+  spendPostureBadge,
+  type SpendPostureTone,
+} from "@/lib/dashboard/wallet-settlement-display";
 
 type TopUpFlash = "succeeded" | "canceled" | "pm-saved";
 
@@ -36,6 +43,20 @@ function formatInvoiceDate(iso: string | undefined): string {
 
 const QUICK_AMOUNTS = ["10.00", "25.00", "100.00"] as const;
 
+const POSTURE_TONE_CLASS: Record<SpendPostureTone, string> = {
+  ok: "border-emerald-400/30 text-emerald-400",
+  info: "border-hairline text-fg-muted",
+  warn: "border-amber-400/30 text-amber-400",
+  danger: "border-rose-400/30 text-rose-400",
+};
+
+const METER_TONE_CLASS: Record<SpendPostureTone, string> = {
+  ok: "bg-emerald-400",
+  info: "bg-fg-muted",
+  warn: "bg-amber-400",
+  danger: "bg-rose-400",
+};
+
 /** Only follow https (or localhost http, for dev) Checkout URLs. */
 function redirectToCheckout(url: string): void {
   let parsed: URL;
@@ -52,9 +73,16 @@ function redirectToCheckout(url: string): void {
   window.location.assign(parsed.toString());
 }
 
-export default function WalletPanel() {
-  const { state, reload, startTopUp, startPaymentMethodCheckout } =
-    useOwnerWallet(true);
+export default function WalletPanel({
+  externalUserId,
+  periodBillableUsdMicros = null,
+}: {
+  externalUserId: string | undefined;
+  /** Period end-user billable USD micros from the Usage page (metered usage, not credits). */
+  periodBillableUsdMicros?: string | null;
+}) {
+  const { state, reload, startTopUp, startPaymentMethodCheckout, ensureDefaultPaymentMethod } =
+    useOwnerWallet(Boolean(externalUserId), externalUserId);
   const [showTopUp, setShowTopUp] = useState(false);
   const [amountUsd, setAmountUsd] = useState<string>("25.00");
   const [busy, setBusy] = useState<"topup" | "pm" | null>(null);
@@ -66,7 +94,19 @@ export default function WalletPanel() {
     if (!next) return;
     setFlash(next);
     clearTopUpQueryParam();
-  }, []);
+    if (next === "pm-saved") {
+      void (async () => {
+        try {
+          await ensureDefaultPaymentMethod();
+        } catch {
+          // Webhook may already have promoted; list still refreshes below.
+        }
+        void reload();
+      })();
+    } else if (next === "succeeded") {
+      void reload();
+    }
+  }, [ensureDefaultPaymentMethod, reload]);
 
   async function onTopUp() {
     setError(null);
@@ -122,6 +162,10 @@ export default function WalletPanel() {
 
   const { wallet, paymentMethods, invoices } = state;
   const balanceUsd = wallet.balance?.usd ?? "0.00";
+  const usageUsd = formatWalletUsd(periodBillableUsdMicros);
+  const billingState = wallet.billingState;
+  const posture = spendPostureBadge(billingState.status);
+  const meter = overageBufferMeter(billingState);
   const defaultPm =
     paymentMethods.find((pm) => pm.isDefault) ?? paymentMethods[0] ?? null;
   const hasPaymentMethod =
@@ -130,15 +174,65 @@ export default function WalletPanel() {
   return (
     <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
-        <div>
-          <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-            Current balance
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span
+              className={`rounded-[3px] border px-1.5 py-px font-mono text-[10.5px] uppercase tracking-[0.06em] ${POSTURE_TONE_CLASS[posture.tone]}`}
+            >
+              {posture.label}
+            </span>
+            <p className="text-[13px] font-semibold text-fg">
+              {billingState.explain.headline}
+            </p>
+          </div>
+          <p className="mt-1 max-w-prose text-[12px] text-fg-muted">
+            {billingState.explain.detail}
           </p>
-          <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
-            ${balanceUsd}
-          </p>
-          <p className="mt-1 text-[12px] text-fg-muted">
-            {wallet.settlement.description}
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
+                Prepaid credits
+              </p>
+              <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
+                ${balanceUsd}
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
+                Usage this period
+              </p>
+              <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
+                ${usageUsd}
+              </p>
+            </div>
+            {meter ? (
+              <div>
+                <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
+                  Spending buffer
+                </p>
+                <p className="mt-1 font-mono text-[20px] font-medium tabular-nums tracking-[-0.01em] text-fg sm:text-[28px]">
+                  {meter.primary}
+                </p>
+                <div
+                  className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/5"
+                  role="progressbar"
+                  aria-label="Spending buffer used"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={meter.percent}
+                >
+                  <div
+                    className={`h-full rounded-full ${METER_TONE_CLASS[posture.tone]}`}
+                    style={{ width: `${meter.percent}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-fg-muted">{meter.status}</p>
+              </div>
+            ) : null}
+          </div>
+          <p className="mt-3 text-[12px] text-fg-muted">
+            {collectionSchedule(billingState)}
           </p>
           {wallet.payPerUsePlans.map((plan) => (
             <p key={plan.planId} className="mt-1 text-[11px] text-fg-faint">
@@ -216,14 +310,14 @@ export default function WalletPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3">
         <div>
           <p className="text-[13px] font-semibold text-fg">
-            Auto-debit payment method
+            Payment method for usage billing
           </p>
           <p className="mt-0.5 text-[12px] text-fg-muted">
             {hasPaymentMethod && defaultPm
               ? `${defaultPm.brand ?? defaultPm.type}${defaultPm.last4 ? ` •••• ${defaultPm.last4}` : ""}`
               : hasPaymentMethod
                 ? "Payment method on file."
-                : "No payment method on file — pay-per-use auto-debit will fail once credits run out."}
+                : "No payment method on file — progressive invoices cannot charge once credits run out."}
           </p>
         </div>
         <Button
@@ -243,7 +337,9 @@ export default function WalletPanel() {
       <div className="px-4 py-3">
         <p className="text-[13px] font-semibold text-fg">Billing history</p>
         {invoices.length === 0 ? (
-          <p className="mt-1 text-[12px] text-fg-faint">No invoices yet.</p>
+          <p className="mt-1 text-[12px] text-fg-faint">
+            No invoices or top-ups yet.
+          </p>
         ) : (
           <ul className="mt-1.5 divide-y divide-hairline">
             {invoices.slice(0, 8).map((invoice) => (
@@ -258,7 +354,9 @@ export default function WalletPanel() {
                   {formatInvoiceDate(invoice.issuedAt ?? invoice.periodEnd)}
                 </span>
                 <span className="rounded-[3px] border border-hairline px-1.5 py-px font-mono text-[10.5px] uppercase tracking-wide text-fg-muted">
-                  {invoice.status}
+                  {invoice.invoiceType === "auto_topup"
+                    ? "top-up"
+                    : invoice.status}
                 </span>
                 <span className="font-mono text-[12px] tabular-nums text-fg">
                   {invoice.totalAmount} {invoice.currency.toUpperCase()}

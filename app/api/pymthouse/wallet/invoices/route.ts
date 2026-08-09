@@ -14,11 +14,24 @@ function parsePageParam(raw: string | null): number | undefined {
 }
 
 export async function GET(request: NextRequest) {
+  const externalUserId =
+    request.nextUrl.searchParams.get("externalUserId")?.trim() || "";
+  if (!externalUserId) {
+    return NextResponse.json(
+      { error: "externalUserId is required" },
+      { status: 400, headers: WALLET_NO_STORE_HEADERS },
+    );
+  }
+
   const page = parsePageParam(request.nextUrl.searchParams.get("page"));
   const pageSize = parsePageParam(request.nextUrl.searchParams.get("pageSize"));
 
   try {
-    const result = await listDashboardWalletInvoices({ page, pageSize });
+    const result = await listDashboardWalletInvoices({
+      externalUserId,
+      page,
+      pageSize,
+    });
     return NextResponse.json(result, { headers: WALLET_NO_STORE_HEADERS });
   } catch (error) {
     return walletErrorResponse(error, "Failed to load wallet invoices");
