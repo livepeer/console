@@ -17,9 +17,9 @@ import KeyboardShortcuts from "@/components/dashboard/KeyboardShortcuts";
 // Reads the same `localStorage["theme"]` key the marketing site uses (see
 // `app/layout.tsx`'s inline script and `components/layout/ThemeToggle.tsx`),
 // so flipping the theme on either surface propagates to the other. Default
-// is "dark" for first-time visitors — the dashboard's native presentation;
-// light is an opt-in via Settings → Appearance.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'dark';var d=s==='dark'||(s==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+// is "system" for first-time visitors — we follow the OS `prefers-color-scheme`
+// until the user pins light or dark via Settings → Appearance.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'system';var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export const metadata: Metadata = {
   title: "Developer Dashboard — Livepeer",
