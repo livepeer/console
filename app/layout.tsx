@@ -17,9 +17,10 @@ export const metadata: Metadata = {
 };
 
 // FOUT prevention — runs synchronously before paint so dual-source CSS
-// variables resolve to the stored theme on first render. ThemeProvider in
-// the (app) layout takes over after hydration.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'dark';var d=s==='dark'||(s==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+// variables resolve to the stored theme on first render. With no stored
+// preference we fall back to "system", i.e. the OS `prefers-color-scheme`.
+// ThemeProvider in the (app) layout takes over after hydration.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'system';var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout({
   children,

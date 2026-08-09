@@ -37,7 +37,7 @@ interface ThemeContextValue {
 const THEME_STORAGE_KEY = "theme";
 
 const ThemeContext = createContext<ThemeContextValue>({
-  preference: "dark",
+  preference: "system",
   resolved: "dark",
   isLoading: true,
   setPreference: () => {},
@@ -65,11 +65,10 @@ function resolvePreference(p: ThemePreference): ResolvedTheme {
  *
  * Source of truth: `localStorage["theme"]`. Same key the marketing site's
  * ThemeToggle uses — flipping the toggle on either surface propagates to the
- * other. Default is "dark" for first-time visitors — the dashboard's native
- * presentation. Users
- * can opt into "light" or "system" via Settings → Appearance; "system" follows
+ * other. Default is "system" for first-time visitors: we follow
  * `prefers-color-scheme` via a matchMedia listener so OS theme changes flip
- * the dashboard in real time.
+ * the dashboard in real time. Users can pin "light" or "dark" via
+ * Settings → Appearance, which tears the listener down.
  *
  * The `<html data-theme="...">` attribute is set both by an inline script in
  * the dashboard layout (`app/(dashboard)/layout.tsx` — runs before
@@ -78,9 +77,9 @@ function resolvePreference(p: ThemePreference): ResolvedTheme {
  * inline script just gets us through the first frame.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Default to "dark" — concrete value gets re-read from localStorage in
+  // Default to "system" — concrete value gets re-read from localStorage in
   // useEffect below. Server render uses this fallback.
-  const [preference, setPreferenceState] = useState<ThemePreference>("dark");
+  const [preference, setPreferenceState] = useState<ThemePreference>("system");
   const [resolved, setResolved] = useState<ResolvedTheme>("dark");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -97,7 +96,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Hydration: read stored preference from localStorage and resolve it.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let stored: ThemePreference = "dark";
+    let stored: ThemePreference = "system";
     try {
       const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
       if (raw === "light" || raw === "dark" || raw === "system") {
