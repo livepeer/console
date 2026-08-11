@@ -310,8 +310,8 @@ test("formatPendingCancelDate formats UTC calendar day", () => {
   );
 });
 
-test("cancel timing helpers default to end of cycle and map date inputs", () => {
-  assert.equal(defaultCancelTimingChoice(), "next_billing_cycle");
+test("cancel timing helpers default to immediate and map date inputs", () => {
+  assert.equal(defaultCancelTimingChoice(), "immediate");
   assert.equal(toDateInputValue("2026-08-08T00:00:00.000Z"), "2026-08-08");
   assert.equal(
     dateInputToEffectiveAtIso("2026-08-15"),

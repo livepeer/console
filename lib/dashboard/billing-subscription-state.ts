@@ -390,7 +390,7 @@ export function dateInputToEffectiveAtIso(dateYmd: string): string {
 }
 
 export function defaultCancelTimingChoice(): SubscriptionTimingChoice {
-  return "next_billing_cycle";
+  return "immediate";
 }
 
 export function resolveTimingPayload(input: {

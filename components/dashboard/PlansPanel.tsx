@@ -2,11 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
-import type { DashboardBillingPlan } from "@/lib/dashboard/pymthouse-billing-bff";
+import Dialog from "@/components/design-system/Dialog";
+import TimingChoicePanel from "@/components/dashboard/TimingChoicePanel";
+import type {
+  DashboardBillingPlan,
+  DashboardScheduledChangeConflict,
+} from "@/lib/dashboard/pymthouse-billing-bff";
 import {
+  defaultCancelTimingChoice,
   formatBillingPlanPrice,
+  resolveTimingPayload,
+  toDateInputValue,
+  type SubscriptionTimingChoice,
 } from "@/lib/dashboard/billing-subscription-state";
-import { useBillingPlans } from "@/lib/dashboard/useBillingPlans";
+import {
+  ScheduledChangeConflictError,
+  useBillingPlans,
+} from "@/lib/dashboard/useBillingPlans";
 
 function isUsagePlan(
   plan: Pick<DashboardBillingPlan, "type" | "isStarterDefault">
@@ -66,6 +78,14 @@ export default function PlansPanel({
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<"success" | "cancel" | null>(null);
+  const [changeDialog, setChangeDialog] = useState<{
+    planId: string;
+    conflict: DashboardScheduledChangeConflict | null;
+  } | null>(null);
+  const [changeChoice, setChangeChoice] = useState<SubscriptionTimingChoice>(
+    defaultCancelTimingChoice()
+  );
+  const [changeCustomDate, setChangeCustomDate] = useState("");
 
   useEffect(() => {
     const next = readCheckoutFlash();
@@ -109,6 +129,53 @@ export default function PlansPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once from return URL
   }, [reload, changePlan, externalUserId]);
 
+  function openChangeTimingDialog(
+    planId: string,
+    conflict: DashboardScheduledChangeConflict | null = null
+  ) {
+    setChangeChoice(defaultCancelTimingChoice());
+    setChangeCustomDate(
+      toDateInputValue(
+        conflict?.timingOptions?.minEffectiveAt ??
+          (state.status === "ready"
+            ? state.subscription?.timingOptions?.change.minEffectiveAt
+            : undefined)
+      )
+    );
+    setChangeDialog({ planId, conflict });
+  }
+
+  async function runChangePlan(
+    planId: string,
+    timing?: {
+      timing?: string;
+      effectiveAt?: string;
+      confirmReplaceScheduled?: boolean;
+    }
+  ) {
+    if (!externalUserId?.trim()) return;
+    const userId = externalUserId.trim();
+    const result = await changePlan({
+      planId,
+      externalUserId: userId,
+      successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
+      cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
+      ...timing,
+    });
+    if (result.checkoutUrl) {
+      window.location.assign(result.checkoutUrl);
+      return;
+    }
+    await reload();
+    const plans = state.status === "ready" ? state.plans : [];
+    const targetPlan = plans.find((p) => p.id === planId);
+    setError(
+      targetPlan && isUsagePlan(targetPlan)
+        ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
+        : "Plan updated.",
+    );
+  }
+
   async function onSubscribe(planId: string) {
     if (!externalUserId?.trim()) {
       setError("Sign in to subscribe.");
@@ -133,36 +200,72 @@ export default function PlansPanel({
           activeStatus === "trialing" ||
           activeStatus === "scheduled");
 
+      if (hasActiveSubscription && targetPlan?.isStarterDefault === true) {
+        setBusyPlanId(null);
+        openChangeTimingDialog(planId);
+        return;
+      }
+
       // Starter/default users already have a subscription — switch instead of
       // create, so pay-per-use can still collect a setup Checkout card.
-      const result = hasActiveSubscription
-        ? await changePlan({
-            planId,
-            externalUserId: userId,
-            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
-            cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
-          })
-        : await subscribe({
+      try {
+        if (hasActiveSubscription) {
+          await runChangePlan(planId);
+        } else {
+          const result = await subscribe({
             planId,
             externalUserId: userId,
             successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
             cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
           });
-
-      if (result.checkoutUrl) {
-        window.location.assign(result.checkoutUrl);
-        return;
+          if (result.checkoutUrl) {
+            window.location.assign(result.checkoutUrl);
+            return;
+          }
+          await reload();
+          setError(
+            targetPlan && isUsagePlan(targetPlan)
+              ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
+              : "Plan updated.",
+          );
+        }
+      } catch (err) {
+        if (err instanceof ScheduledChangeConflictError) {
+          openChangeTimingDialog(planId, err.conflict);
+          return;
+        }
+        throw err;
       }
-
-      await reload();
-      setError(
-        targetPlan && isUsagePlan(targetPlan)
-          ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
-          : "Plan updated.",
-      );
       setBusyPlanId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
+      setBusyPlanId(null);
+    }
+  }
+
+  async function onConfirmChangeTiming() {
+    if (!externalUserId?.trim() || !changeDialog) return;
+    setError(null);
+    setBusyPlanId(changeDialog.planId);
+    try {
+      const payload = resolveTimingPayload({
+        choice: changeChoice,
+        customDateYmd: changeCustomDate,
+      });
+      await runChangePlan(changeDialog.planId, {
+        ...payload,
+        ...(changeDialog.conflict ? { confirmReplaceScheduled: true } : {}),
+      });
+      setChangeDialog(null);
+    } catch (err) {
+      if (err instanceof ScheduledChangeConflictError) {
+        openChangeTimingDialog(changeDialog.planId, err.conflict);
+        return;
+      }
+      setError(
+        err instanceof Error ? err.message : "Could not change subscription"
+      );
+    } finally {
       setBusyPlanId(null);
     }
   }
@@ -272,6 +375,39 @@ export default function PlansPanel({
       {error ? (
         <p className="border-t border-hairline px-4 py-2 text-xs text-rose-400">{error}</p>
       ) : null}
+
+      <Dialog
+        open={changeDialog !== null}
+        onClose={() => {
+          if (busyPlanId === null) setChangeDialog(null);
+        }}
+        maxWidth="max-w-[420px]"
+      >
+        <TimingChoicePanel
+          title={
+            changeDialog?.conflict
+              ? "Replace scheduled plan change?"
+              : "Switch to Starter"
+          }
+          description={
+            changeDialog?.conflict
+              ? "A plan change is already scheduled. Choosing a start time replaces that schedule with your new plan."
+              : "Choose when the switch to Starter should take effect."
+          }
+          options={
+            changeDialog?.conflict?.timingOptions ??
+            state.subscription?.timingOptions?.change
+          }
+          choice={changeChoice}
+          customDate={changeCustomDate}
+          confirmLabel="Confirm switch"
+          busy={busyPlanId !== null}
+          onChoice={setChangeChoice}
+          onCustomDate={setChangeCustomDate}
+          onConfirm={() => void onConfirmChangeTiming()}
+          onClose={() => setChangeDialog(null)}
+        />
+      </Dialog>
     </div>
   );
 }

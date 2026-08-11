@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   DashboardInvoice,
   DashboardPaymentMethod,
+  DashboardSubscriptionHistoryItem,
 } from "@/lib/dashboard/pymthouse-billing-bff";
 
 async function readResponseJson<T>(response: Response): Promise<T> {
@@ -20,11 +21,17 @@ async function readResponseJson<T>(response: Response): Promise<T> {
 
 /** Map missing/unroutable upstream billing APIs to an actionable message. */
 function billingUpstreamMessage(
-  surface: "payment methods" | "invoices",
+  surface: "payment methods" | "invoices" | "subscriptions",
   status: number,
   upstreamError?: string,
 ): string {
   if (status === 404 || status === 405) {
+    if (surface === "subscriptions") {
+      return (
+        `PymtHouse end-user subscriptions API is unavailable (${status}). ` +
+        "Deploy the /users/{id}/subscriptions route to this environment."
+      );
+    }
     return (
       `PymtHouse end-user ${surface} API is unavailable (${status}). ` +
       "Deploy the /users/{id}/payment-methods and /users/{id}/invoices routes " +
@@ -55,8 +62,10 @@ export type BillingAccountState =
       status: "ready";
       paymentMethods: DashboardPaymentMethod[];
       invoices: DashboardInvoice[];
+      subscriptions: DashboardSubscriptionHistoryItem[];
       paymentMethodsError: string | null;
       invoicesError: string | null;
+      subscriptionsError: string | null;
     };
 
 type ListLoadResult<T> = {
@@ -127,6 +136,42 @@ async function loadInvoices(
   }
 }
 
+async function loadSubscriptions(
+  externalUserId: string,
+): Promise<ListLoadResult<DashboardSubscriptionHistoryItem>> {
+  try {
+    const response = await fetch(
+      `/api/pymthouse/subscriptions?externalUserId=${encodeURIComponent(externalUserId)}`,
+    );
+    const body = await readResponseJson<{
+      items?: DashboardSubscriptionHistoryItem[];
+      error?: string;
+    }>(response);
+    if (!response.ok) {
+      if (isSoftBillingListUnavailable(response.status, body.error)) {
+        return { items: [], error: null };
+      }
+      return {
+        items: [],
+        error: billingUpstreamMessage(
+          "subscriptions",
+          response.status,
+          body.error,
+        ),
+      };
+    }
+    return { items: body.items ?? [], error: null };
+  } catch (error) {
+    return {
+      items: [],
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load subscription history",
+    };
+  }
+}
+
 export function useBillingAccount(externalUserId: string | undefined) {
   const [state, setState] = useState<BillingAccountState>({ status: "idle" });
 
@@ -137,24 +182,29 @@ export function useBillingAccount(externalUserId: string | undefined) {
         status: "ready",
         paymentMethods: [],
         invoices: [],
+        subscriptions: [],
         paymentMethodsError: null,
         invoicesError: null,
+        subscriptionsError: null,
       });
       return;
     }
 
     setState({ status: "loading" });
-    // Independent loads — invoice soft-503 must not poison payment methods UI.
-    const [pm, inv] = await Promise.all([
+    // Independent loads — soft failures must not poison sibling surfaces.
+    const [pm, inv, subs] = await Promise.all([
       loadPaymentMethods(trimmed),
       loadInvoices(trimmed),
+      loadSubscriptions(trimmed),
     ]);
     setState({
       status: "ready",
       paymentMethods: pm.items,
       invoices: inv.items,
+      subscriptions: subs.items,
       paymentMethodsError: pm.error,
       invoicesError: inv.error,
+      subscriptionsError: subs.error,
     });
   }, [externalUserId]);
 

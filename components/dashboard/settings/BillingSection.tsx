@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import Dialog from "@/components/design-system/Dialog";
+import TimingChoicePanel from "@/components/dashboard/TimingChoicePanel";
 import {
   IconButton,
   SettingsCard,
@@ -49,7 +50,6 @@ import {
   withCurrentPlanInDisplayList,
   type BillingPlanAction,
   type SubscriptionTimingChoice,
-  type SubscriptionTimingOptions,
 } from "@/lib/dashboard/billing-subscription-state";
 
 function isUsagePlan(
@@ -87,6 +87,19 @@ function formatInvoiceDate(iso: string | undefined): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatSubscriptionHistoryStatus(input: {
+  status: string;
+  current: boolean;
+}): string {
+  if (input.current) return "Current";
+  const status = input.status.trim().toLowerCase();
+  if (status === "scheduled" || status === "pending") return "Scheduled";
+  if (status === "inactive" || status === "canceled" || status === "cancelled") {
+    return "Ended";
+  }
+  return input.status || "—";
 }
 
 function readCheckoutFlash(): "success" | "cancel" | null {
@@ -133,99 +146,6 @@ function billingChangePlanSuccessUrl(planId: string): string {
 
 function billingChangePlanCancelUrl(): string {
   return `${window.location.origin}/settings?tab=billing&checkout=cancel`;
-}
-
-function TimingChoicePanel(props: {
-  title: string;
-  description: string;
-  options: SubscriptionTimingOptions | null | undefined;
-  choice: SubscriptionTimingChoice;
-  customDate: string;
-  confirmLabel: string;
-  busy: boolean;
-  onChoice: (choice: SubscriptionTimingChoice) => void;
-  onCustomDate: (ymd: string) => void;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  const min = toDateInputValue(props.options?.minEffectiveAt);
-  const max = toDateInputValue(props.options?.maxEffectiveAt);
-  return (
-    <div className="p-5">
-      <h2 className="text-base font-semibold text-fg">{props.title}</h2>
-      <p className="mt-1 text-[13px] text-fg-muted">{props.description}</p>
-      <div className="mt-4 space-y-2">
-        {(
-          [
-            {
-              id: "immediate" as const,
-              label: "Immediately",
-              hint: "Takes effect right away",
-            },
-            {
-              id: "next_billing_cycle" as const,
-              label: "End of current period",
-              hint: props.options?.maxEffectiveAt
-                ? formatPendingCancelDate(props.options.maxEffectiveAt)
-                : "Keep access until the period ends",
-            },
-            {
-              id: "custom" as const,
-              label: "Pick a date",
-              hint: min && max ? `${min} – ${max}` : "Choose a date in range",
-            },
-          ] as const
-        ).map((opt) => (
-          <label
-            key={opt.id}
-            className="flex cursor-pointer items-start gap-3 rounded-lg border border-hairline px-3 py-2.5 hover:bg-white/[0.02]"
-          >
-            <input
-              type="radio"
-              className="mt-1"
-              name="timing-choice"
-              checked={props.choice === opt.id}
-              onChange={() => props.onChoice(opt.id)}
-            />
-            <span>
-              <span className="block text-[13px] font-medium text-fg">
-                {opt.label}
-              </span>
-              <span className="block text-[12px] text-fg-muted">{opt.hint}</span>
-            </span>
-          </label>
-        ))}
-      </div>
-      {props.choice === "custom" ? (
-        <input
-          type="date"
-          className="mt-3 w-full rounded-md border border-hairline bg-transparent px-3 py-2 text-[13px] text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-bright/30"
-          min={min || undefined}
-          max={max || undefined}
-          value={props.customDate}
-          onChange={(e) => props.onCustomDate(e.target.value)}
-        />
-      ) : null}
-      <div className="mt-5 flex justify-end gap-2">
-        <button
-          type="button"
-          className="rounded-md px-3 py-1.5 text-[12.5px] text-fg-muted hover:text-fg"
-          onClick={props.onClose}
-          disabled={props.busy}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="rounded-md bg-green-bright px-3 py-1.5 text-[12.5px] font-medium text-black disabled:opacity-50"
-          disabled={props.busy || (props.choice === "custom" && !props.customDate)}
-          onClick={props.onConfirm}
-        >
-          {props.busy ? "Working…" : props.confirmLabel}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -371,6 +291,20 @@ export default function BillingSection() {
     await ensurePaymentMethodForUsagePlan(planId);
   }
 
+  function openChangeTimingDialog(
+    planId: string,
+    conflict: DashboardScheduledChangeConflict | null = null
+  ) {
+    setChangeChoice(defaultCancelTimingChoice());
+    setChangeCustomDate(
+      toDateInputValue(
+        conflict?.timingOptions?.minEffectiveAt ??
+          subscription?.timingOptions?.change.minEffectiveAt
+      )
+    );
+    setChangeDialog({ planId, conflict });
+  }
+
   async function onPlanAction(planId: string, action: BillingPlanAction) {
     if (!externalUserId) {
       setError("Sign in to subscribe.");
@@ -385,15 +319,25 @@ export default function BillingSection() {
     setBusyPlanId(planId);
     try {
       if (action === "change_plan") {
+        const catalog =
+          plansState.status === "ready" ? plansState.plans : [];
+        const liveSubscription =
+          plansState.status === "ready" ? plansState.subscription : null;
+        const targetPlan = withCurrentPlanInDisplayList(
+          catalog,
+          liveSubscription
+        ).find((p) => p.id === planId);
+        // Starter downgrades schedule silently without timing — prompt first.
+        if (targetPlan?.isStarterDefault === true) {
+          setBusyPlanId(null);
+          openChangeTimingDialog(planId);
+          return;
+        }
         try {
           await runChangePlan(planId);
         } catch (err) {
           if (err instanceof ScheduledChangeConflictError) {
-            setChangeChoice("immediate");
-            setChangeCustomDate(
-              toDateInputValue(err.conflict.timingOptions?.minEffectiveAt)
-            );
-            setChangeDialog({ planId, conflict: err.conflict });
+            openChangeTimingDialog(planId, err.conflict);
             return;
           }
           throw err;
@@ -492,10 +436,16 @@ export default function BillingSection() {
       });
       await runChangePlan(changeDialog.planId, {
         ...payload,
-        confirmReplaceScheduled: true,
+        ...(changeDialog.conflict
+          ? { confirmReplaceScheduled: true }
+          : {}),
       });
       setChangeDialog(null);
     } catch (err) {
+      if (err instanceof ScheduledChangeConflictError) {
+        openChangeTimingDialog(changeDialog.planId, err.conflict);
+        return;
+      }
       setError(
         err instanceof Error ? err.message : "Could not change subscription"
       );
@@ -636,10 +586,14 @@ export default function BillingSection() {
   const paymentMethods =
     accountState.status === "ready" ? accountState.paymentMethods : [];
   const invoices = accountState.status === "ready" ? accountState.invoices : [];
+  const subscriptions =
+    accountState.status === "ready" ? accountState.subscriptions : [];
   const paymentMethodsError =
     accountState.status === "ready" ? accountState.paymentMethodsError : null;
   const invoicesError =
     accountState.status === "ready" ? accountState.invoicesError : null;
+  const subscriptionsError =
+    accountState.status === "ready" ? accountState.subscriptionsError : null;
 
   const cancelingPlanName = resolveCancelingPlanName(subscription);
   const cancelingEndsAt = resolveCancelingEffectiveAt(subscription);
@@ -930,6 +884,83 @@ export default function BillingSection() {
       </SettingsCard>
 
       <SettingsHeader
+        title="Plan history"
+        sub="Every plan this account has been on, newest first"
+      />
+      <SettingsCard>
+        {accountLoading ? (
+          <div className="animate-pulse p-5">
+            <div className="h-4 w-full rounded bg-white/5" />
+          </div>
+        ) : subscriptionsError ? (
+          <div className="px-5 py-6 text-center">
+            <p className="text-[13px] text-fg-muted">
+              Could not load plan history.
+            </p>
+            <p className="mt-1 font-mono text-[12px] text-fg-faint">
+              {subscriptionsError}
+            </p>
+            <button
+              type="button"
+              className="mt-2 text-[12.5px] text-fg-strong underline"
+              onClick={() => void reloadAccount()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : subscriptions.length === 0 ? (
+          <div className="px-5 py-9 text-center">
+            <p className="text-[13.5px] text-fg-muted">
+              No subscription history yet.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div
+              className={`grid items-center gap-3 px-[18px] py-3 grid-cols-[1.6fr_0.7fr_0.9fr_0.9fr] ${ST_HEAD_CLASS}`}
+            >
+              <span>Plan</span>
+              <span>Status</span>
+              <span>Started</span>
+              <span>Ended</span>
+            </div>
+            {subscriptions.map((sub) => (
+              <div
+                key={sub.id}
+                className="grid items-center gap-3 border-b border-hairline px-[18px] py-3 grid-cols-[1.6fr_0.7fr_0.9fr_0.9fr] last:border-b-0 transition-colors hover:bg-zebra"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] text-fg">
+                    {sub.planName?.trim() || sub.planKey?.trim() || "Plan"}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-fg-faint">
+                    {sub.id}
+                  </div>
+                </div>
+                <div
+                  className={
+                    sub.current
+                      ? "text-[12px] font-medium text-green-bright"
+                      : "text-[12px] capitalize text-fg-faint"
+                  }
+                >
+                  {formatSubscriptionHistoryStatus(sub)}
+                </div>
+                <div className="text-[12.5px] text-fg-faint">
+                  {formatInvoiceDate(sub.activeFrom ?? undefined)}
+                </div>
+                <div className="text-[12.5px] text-fg-faint">
+                  {sub.current
+                    ? "—"
+                    : formatInvoiceDate(sub.activeTo ?? undefined)}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </SettingsCard>
+
+      <SettingsHeader
         title="Billing history"
         sub="Stripe invoices and auto top-ups for this account"
       />
@@ -1054,8 +1085,16 @@ export default function BillingSection() {
         maxWidth="max-w-[420px]"
       >
         <TimingChoicePanel
-          title="Replace scheduled plan change?"
-          description="A plan change is already scheduled. Choosing a start time replaces that schedule with your new plan."
+          title={
+            changeDialog?.conflict
+              ? "Replace scheduled plan change?"
+              : "Switch to Starter"
+          }
+          description={
+            changeDialog?.conflict
+              ? "A plan change is already scheduled. Choosing a start time replaces that schedule with your new plan."
+              : "Choose when the switch to Starter should take effect."
+          }
           options={
             changeDialog?.conflict?.timingOptions ??
             subscription?.timingOptions?.change

@@ -3,6 +3,7 @@ import {
   type AppUserInvoice,
   type AppUserInvoiceHostedUrlResult,
   type AppUserPaymentMethod,
+  type AppUserSubscriptionHistoryItem,
   type BillingProduct,
   type BillingState,
   type CreateAppUserPaymentMethodCheckoutResult,
@@ -360,6 +361,18 @@ export async function listDashboardUserInvoices(
 }> {
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   return client.listUserInvoices(externalUserId, opts);
+}
+
+export type DashboardSubscriptionHistoryItem = AppUserSubscriptionHistoryItem;
+
+export async function listDashboardUserSubscriptions(
+  externalUserId: string
+): Promise<{
+  items: DashboardSubscriptionHistoryItem[];
+  externalUserId: string;
+}> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.listUserSubscriptions(externalUserId);
 }
 
 export async function getDashboardUserInvoiceHostedUrl(
