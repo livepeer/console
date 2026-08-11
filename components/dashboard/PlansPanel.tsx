@@ -30,7 +30,7 @@ function resolvedPayPerUseBehavior(plan: DashboardBillingPlan): string {
   const resolved = plan.resolvedBehavior?.trim();
   if (resolved) return resolved;
 
-  return "Usage draws down prepaid credits first, then is invoiced automatically as it accrues.";
+  return "Usage draws down included usage first, then prepaid credits, then is invoiced automatically as it accrues.";
 }
 
 function readCheckoutFlash(): "success" | "cancel" | null {

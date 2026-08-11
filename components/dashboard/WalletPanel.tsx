@@ -192,18 +192,31 @@ export default function WalletPanel({
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
+                Included usage
+              </p>
+              <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
+                $
+                {billingState.funding.includedUsage?.remaining.usd ??
+                  billingState.funding.included.usd}
+              </p>
+              {billingState.funding.includedUsage &&
+              billingState.funding.includedUsage.total.usdMicros !== "0" ? (
+                <p className="mt-1 text-[11px] text-fg-muted">
+                  $
+                  {billingState.funding.includedUsage.consumed.usd} of $
+                  {billingState.funding.includedUsage.total.usd} used
+                  {billingState.funding.includedUsage.sourcePlan?.name
+                    ? ` · ${billingState.funding.includedUsage.sourcePlan.name}`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
                 Prepaid credits
               </p>
               <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
                 ${balanceUsd}
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                Usage this period
-              </p>
-              <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
-                ${usageUsd}
               </p>
             </div>
             {meter ? (
@@ -229,7 +242,16 @@ export default function WalletPanel({
                 </div>
                 <p className="mt-1 text-[11px] text-fg-muted">{meter.status}</p>
               </div>
-            ) : null}
+            ) : (
+              <div>
+                <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
+                  Usage this period
+                </p>
+                <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
+                  ${usageUsd}
+                </p>
+              </div>
+            )}
           </div>
           <p className="mt-3 text-[12px] text-fg-muted">
             {collectionSchedule(billingState)}

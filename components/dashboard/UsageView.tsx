@@ -529,7 +529,7 @@ function LimitsPanel({
   const limits = balance
     ? [
         {
-          label: "Prepaid allowance",
+          label: "Included usage",
           used: microsToUsdDisplay(balance.consumedUsdMicros),
           max: `$${microsToUsdDisplay(balance.lifetimeGrantedUsdMicros)}`,
           pct:

@@ -33,6 +33,13 @@ function makeState(overrides: {
     funding: {
       prepaid: money("0", "0.00"),
       included: money("0", "0.00"),
+      includedUsage: {
+        total: money("0", "0.00"),
+        remaining: money("0", "0.00"),
+        consumed: money("0", "0.00"),
+        resetsAt: "2026-09-01T00:00:00.000Z",
+        sourcePlan: null,
+      },
       spendable: money("0", "0.00"),
       overage: {
         eligible: true,

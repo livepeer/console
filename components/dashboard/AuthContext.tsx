@@ -11,7 +11,10 @@ import {
 export type AuthProvider = "github" | "google" | "email";
 
 export interface MockUser {
-  /** Persistent machine id used as PymtHouse `externalUserId` (never email). */
+  /**
+   * Stable id derived from email (SHA-256 hex, `eu_` prefix).
+   * Used as PymtHouse `externalUserId` — never the raw email (SDK forbids @).
+   */
   id: string;
   name: string;
   email: string;
@@ -24,8 +27,8 @@ interface AuthContextValue {
   isConnected: boolean;
   isLoading: boolean;
   user: MockUser | null;
-  connect: (user: Omit<MockUser, "id"> & { id?: string }) => void;
-  updateUser: (patch: Partial<MockUser>) => void;
+  connect: (user: Omit<MockUser, "id">) => Promise<void>;
+  updateUser: (patch: Partial<Omit<MockUser, "id">>) => Promise<void>;
   disconnect: () => void;
 }
 
@@ -33,8 +36,8 @@ const AuthContext = createContext<AuthContextValue>({
   isConnected: false,
   isLoading: true,
   user: null,
-  connect: () => {},
-  updateUser: () => {},
+  connect: async () => {},
+  updateUser: async () => {},
   disconnect: () => {},
 });
 
@@ -42,18 +45,34 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-function newMachineId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `dash_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+const USER_SESSION_KEY = "dashboard-user";
+/** Legacy key from machine-id identity; cleared on load. */
+const LEGACY_MACHINE_ID_KEY = "dashboard-machine-id";
+
+/**
+ * Deterministic PymtHouse externalUserId from email.
+ * Must match builder-sdk: no `@`, no `owner:`/`user:` prefix, charset [A-Za-z0-9._:-].
+ */
+export async function externalUserIdFromEmail(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase() || "demo@livepeer.org";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`livepeer-dashboard:externalUserId:${normalized}`),
+  );
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `eu_${hex}`;
 }
 
-function hydrateMockUser(parsed: Partial<MockUser>): MockUser {
+async function hydrateMockUser(
+  parsed: Partial<MockUser> & Pick<MockUser, "email">,
+): Promise<MockUser> {
+  const email = parsed.email?.trim() || "demo@livepeer.org";
   return {
-    id: typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : newMachineId(),
+    id: await externalUserIdFromEmail(email),
     name: parsed.name ?? "Demo User",
-    email: parsed.email ?? "demo@livepeer.org",
+    email,
     initials: parsed.initials ?? "DU",
     provider: (parsed.provider as AuthProvider) ?? "email",
     avatarUrl: parsed.avatarUrl,
@@ -65,46 +84,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<MockUser | null>(null);
 
-  // Restore from localStorage
+  // Restore from localStorage; re-derive id from email so prior UUID sessions migrate.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("dashboard-user");
+    if (typeof window === "undefined") return;
+
+    localStorage.removeItem(LEGACY_MACHINE_ID_KEY);
+
+    void (async () => {
+      const stored = localStorage.getItem(USER_SESSION_KEY);
       if (stored) {
         try {
           const parsed = JSON.parse(stored) as Partial<MockUser>;
-          // Backfill provider + machine id for pre-existing localStorage entries
-          const hydrated = hydrateMockUser(parsed);
-          setUser(hydrated);
-          setIsConnected(true);
-          localStorage.setItem("dashboard-user", JSON.stringify(hydrated));
+          if (parsed.email) {
+            const hydrated = await hydrateMockUser(parsed);
+            setUser(hydrated);
+            setIsConnected(true);
+            localStorage.setItem(USER_SESSION_KEY, JSON.stringify(hydrated));
+          }
         } catch {
           // ignore
         }
       }
       setIsLoading(false);
-    }
+    })();
   }, []);
 
-  const connect = (u: Omit<MockUser, "id"> & { id?: string }) => {
-    const next = hydrateMockUser(u);
+  const connect = async (u: Omit<MockUser, "id">) => {
+    const next = await hydrateMockUser(u);
     setUser(next);
     setIsConnected(true);
-    localStorage.setItem("dashboard-user", JSON.stringify(next));
+    localStorage.setItem(USER_SESSION_KEY, JSON.stringify(next));
   };
 
-  const updateUser = (patch: Partial<MockUser>) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      const next = hydrateMockUser({ ...prev, ...patch });
-      localStorage.setItem("dashboard-user", JSON.stringify(next));
-      return next;
-    });
+  const updateUser = async (patch: Partial<Omit<MockUser, "id">>) => {
+    const prev = user;
+    if (!prev) return;
+    const next = await hydrateMockUser({ ...prev, ...patch });
+    setUser(next);
+    localStorage.setItem(USER_SESSION_KEY, JSON.stringify(next));
   };
 
   const disconnect = () => {
     setUser(null);
     setIsConnected(false);
-    localStorage.removeItem("dashboard-user");
+    localStorage.removeItem(USER_SESSION_KEY);
+    localStorage.removeItem(LEGACY_MACHINE_ID_KEY);
   };
 
   return (

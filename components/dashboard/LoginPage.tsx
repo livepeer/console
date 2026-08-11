@@ -78,10 +78,10 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
   const { connect } = useAuth();
   const router = useRouter();
 
-  function handleEmailSubmit(e?: React.FormEvent) {
+  async function handleEmailSubmit(e?: React.FormEvent) {
     e?.preventDefault();
     const displayName = name || email.split("@")[0] || "Demo User";
-    connect({
+    await connect({
       name: displayName,
       email: email || "demo@livepeer.org",
       initials: getInitials(displayName),
@@ -90,14 +90,14 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
     router.push("/home");
   }
 
-  function handleOAuthSubmit(provider: AuthProvider) {
+  async function handleOAuthSubmit(provider: AuthProvider) {
     // Mock OAuth — pretend the provider returned a profile.
     const mockProfiles: Record<"github" | "google", { name: string; email: string }> = {
       github: { name: "Rick Staa", email: "rick.staa@github.com" },
       google: { name: "Rick Staa", email: "rick.staa@gmail.com" },
     };
     const profile = mockProfiles[provider as "github" | "google"];
-    connect({
+    await connect({
       name: profile.name,
       email: profile.email,
       initials: getInitials(profile.name),
