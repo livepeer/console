@@ -3,10 +3,11 @@ import { describe, it } from "node:test";
 
 import type { BillingState } from "@pymthouse/builder-sdk";
 import {
+  availableRunway,
   collectionSchedule,
-  overageBufferMeter,
+  overageLimitNote,
   spendPostureBadge,
-} from "@/lib/dashboard/wallet-settlement-display";
+} from "./wallet-settlement-display";
 
 function money(usdMicros: string, usd: string) {
   return { usdMicros, usd, currency: "USD" };
@@ -14,6 +15,8 @@ function money(usdMicros: string, usd: string) {
 
 function makeState(overrides: {
   status?: BillingState["status"];
+  includedRemaining?: { usdMicros: string; usd: string };
+  prepaid?: { usdMicros: string; usd: string };
   ceiling?: { usdMicros: string; usd: string };
   unbilledDebt?: { usdMicros: string; usd: string } | null;
   remaining?: { usdMicros: string; usd: string } | null;
@@ -31,11 +34,17 @@ function makeState(overrides: {
     canSpend: true,
     reason: null,
     funding: {
-      prepaid: money("0", "0.00"),
+      prepaid: {
+        ...money("0", "0.00"),
+        ...(overrides.prepaid ?? {}),
+      },
       included: money("0", "0.00"),
       includedUsage: {
-        total: money("0", "0.00"),
-        remaining: money("0", "0.00"),
+        total: money("10000000", "10.00"),
+        remaining: {
+          ...money("0", "0.00"),
+          ...(overrides.includedRemaining ?? {}),
+        },
         consumed: money("0", "0.00"),
         resetsAt: "2026-09-01T00:00:00.000Z",
         sourcePlan: null,
@@ -99,42 +108,105 @@ describe("spendPostureBadge", () => {
   });
 });
 
-describe("overageBufferMeter", () => {
-  it("reports debt against the ceiling with remaining headroom", () => {
-    const meter = overageBufferMeter(makeState({}));
-    assert.equal(meter?.primary, "$0.50 / $2.00");
-    assert.equal(meter?.status, "$1.50 of buffer left");
-    assert.equal(meter?.percent, 25);
+describe("availableRunway", () => {
+  it("sums included and prepaid when funded", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "active",
+        includedRemaining: { usdMicros: "8000000", usd: "8.00" },
+        prepaid: { usdMicros: "2500000", usd: "2.50" },
+        unbilledDebt: null,
+      }),
+    );
+    assert.equal(runway.usd, "$10.50");
+    assert.equal(runway.usdMicros, "10500000");
+    assert.equal(runway.tone, "ok");
+    assert.equal(runway.detail, "Included $8.00 · Credits $2.50");
   });
 
-  it("says the buffer is used up when blocked", () => {
-    const meter = overageBufferMeter(
+  it("omits zero sides from the funded breakdown", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "active",
+        includedRemaining: { usdMicros: "5000000", usd: "5.00" },
+        prepaid: { usdMicros: "0", usd: "0.00" },
+        unbilledDebt: null,
+      }),
+    );
+    assert.equal(runway.usd, "$5.00");
+    assert.equal(runway.detail, "Included $5.00");
+  });
+
+  it("goes negative once unbilled debt exceeds funding", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "overage",
+        includedRemaining: { usdMicros: "0", usd: "0.00" },
+        prepaid: { usdMicros: "0", usd: "0.00" },
+        unbilledDebt: { usdMicros: "1250000", usd: "1.25" },
+      }),
+    );
+    assert.equal(runway.usd, "-$1.25");
+    assert.equal(runway.usdMicros, "-1250000");
+    assert.equal(runway.tone, "info");
+    assert.equal(runway.detail, "Unbilled $1.25");
+  });
+
+  it("treats null debt as zero", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "active",
+        includedRemaining: { usdMicros: "1000000", usd: "1.00" },
+        unbilledDebt: null,
+      }),
+    );
+    assert.equal(runway.usd, "$1.00");
+  });
+
+  it("uses danger tone when blocked below zero", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "blocked",
+        includedRemaining: { usdMicros: "0", usd: "0.00" },
+        unbilledDebt: { usdMicros: "2000000", usd: "2.00" },
+      }),
+    );
+    assert.equal(runway.usd, "-$2.00");
+    assert.equal(runway.tone, "danger");
+  });
+});
+
+describe("overageLimitNote", () => {
+  it("shows ceiling and remaining headroom while spendable", () => {
+    const note = overageLimitNote(makeState({}));
+    assert.equal(note, "Overage limit $2.00 · $1.50 left");
+  });
+
+  it("drops headroom when remaining is zero but not blocked", () => {
+    const note = overageLimitNote(
+      makeState({
+        remaining: { usdMicros: "0", usd: "0.00" },
+      }),
+    );
+    assert.equal(note, "Overage limit $2.00");
+  });
+
+  it("says the limit is reached when blocked", () => {
+    const note = overageLimitNote(
       makeState({
         status: "blocked",
         unbilledDebt: { usdMicros: "2000000", usd: "2.00" },
         remaining: { usdMicros: "0", usd: "0.00" },
-        utilizationBps: 10_000,
       }),
     );
-    assert.equal(meter?.status, "Buffer used up");
-    assert.equal(meter?.percent, 100);
+    assert.equal(note, "Overage limit reached");
   });
 
-  it("clamps utilization above the ceiling to a full bar", () => {
-    const meter = overageBufferMeter(makeState({ utilizationBps: 14_000 }));
-    assert.equal(meter?.percent, 100);
-  });
-
-  it("hides the meter when there is no ceiling", () => {
-    const meter = overageBufferMeter(
+  it("hides the note when there is no ceiling", () => {
+    const note = overageLimitNote(
       makeState({ ceiling: { usdMicros: "0", usd: "0.00" } }),
     );
-    assert.equal(meter, null);
-  });
-
-  it("hides the meter when debt could not be read", () => {
-    const meter = overageBufferMeter(makeState({ unbilledDebt: null }));
-    assert.equal(meter, null);
+    assert.equal(note, null);
   });
 });
 

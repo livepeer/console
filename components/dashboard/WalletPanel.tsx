@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
 import { useOwnerWallet } from "@/lib/dashboard/useOwnerWallet";
 import {
+  availableRunway,
   collectionSchedule,
   formatWalletUsd,
-  overageBufferMeter,
+  overageLimitNote,
   spendPostureBadge,
   type SpendPostureTone,
 } from "@/lib/dashboard/wallet-settlement-display";
@@ -50,11 +51,11 @@ const POSTURE_TONE_CLASS: Record<SpendPostureTone, string> = {
   danger: "border-rose-400/30 text-rose-400",
 };
 
-const METER_TONE_CLASS: Record<SpendPostureTone, string> = {
-  ok: "bg-emerald-400",
-  info: "bg-fg-muted",
-  warn: "bg-amber-400",
-  danger: "bg-rose-400",
+const AVAILABLE_TONE_CLASS: Record<SpendPostureTone, string> = {
+  ok: "text-fg",
+  info: "text-fg",
+  warn: "text-amber-400",
+  danger: "text-rose-400",
 };
 
 /** Only follow https (or localhost http, for dev) Checkout URLs. */
@@ -161,11 +162,11 @@ export default function WalletPanel({
   }
 
   const { wallet, paymentMethods, invoices } = state;
-  const balanceUsd = wallet.balance?.usd ?? "0.00";
   const usageUsd = formatWalletUsd(periodBillableUsdMicros);
   const billingState = wallet.billingState;
   const posture = spendPostureBadge(billingState.status);
-  const meter = overageBufferMeter(billingState);
+  const runway = availableRunway(billingState);
+  const limitNote = overageLimitNote(billingState);
   const defaultPm =
     paymentMethods.find((pm) => pm.isDefault) ?? paymentMethods[0] ?? null;
   const hasPaymentMethod =
@@ -189,69 +190,31 @@ export default function WalletPanel({
             {billingState.explain.detail}
           </p>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                Included usage
+                Available
               </p>
-              <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
-                $
-                {billingState.funding.includedUsage?.remaining.usd ??
-                  billingState.funding.included.usd}
+              <p
+                className={`mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] ${AVAILABLE_TONE_CLASS[runway.tone]}`}
+              >
+                {runway.usd}
               </p>
-              {billingState.funding.includedUsage &&
-              billingState.funding.includedUsage.total.usdMicros !== "0" ? (
-                <p className="mt-1 text-[11px] text-fg-muted">
-                  $
-                  {billingState.funding.includedUsage.consumed.usd} of $
-                  {billingState.funding.includedUsage.total.usd} used
-                  {billingState.funding.includedUsage.sourcePlan?.name
-                    ? ` · ${billingState.funding.includedUsage.sourcePlan.name}`
-                    : ""}
-                </p>
+              {runway.detail ? (
+                <p className="mt-1 text-[11px] text-fg-muted">{runway.detail}</p>
+              ) : null}
+              {limitNote ? (
+                <p className="mt-1 text-[11px] text-fg-muted">{limitNote}</p>
               ) : null}
             </div>
             <div>
               <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                Prepaid credits
+                Usage this period
               </p>
               <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
-                ${balanceUsd}
+                ${usageUsd}
               </p>
             </div>
-            {meter ? (
-              <div>
-                <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                  Spending buffer
-                </p>
-                <p className="mt-1 font-mono text-[20px] font-medium tabular-nums tracking-[-0.01em] text-fg sm:text-[28px]">
-                  {meter.primary}
-                </p>
-                <div
-                  className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-white/5"
-                  role="progressbar"
-                  aria-label="Spending buffer used"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={meter.percent}
-                >
-                  <div
-                    className={`h-full rounded-full ${METER_TONE_CLASS[posture.tone]}`}
-                    style={{ width: `${meter.percent}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-fg-muted">{meter.status}</p>
-              </div>
-            ) : (
-              <div>
-                <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-                  Usage this period
-                </p>
-                <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
-                  ${usageUsd}
-                </p>
-              </div>
-            )}
           </div>
           <p className="mt-3 text-[12px] text-fg-muted">
             {collectionSchedule(billingState)}

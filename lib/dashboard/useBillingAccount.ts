@@ -34,6 +34,20 @@ function billingUpstreamMessage(
   return upstreamError ?? `${surface} failed (${status})`;
 }
 
+/**
+ * List endpoints may answer 503 "Billing unavailable" for expected empty
+ * conditions (no Stripe customer yet, sandbox Connect not ready, OM admin
+ * client offline). Those are empty states, not hard UI failures.
+ */
+export function isSoftBillingListUnavailable(
+  status: number,
+  upstreamError?: string,
+): boolean {
+  if (status !== 503) return false;
+  const msg = upstreamError?.trim().toLowerCase() ?? "";
+  return !msg || msg === "billing unavailable";
+}
+
 export type BillingAccountState =
   | { status: "idle" }
   | { status: "loading" }
@@ -41,8 +55,77 @@ export type BillingAccountState =
       status: "ready";
       paymentMethods: DashboardPaymentMethod[];
       invoices: DashboardInvoice[];
+      paymentMethodsError: string | null;
+      invoicesError: string | null;
+    };
+
+type ListLoadResult<T> = {
+  items: T[];
+  error: string | null;
+};
+
+async function loadPaymentMethods(
+  externalUserId: string,
+): Promise<ListLoadResult<DashboardPaymentMethod>> {
+  try {
+    const response = await fetch(
+      `/api/pymthouse/payment-methods?externalUserId=${encodeURIComponent(externalUserId)}`,
+    );
+    const body = await readResponseJson<{
+      paymentMethods?: DashboardPaymentMethod[];
+      error?: string;
+    }>(response);
+    if (!response.ok) {
+      if (isSoftBillingListUnavailable(response.status, body.error)) {
+        return { items: [], error: null };
+      }
+      return {
+        items: [],
+        error: billingUpstreamMessage(
+          "payment methods",
+          response.status,
+          body.error,
+        ),
+      };
     }
-  | { status: "error"; message: string };
+    return { items: body.paymentMethods ?? [], error: null };
+  } catch (error) {
+    return {
+      items: [],
+      error:
+        error instanceof Error ? error.message : "Failed to load payment methods",
+    };
+  }
+}
+
+async function loadInvoices(
+  externalUserId: string,
+): Promise<ListLoadResult<DashboardInvoice>> {
+  try {
+    const response = await fetch(
+      `/api/pymthouse/invoices?externalUserId=${encodeURIComponent(externalUserId)}&pageSize=20`,
+    );
+    const body = await readResponseJson<{
+      items?: DashboardInvoice[];
+      error?: string;
+    }>(response);
+    if (!response.ok) {
+      if (isSoftBillingListUnavailable(response.status, body.error)) {
+        return { items: [], error: null };
+      }
+      return {
+        items: [],
+        error: billingUpstreamMessage("invoices", response.status, body.error),
+      };
+    }
+    return { items: body.items ?? [], error: null };
+  } catch (error) {
+    return {
+      items: [],
+      error: error instanceof Error ? error.message : "Failed to load invoices",
+    };
+  }
+}
 
 export function useBillingAccount(externalUserId: string | undefined) {
   const [state, setState] = useState<BillingAccountState>({ status: "idle" });
@@ -54,60 +137,25 @@ export function useBillingAccount(externalUserId: string | undefined) {
         status: "ready",
         paymentMethods: [],
         invoices: [],
+        paymentMethodsError: null,
+        invoicesError: null,
       });
       return;
     }
 
     setState({ status: "loading" });
-    try {
-      const q = encodeURIComponent(trimmed);
-      const [pmResponse, invResponse] = await Promise.all([
-        fetch(`/api/pymthouse/payment-methods?externalUserId=${q}`),
-        fetch(`/api/pymthouse/invoices?externalUserId=${q}&pageSize=20`),
-      ]);
-
-      const pmBody = await readResponseJson<{
-        paymentMethods?: DashboardPaymentMethod[];
-        error?: string;
-        code?: string;
-      }>(pmResponse);
-      if (!pmResponse.ok) {
-        throw new Error(
-          billingUpstreamMessage(
-            "payment methods",
-            pmResponse.status,
-            pmBody.error,
-          ),
-        );
-      }
-
-      const invBody = await readResponseJson<{
-        items?: DashboardInvoice[];
-        error?: string;
-        code?: string;
-      }>(invResponse);
-      if (!invResponse.ok) {
-        throw new Error(
-          billingUpstreamMessage(
-            "invoices",
-            invResponse.status,
-            invBody.error,
-          ),
-        );
-      }
-
-      setState({
-        status: "ready",
-        paymentMethods: pmBody.paymentMethods ?? [],
-        invoices: invBody.items ?? [],
-      });
-    } catch (error) {
-      setState({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to load billing",
-      });
-    }
+    // Independent loads — invoice soft-503 must not poison payment methods UI.
+    const [pm, inv] = await Promise.all([
+      loadPaymentMethods(trimmed),
+      loadInvoices(trimmed),
+    ]);
+    setState({
+      status: "ready",
+      paymentMethods: pm.items,
+      invoices: inv.items,
+      paymentMethodsError: pm.error,
+      invoicesError: inv.error,
+    });
   }, [externalUserId]);
 
   useEffect(() => {

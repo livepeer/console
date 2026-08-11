@@ -3,13 +3,20 @@ import test from "node:test";
 import {
   dateInputToEffectiveAtIso,
   defaultCancelTimingChoice,
+  canCancelBillingSubscription,
   deriveBillingPlanAction,
   deriveBillingSubscriptionUiState,
+  formatBillingPlanPrice,
+  formatIncludedUsdMicros,
   formatPendingCancelDate,
   isNothingToResumeError,
+  paidCatalogPlanIds,
   resolveApplicablePendingCancel,
   resolveTimingPayload,
+  includedUsageFeatureLabel,
+  starterIncludedUsageLabel,
   toDateInputValue,
+  withCurrentPlanInDisplayList,
 } from "./billing-subscription-state";
 
 test("derives no subscription as a subscribe state", () => {
@@ -28,6 +35,86 @@ test("marks the active plan current and other plans switchable", () => {
   assert.deepEqual(state, { kind: "active", planId: "pro" });
   assert.equal(deriveBillingPlanAction(state, "pro"), "current");
   assert.equal(deriveBillingPlanAction(state, "scale"), "change_plan");
+});
+
+test("Starter / non-catalog plans cannot be canceled — only paid catalog plans can", () => {
+  const starterActive = deriveBillingSubscriptionUiState({
+    planId: "starter",
+    status: "active",
+  });
+  assert.equal(
+    canCancelBillingSubscription(starterActive, ["pro", "scale"], true),
+    false,
+  );
+  assert.equal(
+    canCancelBillingSubscription(
+      deriveBillingSubscriptionUiState({ planId: "pro", status: "active" }),
+      ["pro", "scale"],
+      true,
+    ),
+    true,
+  );
+  assert.equal(
+    canCancelBillingSubscription(starterActive, ["pro"], false),
+    false,
+  );
+});
+
+test("withCurrentPlanInDisplayList injects Starter when missing from catalog", () => {
+  const paid = [
+    {
+      id: "pro",
+      name: "Pro",
+      type: "subscription",
+      status: "active",
+      priceAmount: "29",
+      priceCurrency: "USD",
+      billingCycle: "monthly",
+      chargeThresholdUsdMicros: null,
+      resolvedBehavior: null,
+      capabilityCount: 3,
+      isStarterDefault: false,
+    },
+  ];
+
+  const withStarter = withCurrentPlanInDisplayList(paid, {
+    planId: "starter",
+    planName: "Starter",
+  });
+  assert.equal(withStarter.length, 2);
+  assert.equal(withStarter[0]?.id, "starter");
+  assert.equal(withStarter[0]?.name, "Starter");
+  assert.equal(withStarter[0]?.type, "free");
+  assert.equal(withStarter[0]?.isStarterDefault, true);
+  assert.equal(withStarter[1]?.id, "pro");
+
+  // Already in catalog — no duplicate
+  assert.deepEqual(
+    withCurrentPlanInDisplayList(paid, { planId: "pro", planName: "Pro" }),
+    paid,
+  );
+
+  // No subscription — catalog only
+  assert.deepEqual(withCurrentPlanInDisplayList(paid, null), paid);
+
+  // Starter alone when no paid plans published
+  const starterOnly = withCurrentPlanInDisplayList([], {
+    planId: "starter",
+    planName: "Starter",
+  });
+  assert.equal(starterOnly.length, 1);
+  assert.equal(starterOnly[0]?.name, "Starter");
+});
+
+test("paidCatalogPlanIds excludes Starter defaults", () => {
+  assert.deepEqual(
+    paidCatalogPlanIds([
+      { id: "starter", isStarterDefault: true },
+      { id: "pro", isStarterDefault: false },
+      { id: "legacy" },
+    ]),
+    ["pro", "legacy"],
+  );
 });
 
 test("routes pending subscriptions to checkout retry", () => {
@@ -247,5 +334,43 @@ test("cancel timing helpers default to end of cycle and map date inputs", () => 
       customDateYmd: "2026-08-15",
     }),
     { effectiveAt: "2026-08-15T12:00:00.000Z" },
+  );
+});
+
+test("formatIncludedUsdMicros converts OpenMeter discounts.usage micros", () => {
+  assert.equal(formatIncludedUsdMicros("10000000"), "$10");
+  assert.equal(formatIncludedUsdMicros("2500000"), "$2.50");
+  assert.equal(formatIncludedUsdMicros("0"), null);
+  assert.equal(formatIncludedUsdMicros(null), null);
+  assert.equal(formatIncludedUsdMicros("not-a-number"), null);
+});
+
+test("formatBillingPlanPrice prefers Starter included usage over $0 fee", () => {
+  assert.deepEqual(
+    formatBillingPlanPrice({
+      type: "free",
+      priceAmount: "0",
+      priceCurrency: "USD",
+      billingCycle: "monthly",
+      includedUsdMicros: "10000000",
+      isStarterDefault: true,
+    }),
+    { price: "$10", priceSub: " · included" },
+  );
+  assert.equal(
+    includedUsageFeatureLabel({ includedUsdMicros: "10000000" }),
+    "$10 included usage",
+  );
+  assert.equal(
+    includedUsageFeatureLabel({ includedUsdMicros: null }),
+    null,
+  );
+  assert.equal(
+    starterIncludedUsageLabel({ includedUsdMicros: "10000000" }),
+    "$10 included usage",
+  );
+  assert.equal(
+    starterIncludedUsageLabel({ includedUsdMicros: null }),
+    "Free included usage",
   );
 });

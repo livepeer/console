@@ -88,9 +88,13 @@ export type DashboardBillingPlan = {
   priceAmount: string;
   priceCurrency: string;
   billingCycle: string | null;
+  /** Plan rate-card discounts.usage allowance (USD micros), when set. */
+  includedUsdMicros: string | null;
   chargeThresholdUsdMicros: string | null;
   resolvedBehavior: string | null;
   capabilityCount: number;
+  /** App Starter default — shown for upgrade/downgrade, not cancelable. */
+  isStarterDefault: boolean;
 };
 
 function readOptionalString(value: unknown): string | null {
@@ -106,34 +110,48 @@ function mapProduct(product: BillingProduct): DashboardBillingPlan {
     chargeThresholdUsdMicros?: unknown;
     resolvedBehavior?: unknown;
   };
+  const isStarterDefault = product.isStarterDefault === true;
+  const name = isStarterDefault
+    ? "Starter"
+    : product.name?.trim() || product.id;
 
   return {
     id: product.id,
-    name: product.name,
-    type: product.type,
+    name,
+    // Starter is stored as type=usage upstream but is the free floor plan —
+    // surface it as free so the UI does not treat Switch as pay-per-use.
+    type: isStarterDefault ? "free" : product.type,
     status: product.status,
     priceAmount: product.priceAmount,
     priceCurrency: product.priceCurrency,
     billingCycle: product.allowance?.billingCycle ?? null,
-    chargeThresholdUsdMicros: readOptionalString(
-      dynamicProduct.chargeThresholdUsdMicros
+    includedUsdMicros: readOptionalString(
+      product.allowance?.includedUsdMicros,
     ),
-    resolvedBehavior: readOptionalString(dynamicProduct.resolvedBehavior),
+    chargeThresholdUsdMicros: isStarterDefault
+      ? null
+      : readOptionalString(dynamicProduct.chargeThresholdUsdMicros),
+    resolvedBehavior: isStarterDefault
+      ? null
+      : readOptionalString(dynamicProduct.resolvedBehavior),
     capabilityCount: product.capabilities?.length ?? 0,
+    isStarterDefault,
   };
 }
 
-/** Active (non-starter / non-network-default) products available for subscribe. */
+/**
+ * Active products for the billing catalog: paid plans + Starter (for
+ * upgrade/downgrade). Network-default (platform) products stay hidden.
+ */
 export async function listDashboardBillingPlans(): Promise<
   DashboardBillingPlan[]
 > {
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   const { products } = await client.listBillingProducts();
   const plans = (products ?? [])
-    .filter(
-      (p) => p.status === "active" && !p.isNetworkDefault && !p.isStarterDefault
-    )
-    .map(mapProduct);
+    .filter((p) => p.status === "active" && !p.isNetworkDefault)
+    .map(mapProduct)
+    .sort((a, b) => Number(b.isStarterDefault) - Number(a.isStarterDefault));
 
   // The apiVersion=2 billing-product shape omits chargeThresholdUsdMicros /
   // resolvedBehavior (pymthouse toBillingProduct). The owner wallet summary

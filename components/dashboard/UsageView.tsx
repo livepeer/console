@@ -6,7 +6,6 @@ import StackedAreaChart, { MiniSpark } from "@/components/dashboard/StackedAreaC
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { useAccountUsage } from "@/lib/dashboard/useAccountUsage";
-import { getUtcCalendarMonthIsoBounds } from "@pymthouse/builder-sdk";
 import {
   buildUsageCapabilityRows,
   formatPeriodResetLabel,
@@ -266,7 +265,7 @@ export default function UsageView() {
   const { data } = usageState;
   const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
-  const resetsAt = formatPeriodResetLabel(getUtcCalendarMonthIsoBounds().endDate);
+  const resetsAt = formatPeriodResetLabel(data.period.end);
   const grantedMicros = data.balance?.lifetimeGrantedUsdMicros ?? null;
 
   return (

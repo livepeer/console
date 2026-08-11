@@ -31,23 +31,31 @@ import type {
 } from "@/lib/dashboard/pymthouse-billing-bff";
 import {
   billingPlanActionLabel,
+  canCancelBillingSubscription,
   defaultCancelTimingChoice,
   deriveBillingPlanAction,
   deriveBillingSubscriptionUiState,
+  formatBillingPlanPrice,
   formatPendingCancelDate,
   isActiveSubscriptionConflict,
   isNothingToResumeError,
+  paidCatalogPlanIds,
   resolveApplicablePendingCancel,
   resolveCancelingEffectiveAt,
   resolveCancelingPlanName,
   resolveTimingPayload,
+  includedUsageFeatureLabel,
   toDateInputValue,
+  withCurrentPlanInDisplayList,
   type BillingPlanAction,
   type SubscriptionTimingChoice,
   type SubscriptionTimingOptions,
 } from "@/lib/dashboard/billing-subscription-state";
 
-function isUsagePlan(plan: Pick<DashboardBillingPlan, "type">): boolean {
+function isUsagePlan(
+  plan: Pick<DashboardBillingPlan, "type" | "isStarterDefault">
+): boolean {
+  if (plan.isStarterDefault) return false;
   return plan.type.trim().toLowerCase() === "usage";
 }
 
@@ -58,31 +66,6 @@ function resolvedPayPerUseBehavior(plan: DashboardBillingPlan): string {
   }
 
   return "Pay-per-use — usage draws down prepaid credits first, then is invoiced automatically as it accrues.";
-}
-
-function formatPlanPrice(
-  plan: Pick<DashboardBillingPlan, "type" | "priceAmount" | "priceCurrency" | "billingCycle">
-): { price: string; priceSub: string } {
-  const n = Number(plan.priceAmount);
-  const money = Number.isFinite(n)
-    ? new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: plan.priceCurrency || "USD",
-        maximumFractionDigits: n % 1 === 0 ? 0 : 2,
-      }).format(n)
-    : plan.priceAmount;
-
-  if (plan.type.trim().toLowerCase() === "usage") {
-    return { price: money, priceSub: " · pay as you go" };
-  }
-
-  const c = plan.billingCycle?.toLowerCase() ?? "";
-  if (c === "monthly" || c === "month")
-    return { price: money, priceSub: " / month" };
-  if (c === "yearly" || c === "year" || c === "annual") {
-    return { price: money, priceSub: " / year" };
-  }
-  return { price: money, priceSub: plan.billingCycle ? ` · ${plan.billingCycle}` : "" };
 }
 
 function formatInvoiceAmount(totalAmount: string, currency: string): string {
@@ -113,16 +96,43 @@ function readCheckoutFlash(): "success" | "cancel" | null {
   return null;
 }
 
+/** Plan id to finish switching after setup-mode Checkout returns. */
+function readResumePlanChange(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search)
+    .get("changePlan")
+    ?.trim();
+  return value || null;
+}
+
 function clearCheckoutQueryParam(): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
-  if (!url.searchParams.has("checkout")) return;
-  url.searchParams.delete("checkout");
+  let changed = false;
+  for (const key of ["checkout", "changePlan"] as const) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  if (!changed) return;
   window.history.replaceState(
     {},
     "",
     `${url.pathname}${url.search}${url.hash}`
   );
+}
+
+function billingChangePlanSuccessUrl(planId: string): string {
+  const url = new URL("/settings", window.location.origin);
+  url.searchParams.set("tab", "billing");
+  url.searchParams.set("checkout", "success");
+  url.searchParams.set("changePlan", planId);
+  return url.toString();
+}
+
+function billingChangePlanCancelUrl(): string {
+  return `${window.location.origin}/settings?tab=billing&checkout=cancel`;
 }
 
 function TimingChoicePanel(props: {
@@ -148,16 +158,16 @@ function TimingChoicePanel(props: {
         {(
           [
             {
+              id: "immediate" as const,
+              label: "Immediately",
+              hint: "Takes effect right away",
+            },
+            {
               id: "next_billing_cycle" as const,
               label: "End of current period",
               hint: props.options?.maxEffectiveAt
                 ? formatPendingCancelDate(props.options.maxEffectiveAt)
                 : "Keep access until the period ends",
-            },
-            {
-              id: "immediate" as const,
-              label: "Immediately",
-              hint: "Takes effect right away",
             },
             {
               id: "custom" as const,
@@ -269,8 +279,12 @@ export default function BillingSection() {
 
   useEffect(() => {
     const next = readCheckoutFlash();
-    if (!next) return;
-    setFlash(next);
+    const resumePlanId = readResumePlanChange();
+    if (!next && !resumePlanId) return;
+    // Wait for auth before consuming a resume intent from the return URL.
+    if (resumePlanId && !externalUserId) return;
+
+    if (next) setFlash(next);
     clearCheckoutQueryParam();
     if (next === "success") {
       void (async () => {
@@ -281,10 +295,26 @@ export default function BillingSection() {
             // Webhook may already have promoted; list/UI still refreshes.
           }
         }
+        if (resumePlanId && externalUserId) {
+          setBusyPlanId(resumePlanId);
+          try {
+            await runChangePlan(resumePlanId);
+          } catch (err) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : "Could not finish plan change after adding a card"
+            );
+          } finally {
+            setBusyPlanId(null);
+          }
+          return;
+        }
         void reloadPlans();
         void reloadAccount();
       })();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once from return URL
   }, [
     externalUserId,
     ensureDefaultPaymentMethod,
@@ -328,8 +358,8 @@ export default function BillingSection() {
     const result = await changePlan({
       planId,
       externalUserId,
-      successUrl: `${window.location.origin}/settings?tab=billing&checkout=success`,
-      cancelUrl: `${window.location.origin}/settings?tab=billing&checkout=cancel`,
+      successUrl: billingChangePlanSuccessUrl(planId),
+      cancelUrl: billingChangePlanCancelUrl(),
       ...timing,
     });
     if (result.checkoutUrl) {
@@ -377,8 +407,12 @@ export default function BillingSection() {
             ? (subscriptionUiState.planId ?? planId)
             : planId,
         externalUserId,
-        successUrl: `${window.location.origin}/settings?tab=billing&checkout=success`,
-        cancelUrl: `${window.location.origin}/settings?tab=billing&checkout=cancel`,
+        successUrl: billingChangePlanSuccessUrl(
+          action === "retry_checkout"
+            ? (subscriptionUiState.planId ?? planId)
+            : planId
+        ),
+        cancelUrl: billingChangePlanCancelUrl(),
       };
       const result = await subscribe(input);
 
@@ -591,13 +625,21 @@ export default function BillingSection() {
   const accountLoading =
     accountState.status === "loading" || accountState.status === "idle";
 
-  const plans = plansState.status === "ready" ? plansState.plans : [];
+  const catalogPlans = plansState.status === "ready" ? plansState.plans : [];
   const subscription =
     plansState.status === "ready" ? plansState.subscription : null;
+  const plans = withCurrentPlanInDisplayList(
+    catalogPlans,
+    subscription
+  ) as DashboardBillingPlan[];
   const subscriptionUiState = deriveBillingSubscriptionUiState(subscription);
   const paymentMethods =
     accountState.status === "ready" ? accountState.paymentMethods : [];
   const invoices = accountState.status === "ready" ? accountState.invoices : [];
+  const paymentMethodsError =
+    accountState.status === "ready" ? accountState.paymentMethodsError : null;
+  const invoicesError =
+    accountState.status === "ready" ? accountState.invoicesError : null;
 
   const cancelingPlanName = resolveCancelingPlanName(subscription);
   const cancelingEndsAt = resolveCancelingEffectiveAt(subscription);
@@ -613,8 +655,12 @@ export default function BillingSection() {
             ? "Current subscription"
             : "Choose a plan to get started");
 
-  const canCancel =
-    Boolean(externalUserId) && subscriptionUiState.kind === "active";
+  // Starter is the floor — cancel is only for paid catalog plans.
+  const canCancel = canCancelBillingSubscription(
+    subscriptionUiState,
+    paidCatalogPlanIds(catalogPlans),
+    Boolean(externalUserId)
+  );
   const canResume =
     Boolean(externalUserId) &&
     Boolean(resolveApplicablePendingCancel(subscription));
@@ -727,17 +773,33 @@ export default function BillingSection() {
               const isPending =
                 subscriptionUiState.kind === "pending" &&
                 subscriptionUiState.planId === plan.id;
-              const { price, priceSub } = formatPlanPrice(plan);
-              const features = [
-                isUsagePlan(plan)
-                  ? resolvedPayPerUseBehavior(plan)
-                  : plan.billingCycle
-                    ? `${plan.billingCycle} billing`
-                    : "Usage-based billing",
+              const { price, priceSub } = formatBillingPlanPrice(plan);
+              const isStarter =
+                plan.isStarterDefault === true ||
+                plan.type.trim().toLowerCase() === "free";
+              const includedUsage = includedUsageFeatureLabel(plan);
+              const features: string[] = [];
+              if (isUsagePlan(plan)) {
+                features.push(resolvedPayPerUseBehavior(plan));
+              } else {
+                if (includedUsage) {
+                  features.push(includedUsage);
+                } else if (isStarter) {
+                  features.push("Free included usage");
+                }
+                if (!isStarter) {
+                  features.push(
+                    plan.billingCycle
+                      ? `${plan.billingCycle} billing`
+                      : "Usage-based billing",
+                  );
+                }
+              }
+              features.push(
                 plan.capabilityCount > 0
                   ? `${plan.capabilityCount} capabilities`
                   : "All included capabilities",
-              ];
+              );
               return (
                 <LivePlanCard
                   key={plan.id}
@@ -782,13 +844,13 @@ export default function BillingSection() {
           <div className="animate-pulse px-5 py-9">
             <div className="mx-auto h-5 w-40 rounded bg-white/5" />
           </div>
-        ) : accountState.status === "error" ? (
+        ) : paymentMethodsError ? (
           <div className="px-5 py-6 text-center">
             <p className="text-[13px] text-fg-muted">
               Could not load payment methods.
             </p>
             <p className="mt-1 font-mono text-[12px] text-fg-faint">
-              {accountState.message}
+              {paymentMethodsError}
             </p>
             <button
               type="button"
@@ -809,8 +871,9 @@ export default function BillingSection() {
               No payment method
             </p>
             <p className="mt-1 text-[12.5px] text-fg-faint">
-              Add a card via Stripe Checkout. Completing Checkout updates your
-              card on file even if you do not return to this page.
+              Add a card via Stripe Checkout for subscription and usage charges.
+              Completing Checkout updates your card on file even if you do not
+              return to this page.
             </p>
           </div>
         ) : (
@@ -875,13 +938,13 @@ export default function BillingSection() {
           <div className="animate-pulse p-5">
             <div className="h-4 w-full rounded bg-white/5" />
           </div>
-        ) : accountState.status === "error" ? (
+        ) : invoicesError ? (
           <div className="px-5 py-6 text-center">
             <p className="text-[13px] text-fg-muted">
               Could not load billing history.
             </p>
             <p className="mt-1 font-mono text-[12px] text-fg-faint">
-              {accountState.message}
+              {invoicesError}
             </p>
             <button
               type="button"
@@ -907,7 +970,15 @@ export default function BillingSection() {
               <span aria-hidden="true" />
             </div>
             {invoices.map((inv) => {
-              const isAutoTopUp = inv.invoiceType === "auto_topup";
+              const isReceiptOnly =
+                inv.invoiceType === "auto_topup" ||
+                inv.invoiceType === "payment";
+              const statusLabel =
+                inv.invoiceType === "auto_topup"
+                  ? "Top-up"
+                  : inv.invoiceType === "payment"
+                    ? "Paid"
+                    : inv.status;
               return (
               <div
                 key={inv.id}
@@ -923,7 +994,7 @@ export default function BillingSection() {
                   {formatInvoiceAmount(inv.totalAmount, inv.currency)}
                 </div>
                 <div className="text-[12px] capitalize text-fg-faint">
-                  {isAutoTopUp ? "Top-up" : inv.status}
+                  {statusLabel}
                 </div>
                 <div className="flex justify-end gap-3">
                   <button
@@ -932,9 +1003,9 @@ export default function BillingSection() {
                     disabled={invoiceBusyId === inv.id}
                     onClick={() => void onOpenInvoice(inv.id, "hosted")}
                   >
-                    {isAutoTopUp ? "Receipt" : "View"}
+                    {isReceiptOnly ? "Receipt" : "View"}
                   </button>
-                  {isAutoTopUp ? null : (
+                  {isReceiptOnly ? null : (
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg disabled:opacity-50"
@@ -1098,6 +1169,7 @@ function LivePlanCard({
           ? "Working…"
           : billingPlanActionLabel(action, {
               usagePlan: isUsagePlan(plan),
+              starterPlan: plan.isStarterDefault === true,
             })}
         {action !== "current" && !busy ? (
           <ArrowRight className="h-2.5 w-2.5" aria-hidden="true" />

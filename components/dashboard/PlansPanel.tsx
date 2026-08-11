@@ -3,27 +3,21 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
 import type { DashboardBillingPlan } from "@/lib/dashboard/pymthouse-billing-bff";
+import {
+  formatBillingPlanPrice,
+} from "@/lib/dashboard/billing-subscription-state";
 import { useBillingPlans } from "@/lib/dashboard/useBillingPlans";
 
-function isUsagePlan(plan: Pick<DashboardBillingPlan, "type">): boolean {
+function isUsagePlan(
+  plan: Pick<DashboardBillingPlan, "type" | "isStarterDefault">
+): boolean {
+  if (plan.isStarterDefault) return false;
   return plan.type.trim().toLowerCase() === "usage";
 }
 
 function formatPrice(plan: DashboardBillingPlan): string {
-  const n = Number(plan.priceAmount);
-  const money = Number.isFinite(n)
-    ? new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: plan.priceCurrency || "USD",
-      }).format(n)
-    : plan.priceAmount;
-
-  if (isUsagePlan(plan)) return `${money} · pay as you go`;
-  if (!plan.billingCycle) return money;
-  const c = plan.billingCycle.toLowerCase();
-  if (c === "monthly" || c === "month") return `${money}/mo`;
-  if (c === "yearly" || c === "year" || c === "annual") return `${money}/yr`;
-  return `${money} · ${plan.billingCycle}`;
+  const { price, priceSub } = formatBillingPlanPrice(plan);
+  return `${price}${priceSub}`;
 }
 
 function resolvedPayPerUseBehavior(plan: DashboardBillingPlan): string {
@@ -40,11 +34,25 @@ function readCheckoutFlash(): "success" | "cancel" | null {
   return null;
 }
 
+function readResumePlanChange(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search)
+    .get("changePlan")
+    ?.trim();
+  return value || null;
+}
+
 function clearCheckoutQueryParam(): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
-  if (!url.searchParams.has("checkout")) return;
-  url.searchParams.delete("checkout");
+  let changed = false;
+  for (const key of ["checkout", "changePlan"] as const) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  if (!changed) return;
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -61,13 +69,45 @@ export default function PlansPanel({
 
   useEffect(() => {
     const next = readCheckoutFlash();
-    if (!next) return;
-    setFlash(next);
+    const resumePlanId = readResumePlanChange();
+    if (!next && !resumePlanId) return;
+    if (resumePlanId && !externalUserId?.trim()) return;
+
+    if (next) setFlash(next);
     clearCheckoutQueryParam();
-    if (next === "success") {
+    if (next !== "success") return;
+
+    void (async () => {
+      if (resumePlanId && externalUserId?.trim()) {
+        setBusyPlanId(resumePlanId);
+        try {
+          const result = await changePlan({
+            planId: resumePlanId,
+            externalUserId: externalUserId.trim(),
+            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(resumePlanId)}`,
+            cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
+          });
+          if (result.checkoutUrl) {
+            window.location.assign(result.checkoutUrl);
+            return;
+          }
+          await reload();
+          setError("Plan updated.");
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Could not finish plan change after adding a card",
+          );
+        } finally {
+          setBusyPlanId(null);
+        }
+        return;
+      }
       void reload();
-    }
-  }, [reload]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resume once from return URL
+  }, [reload, changePlan, externalUserId]);
 
   async function onSubscribe(planId: string) {
     if (!externalUserId?.trim()) {
@@ -99,13 +139,13 @@ export default function PlansPanel({
         ? await changePlan({
             planId,
             externalUserId: userId,
-            successUrl: `${window.location.origin}/usage?checkout=success`,
+            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
             cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
           })
         : await subscribe({
             planId,
             externalUserId: userId,
-            successUrl: `${window.location.origin}/usage?checkout=success`,
+            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
             cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
           });
 
@@ -216,9 +256,13 @@ export default function PlansPanel({
                 >
                   {busyPlanId === plan.id
                     ? "Redirecting…"
-                    : isUsagePlan(plan)
-                      ? "Enable pay-per-use"
-                      : "Subscribe"}
+                    : plan.isStarterDefault
+                      ? hasActiveSubscription && !isCurrent
+                        ? "Switch to Starter"
+                        : "Choose Starter"
+                      : isUsagePlan(plan)
+                        ? "Enable pay-per-use"
+                        : "Subscribe"}
                 </Button>
               )}
             </li>
