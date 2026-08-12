@@ -15,12 +15,12 @@ import {
   ArrowUpRight,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardSubNav from "@/components/dashboard/DashboardSubNav";
-import CostTag from "@/components/dashboard/CostTag";
-import KeyBadge from "@/components/dashboard/KeyBadge";
-import CallsTable from "@/components/dashboard/CallsTable";
-import StatusDot from "@/components/dashboard/StatusDot";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsoleSubNav from "@/components/console/ConsoleSubNav";
+import CostTag from "@/components/console/CostTag";
+import KeyBadge from "@/components/console/KeyBadge";
+import CallsTable from "@/components/console/CallsTable";
+import StatusDot from "@/components/console/StatusDot";
 import {
   getAppById,
   effectiveVisibility,
@@ -29,20 +29,17 @@ import {
   PIPELINE_APP_IDS,
   SETTINGS_API_KEYS,
   MOCK_RECENT_REQUESTS,
-} from "@/lib/dashboard/mock-data";
-import { getAppIcon } from "@/lib/dashboard/utils";
-import PlaygroundForm from "@/components/dashboard/playground/PlaygroundForm";
-import JsonInput from "@/components/dashboard/playground/JsonInput";
-import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput";
-import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
-import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
-import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
-import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
-import {
-  OverviewTab,
-  SettingsTab,
-} from "@/components/dashboard/AppDetailView";
-import type { App, Pipeline, PipelineVisibility } from "@/lib/dashboard/types";
+} from "@/lib/console/mock-data";
+import { getAppIcon } from "@/lib/console/utils";
+import PlaygroundForm from "@/components/console/playground/PlaygroundForm";
+import JsonInput from "@/components/console/playground/JsonInput";
+import PlaygroundOutput from "@/components/console/playground/PlaygroundOutput";
+import TranscodingOutput from "@/components/console/playground/TranscodingOutput";
+import CodeSnippets from "@/components/console/playground/CodeSnippets";
+import WebcamPlayground from "@/components/console/playground/WebcamPlayground";
+import AppAnalytics from "@/components/console/stats/AppAnalytics";
+import { OverviewTab, SettingsTab } from "@/components/console/AppDetailView";
+import type { App, Pipeline, PipelineVisibility } from "@/lib/console/types";
 
 // ─── Tabs ───
 //
@@ -106,11 +103,16 @@ function modelMatchesRow(catalogId: string, runModel: string): boolean {
 // ─── Playground Tab ───
 
 function PlaygroundTab({ model }: { model: App }) {
-  const [inputMode, setInputMode] = useState<"form" | "json" | "python" | "node" | "http">("form");
+  const [inputMode, setInputMode] = useState<
+    "form" | "json" | "python" | "node" | "http"
+  >("form");
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [inferenceTime, setInferenceTime] = useState<number | undefined>();
-  const [lastRunValues, setLastRunValues] = useState<Record<string, unknown> | null>(null);
+  const [lastRunValues, setLastRunValues] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const handleRun = useCallback(
     (values: Record<string, unknown>) => {
@@ -145,15 +147,15 @@ function PlaygroundTab({ model }: { model: App }) {
                 usage: { prompt_tokens: 12, total_tokens: 12 },
               },
               null,
-              2,
-            ),
+              2
+            )
           );
         } else {
           setResult(cfg.mockOutputUrl || "Output generated successfully");
         }
       }, time * 1000);
     },
-    [model],
+    [model]
   );
 
   // Ctrl+Enter shortcut
@@ -328,7 +330,8 @@ function ApiTab({ model }: { model: App }) {
         </p>
         <KeyBadge prefix={defaultKey.prefix} />
         <p className="mt-2 text-[11px] text-fg-faint">
-          Drop this into the <code className="text-fg-muted">Authorization</code> header below, or{" "}
+          Drop this into the{" "}
+          <code className="text-fg-muted">Authorization</code> header below, or{" "}
           <Link
             href="/settings?tab=tokens"
             className="text-fg-strong underline-offset-2 hover:text-fg hover:underline"
@@ -420,10 +423,7 @@ function ReadmeTab({ model }: { model: App }) {
             </thead>
             <tbody>
               {tableRows.slice(2).map((row, ri) => (
-                <tr
-                  key={ri}
-                  className="border-b border-hairline last:border-0"
-                >
+                <tr key={ri} className="border-b border-hairline last:border-0">
                   {row.map((cell, ci) => (
                     <td key={ci} className="px-3 py-2 text-fg-label">
                       {cell.trim()}
@@ -433,7 +433,7 @@ function ReadmeTab({ model }: { model: App }) {
               ))}
             </tbody>
           </table>
-        </div>,
+        </div>
       );
       tableRows = [];
     }
@@ -449,7 +449,7 @@ function ReadmeTab({ model }: { model: App }) {
             className="scrollbar-dark overflow-x-auto rounded-lg border border-hairline bg-overlay p-4 text-xs leading-relaxed text-fg-muted"
           >
             {codeContent.trim()}
-          </pre>,
+          </pre>
         );
         codeContent = "";
         inCodeBlock = false;
@@ -467,9 +467,7 @@ function ReadmeTab({ model }: { model: App }) {
 
     if (line.startsWith("|")) {
       if (!inTable) inTable = true;
-      const cells = line
-        .split("|")
-        .filter((c) => c.trim() !== "");
+      const cells = line.split("|").filter((c) => c.trim() !== "");
       tableRows.push(cells);
       return;
     } else if (inTable) {
@@ -483,7 +481,7 @@ function ReadmeTab({ model }: { model: App }) {
           className="mt-5 mb-2 text-xl font-semibold text-fg first:mt-0"
         >
           {line.slice(2)}
-        </h1>,
+        </h1>
       );
     } else if (line.startsWith("## ")) {
       elements.push(
@@ -492,7 +490,7 @@ function ReadmeTab({ model }: { model: App }) {
           className="mt-5 mb-2 text-lg font-semibold text-fg first:mt-0"
         >
           {line.slice(3)}
-        </h2>,
+        </h2>
       );
     } else if (line.startsWith("### ")) {
       elements.push(
@@ -501,35 +499,53 @@ function ReadmeTab({ model }: { model: App }) {
           className="mt-4 mb-2 text-sm font-semibold text-fg-strong first:mt-0"
         >
           {line.slice(4)}
-        </h3>,
+        </h3>
       );
     } else if (line.startsWith("- **")) {
       const match = line.match(/^- \*\*(.+?)\*\*\s*[—–-]\s*(.+)$/);
       if (match) {
         elements.push(
-          <div key={i} className="flex items-start gap-2 pl-4 text-sm text-fg-faint">
-            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint" aria-hidden="true" />
+          <div
+            key={i}
+            className="flex items-start gap-2 pl-4 text-sm text-fg-faint"
+          >
+            <span
+              className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint"
+              aria-hidden="true"
+            />
             <span>
               <span className="font-medium text-fg-strong">{match[1]}</span>
               <span className="text-fg-disabled"> — </span>
               {match[2]}
             </span>
-          </div>,
+          </div>
         );
       } else {
         elements.push(
-          <div key={i} className="flex items-start gap-2 pl-4 text-sm text-fg-faint">
-            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint" aria-hidden="true" />
+          <div
+            key={i}
+            className="flex items-start gap-2 pl-4 text-sm text-fg-faint"
+          >
+            <span
+              className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint"
+              aria-hidden="true"
+            />
             <span>{line.slice(2).replace(/\*\*/g, "")}</span>
-          </div>,
+          </div>
         );
       }
     } else if (line.startsWith("- ")) {
       elements.push(
-        <div key={i} className="flex items-start gap-2 pl-4 text-sm text-fg-faint">
-          <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint" aria-hidden="true" />
+        <div
+          key={i}
+          className="flex items-start gap-2 pl-4 text-sm text-fg-faint"
+        >
+          <span
+            className="mt-2 h-1 w-1 shrink-0 rounded-full bg-fg-faint"
+            aria-hidden="true"
+          />
           <span>{line.slice(2)}</span>
-        </div>,
+        </div>
       );
     } else if (line.trim() === "") {
       elements.push(<div key={i} className="h-2" />);
@@ -537,7 +553,7 @@ function ReadmeTab({ model }: { model: App }) {
       elements.push(
         <p key={i} className="text-sm leading-relaxed text-fg-faint">
           {line}
-        </p>,
+        </p>
       );
     }
   });
@@ -568,7 +584,7 @@ function JobsTab({
   runs,
 }: {
   model: App;
-  runs: import("@/lib/dashboard/types").AccountActivityRow[];
+  runs: import("@/lib/console/types").AccountActivityRow[];
 }) {
   if (runs.length === 0) {
     return (
@@ -606,7 +622,7 @@ export default function AppDetailPage() {
 
   // Visibility (publish state) for the owner Settings tab.
   const [visibility, setVisibility] = useState<PipelineVisibility>(
-    app?.deployment?.visibility ?? "private",
+    app?.deployment?.visibility ?? "private"
   );
   useEffect(() => {
     if (app) setVisibility(effectiveVisibility(app));
@@ -624,9 +640,7 @@ export default function AppDetailPage() {
   // `app` may be undefined (404 path below); run the hook unconditionally.
   const filteredRuns = useMemo(() => {
     if (!app) return [];
-    return MOCK_RECENT_REQUESTS.filter((r) =>
-      modelMatchesRow(app.id, r.model),
-    );
+    return MOCK_RECENT_REQUESTS.filter((r) => modelMatchesRow(app.id, r.model));
   }, [app]);
 
   // Tab set: Overview + the consumer tabs are shown to everyone (Overview
@@ -634,7 +648,7 @@ export default function AppDetailPage() {
   // additionally get the Settings trail.
   const tabs: TabSpec[] = useMemo(() => {
     const consumer = TABS.map((t) =>
-      t.key === "jobs" ? { ...t, count: filteredRuns.length } : t,
+      t.key === "jobs" ? { ...t, count: filteredRuns.length } : t
     );
     const base = [OVERVIEW_TAB, ...consumer];
     return isOwner ? [...base, ...OWNER_TABS] : base;
@@ -647,12 +661,12 @@ export default function AppDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get(
-      "tab",
+      "tab"
     ) as Tab | null;
     setActiveTab(
       requested && tabs.some((t) => t.key === requested)
         ? requested
-        : defaultTab,
+        : defaultTab
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner]);
@@ -801,7 +815,10 @@ export default function AppDetailPage() {
                   onClick={() => setActiveTab("playground")}
                   className="ml-auto inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-subtle bg-dark-card px-2.5 text-[12px] font-medium text-fg-strong whitespace-nowrap transition-colors hover:border-strong hover:bg-hover hover:text-fg"
                 >
-                  <Play className="h-3 w-3 text-green-bright" aria-hidden="true" />
+                  <Play
+                    className="h-3 w-3 text-green-bright"
+                    aria-hidden="true"
+                  />
                   Open playground
                 </button>
               </div>
@@ -836,8 +853,7 @@ export default function AppDetailPage() {
           >
             {tabs.map((tab, i) => {
               const selected = activeTab === tab.key;
-              const showCount =
-                typeof tab.count === "number" && tab.count > 0;
+              const showCount = typeof tab.count === "number" && tab.count > 0;
               return (
                 <button
                   key={tab.key}
@@ -878,7 +894,7 @@ export default function AppDetailPage() {
           </div>
 
           {/* Tabs — mobile scroll strip */}
-          <DashboardSubNav
+          <ConsoleSubNav
             hideAt="md"
             ariaLabel="App section"
             tabs={tabs}

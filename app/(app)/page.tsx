@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import ExploreView from "@/components/dashboard/ExploreView";
+import { useAuth } from "@/components/console/AuthContext";
+import ExploreView from "@/components/console/ExploreView";
 
 // Root `/`:
-//   - signed in  → redirect to /home (the dashboard default)
+//   - signed in  → redirect to /home (the console default)
 //   - signed out → the Explore catalog stays here as the public landing
 // (Logged-in users still reach Explore via the sidebar, which points to
 // /explore — that route doesn't redirect.)

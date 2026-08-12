@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { House } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import FirstRunChecklist, {
   FIRST_RUN_CHANGED_EVENT,
   FIRST_RUN_DISMISSED_KEY,
-} from "@/components/dashboard/FirstRunChecklist";
-import HomeCommandBar from "@/components/dashboard/HomeCommandBar";
-import ConsumedAppsPanel from "@/components/dashboard/ConsumedAppsPanel";
-import ActivityPanel from "@/components/dashboard/ActivityPanel";
-import SectionHeader from "@/components/dashboard/SectionHeader";
+} from "@/components/console/FirstRunChecklist";
+import HomeCommandBar from "@/components/console/HomeCommandBar";
+import ConsumedAppsPanel from "@/components/console/ConsumedAppsPanel";
+import ActivityPanel from "@/components/console/ActivityPanel";
+import SectionHeader from "@/components/console/SectionHeader";
 
 // ─── Home page header — just the title chrome ───
 //
@@ -21,7 +21,7 @@ import SectionHeader from "@/components/dashboard/SectionHeader";
 // usage" is already reachable from the sidebar and the Usage panel below.
 
 function HomePageHeader() {
-  return <DashboardPageHeader title="Home" icon={House} />;
+  return <ConsolePageHeader title="Home" icon={House} />;
 }
 
 // ─── Home Page ───
@@ -58,13 +58,13 @@ export default function HomePage() {
   // server-side run history, but in mock mode the flag alone is the source
   // of truth (MOCK_RECENT_REQUESTS is always non-empty for the organization demo).
   const [firstRunDismissed, setFirstRunDismissed] = useState<boolean | null>(
-    null,
+    null
   );
   useEffect(() => {
     if (typeof window === "undefined") return;
     const read = () =>
       setFirstRunDismissed(
-        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1",
+        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1"
       );
     read();
     // Cross-tab updates via storage; same-tab updates (e.g. Quickstart click in

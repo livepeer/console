@@ -2,8 +2,8 @@
 
 import { AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
-import RequestIdChip from "@/components/dashboard/RequestIdChip";
-import { generateMockRequestId } from "@/lib/dashboard/utils";
+import RequestIdChip from "@/components/console/RequestIdChip";
+import { generateMockRequestId } from "@/lib/console/utils";
 import { EXTERNAL_LINKS } from "@/lib/constants";
 
 interface ErrorStateProps {
@@ -21,7 +21,7 @@ interface ErrorStateProps {
 }
 
 /**
- * ErrorState — the canonical error surface for any dashboard data view.
+ * ErrorState — the canonical error surface for any console data view.
  * Replaces blank screens and bare "Something went wrong" lines with:
  *  - clear cause-agnostic headline
  *  - retry affordance (when supplied by caller)

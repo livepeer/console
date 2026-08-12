@@ -6,7 +6,7 @@ const VARIANT_STYLES = {
   category:
     "rounded border-transparent bg-foreground/[0.10] text-foreground/50 px-2.5 py-0.5 text-[11px] uppercase tracking-wide",
   tag: "rounded border-transparent bg-foreground/[0.06] text-foreground/30 px-2.5 py-0.5 text-[11px]",
-  // Dashboard-specific tiny pill — used by AppsButton dropdown row chips
+  // Console-specific tiny pill — used by AppsButton dropdown row chips
   // ("Preview", etc). Smaller than `tag`, tighter type, no uppercase tracking.
   neutral:
     "rounded-full border-transparent bg-foreground/[0.06] text-foreground/40 px-1.5 py-[1px] text-[9px] leading-tight",

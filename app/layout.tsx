@@ -11,7 +11,7 @@ export const metadata: Metadata = {
         ? `https://${process.env.VERCEL_URL}`
         : "https://dashboard.livepeer.org"
   ),
-  title: "Livepeer Developer Dashboard",
+  title: "Livepeer Console",
   description:
     "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
 };

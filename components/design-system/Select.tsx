@@ -60,7 +60,8 @@ export default function Select(props: SelectProps) {
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -117,9 +118,7 @@ export default function Select(props: SelectProps) {
   };
 
   const triggerSize =
-    size === "sm"
-      ? "h-9 px-3 text-xs"
-      : "px-3 py-2.5 text-sm";
+    size === "sm" ? "h-9 px-3 text-xs" : "px-3 py-2.5 text-sm";
 
   return (
     <div ref={ref} className={`relative ${className ?? ""}`}>

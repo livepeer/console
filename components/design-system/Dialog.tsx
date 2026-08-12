@@ -12,7 +12,12 @@ interface DialogProps {
   maxWidth?: string;
 }
 
-export default function Dialog({ open, onClose, children, maxWidth = "max-w-[640px]" }: DialogProps) {
+export default function Dialog({
+  open,
+  onClose,
+  children,
+  maxWidth = "max-w-[640px]",
+}: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -37,7 +42,9 @@ export default function Dialog({ open, onClose, children, maxWidth = "max-w-[640
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   const handleBackdropClick = useCallback(
@@ -46,7 +53,7 @@ export default function Dialog({ open, onClose, children, maxWidth = "max-w-[640
         onClose();
       }
     },
-    [onClose],
+    [onClose]
   );
 
   if (!mounted) return null;
@@ -84,6 +91,6 @@ export default function Dialog({ open, onClose, children, maxWidth = "max-w-[640
         </div>
       )}
     </AnimatePresence>,
-    document.body,
+    document.body
   );
 }

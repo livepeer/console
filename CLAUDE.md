@@ -15,29 +15,31 @@
 ```
 app/
 ├── layout.tsx              # Root layout — html/body, Geist fonts, theme bootstrap (FOUT-safe)
-├── globals.css             # Tailwind v4 @theme block + dashboard token layer
-├── (app)/                  # Dashboard chrome (sidebar, providers, keyboard shortcuts)
+├── globals.css             # Tailwind v4 @theme block + console token layer
+├── (app)/                  # Console chrome (sidebar, providers, keyboard shortcuts)
 │   ├── layout.tsx
-│   ├── page.tsx            # /          → Explore (public)
-│   ├── home/page.tsx       # /home      → Dashboard home (auth-gated via SignInWall)
-│   ├── jobs, usage, keys, settings  # auth-gated
-│   ├── models/[id]         # public
+│   ├── page.tsx            # /          → Explore (public; → /home when signed in)
+│   ├── explore/page.tsx    # /explore   → Explore (public)
+│   ├── home/page.tsx       # /home      → Console home (auth-gated via SignInWall)
+│   ├── calls, usage, keys, settings  # auth-gated
+│   ├── apps/[id]           # public
+│   ├── orgs/[slug]         # public
 │   ├── network             # public
 │   └── error.tsx
 ├── (auth)/                 # /login, /signup — no sidebar
 └── not-found.tsx
 
 components/
-├── dashboard/              # Dashboard surfaces, providers (Auth, Theme), nav, charts, tables
+├── console/                # Console surfaces, providers (Auth, Theme), nav, charts, tables
 └── design-system/          # Vendored primitives — Badge, Button, Dialog, Drawer,
                             # ErrorState, Select, Skeleton, Tooltip, LivepeerLogo.
                             # TEMPORARY — replace with @livepeer/design-system when published.
 
 lib/
-├── dashboard/              # mock-data, types, utils, useStarredModels, model-stats, generate-card-visual
+├── console/                # mock-data, types, utils, useStarredModels, model-stats, generate-card-visual
 └── constants.ts            # PORTAL_NAV_ITEMS, EXTERNAL_LINKS
 
-public/images/dashboard/    # Model card visuals + daydream logo
+public/images/console/    # Model card visuals + daydream logo
 ```
 
 ## Conventions
@@ -48,11 +50,11 @@ The Home (`/home`) shows `<FirstRunChecklist>` for any signed-in user where `loc
 
 ### Section headings
 
-Use `<SectionHeader>` from `components/dashboard/SectionHeader.tsx`. Dashboard convention is `text-base font-semibold` headings; do not roll ad-hoc `<h2 className="text-base font-semibold">` markup.
+Use `<SectionHeader>` from `components/console/SectionHeader.tsx`. Console convention is `text-base font-semibold` headings; do not roll ad-hoc `<h2 className="text-base font-semibold">` markup.
 
 ### KPI rows
 
-Wrap any row of `<KpiCard>` / `<StatCard>` in `<KpiStrip cols={3 | 4}>` (`components/dashboard/KpiStrip.tsx`). Don't roll ad-hoc `grid grid-cols-2 sm:grid-cols-4` containers — they drift over time.
+Wrap any row of `<KpiCard>` / `<StatCard>` in `<KpiStrip cols={3 | 4}>` (`components/console/KpiStrip.tsx`). Don't roll ad-hoc `grid grid-cols-2 sm:grid-cols-4` containers — they drift over time.
 
 ### Page max-widths
 
@@ -62,15 +64,15 @@ Each page picks one based on content type and uses it for every inner max-width 
 - `max-w-6xl` — data tables / charts (Network, Usage)
 - `max-w-7xl` — catalogs / dense grids (Explore, Models list)
 
-There's no shared `<DashboardPage>` wrapper because every page layers a sticky `<TabStrip>` between header and content, requiring the max-width to repeat 2-3 times intentionally per page.
+There's no shared `<ConsolePage>` wrapper because every page layers a sticky `<TabStrip>` between header and content, requiring the max-width to repeat 2-3 times intentionally per page.
 
 ### Cards
 
-Dashboard surfaces use inline classes — typically `rounded-xl border border-hairline bg-{dark-surface|dark-card|transparent}` with `p-4` (data-dense rows) or `p-6` (feature blocks).
+Console surfaces use inline classes — typically `rounded-xl border border-hairline bg-{dark-surface|dark-card|transparent}` with `p-4` (data-dense rows) or `p-6` (feature blocks).
 
 ### Tables
 
-Tables on the dashboard are intentionally bespoke — Home "Your runs", `UsageTab` activity log, and `PaymentTab` connected-providers all roll their own markup because their interaction patterns differ (sticky mobile/desktop headers, live pulse on most-recent row, highlighted target row, etc.). There is no shared `<DataTable>` primitive. If a future surface needs a generic sortable table, build it then — don't try to back-fit a primitive that compromises the existing surfaces.
+Tables in the console are intentionally bespoke — Home "Your runs", `UsageTab` activity log, and `PaymentTab` connected-providers all roll their own markup because their interaction patterns differ (sticky mobile/desktop headers, live pulse on most-recent row, highlighted target row, etc.). There is no shared `<DataTable>` primitive. If a future surface needs a generic sortable table, build it then — don't try to back-fit a primitive that compromises the existing surfaces.
 
 ### Form-control focus ring
 
@@ -78,7 +80,7 @@ All form controls (`SearchInput`, `Select`, etc.) show `focus-visible:ring-1 foc
 
 ### Loading + error states
 
-Suspense boundaries on every dashboard route use `<DashboardPageSkeleton>` as the fallback (`components/dashboard/DashboardPageSkeleton.tsx`). The `(app)/error.tsx` segment-level boundary renders `<ErrorState>` (`components/design-system/ErrorState.tsx`) for any thrown render error, with a request ID + retry + Discord help link.
+Suspense boundaries on every console route use `<ConsolePageSkeleton>` as the fallback (`components/console/ConsolePageSkeleton.tsx`). The `(app)/error.tsx` segment-level boundary renders `<ErrorState>` (`components/design-system/ErrorState.tsx`) for any thrown render error, with a request ID + retry + Discord help link.
 
 ### Color / token rules
 
@@ -102,11 +104,11 @@ Existing tokens in `globals.css` `@theme`: `--motion-duration-fast` (150ms, hove
 
 ## Design system — vendored, not final
 
-`components/design-system/` is **vendored**. When `@livepeer/design-system` ships as a real package, swap the imports — keep `components/design-system/` as a barrel that re-exports from the package, or delete it entirely. The 38+ dashboard components import from `@/components/design-system/X`, so the swap-out is a single barrel-file change rather than a 38-file rewrite.
+`components/design-system/` is **vendored**. When `@livepeer/design-system` ships as a real package, swap the imports — keep `components/design-system/` as a barrel that re-exports from the package, or delete it entirely. The 38+ console components import from `@/components/design-system/X`, so the swap-out is a single barrel-file change rather than a 38-file rewrite.
 
 ## Don't
 
 - **No `next/image`** — use raw `<img>` tags. Some downstream primitives need direct CSS filter/absolute stacking that `next/image`'s wrapper breaks.
 - **No global state** — local `useState` only. No state libraries.
-- **No backend dependencies** — all data is mock (`lib/dashboard/mock-data.ts`). When the real API lands, replace the mock imports surgically; don't restructure the components around the data layer.
+- **No backend dependencies** — all data is mock (`lib/console/mock-data.ts`). When the real API lands, replace the mock imports surgically; don't restructure the components around the data layer.
 - **No new dependencies without discussion.** The dependency list is intentionally small.
