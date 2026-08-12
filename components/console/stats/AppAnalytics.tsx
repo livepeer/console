@@ -42,14 +42,17 @@ function formatRequestCount(v: number): string {
 
 export default function AppAnalytics({ model }: { model: App }) {
   const [period, setPeriod] = useState<StatsPeriod>("7d");
-  const stats = useMemo(() => generateModelStats(model, period), [model, period]);
+  const stats = useMemo(
+    () => generateModelStats(model, period),
+    [model, period]
+  );
   const requestsTicks = useMemo(
     () => computeAxisTicks(stats.requests, "label", 6),
-    [stats.requests],
+    [stats.requests]
   );
   const latencyTicks = useMemo(
     () => computeAxisTicks(stats.latency, "label", 6),
-    [stats.latency],
+    [stats.latency]
   );
 
   const kpiCards: NetworkStat[] = [
@@ -86,10 +89,15 @@ export default function AppAnalytics({ model }: { model: App }) {
         <div>
           <h3 className="text-sm font-medium text-fg-muted">Analytics</h3>
           <p className="mt-1 text-sm text-fg-muted">
-            Performance, supply, and reliability for {model.name} on the network.
+            Performance, supply, and reliability for {model.name} on the
+            network.
           </p>
         </div>
-        <PeriodToggle value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+        <PeriodToggle
+          value={period}
+          onChange={setPeriod}
+          options={PERIOD_OPTIONS}
+        />
       </div>
 
       {/* KPI strip */}
@@ -249,7 +257,9 @@ export default function AppAnalytics({ model }: { model: App }) {
       <div className="rounded-xl border border-hairline bg-dark-surface p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="text-sm font-medium text-fg-muted">Uptime (90 days)</h4>
+            <h4 className="text-sm font-medium text-fg-muted">
+              Uptime (90 days)
+            </h4>
             <p className="mt-1 text-sm text-fg-muted">
               Daily reachability across all GPU providers.
             </p>

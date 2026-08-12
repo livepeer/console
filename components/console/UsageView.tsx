@@ -44,11 +44,56 @@ type Capability = {
 // Per-capability colors picked at matched lightness/chroma so no one swatch
 // dominates the legend (per Linear dashboard best practices §2).
 const CAPABILITIES: Capability[] = [
-  { id: "daydream",  name: "Daydream Video",      unit: "sec",  price: 0.012,   color: "#4ade80", base: 180, drift: 1.8, noise: 0.3 },
-  { id: "transcode", name: "Livepeer Transcode",  unit: "min",  price: 0.0006,  color: "#38bdf8", base: 120, drift: 1.4, noise: 0.3 },
-  { id: "flux",      name: "FLUX [schnell]",      unit: "img",  price: 0.003,   color: "#a78bfa", base: 80,  drift: 1.6, noise: 0.4 },
-  { id: "whisper",   name: "Whisper v3",          unit: "min",  price: 0.001,   color: "#fb923c", base: 40,  drift: 1.2, noise: 0.5 },
-  { id: "sdxl",      name: "SDXL Turbo",          unit: "img",  price: 0.002,   color: "#f472b6", base: 22,  drift: 1.1, noise: 0.6 },
+  {
+    id: "daydream",
+    name: "Daydream Video",
+    unit: "sec",
+    price: 0.012,
+    color: "#4ade80",
+    base: 180,
+    drift: 1.8,
+    noise: 0.3,
+  },
+  {
+    id: "transcode",
+    name: "Livepeer Transcode",
+    unit: "min",
+    price: 0.0006,
+    color: "#38bdf8",
+    base: 120,
+    drift: 1.4,
+    noise: 0.3,
+  },
+  {
+    id: "flux",
+    name: "FLUX [schnell]",
+    unit: "img",
+    price: 0.003,
+    color: "#a78bfa",
+    base: 80,
+    drift: 1.6,
+    noise: 0.4,
+  },
+  {
+    id: "whisper",
+    name: "Whisper v3",
+    unit: "min",
+    price: 0.001,
+    color: "#fb923c",
+    base: 40,
+    drift: 1.2,
+    noise: 0.5,
+  },
+  {
+    id: "sdxl",
+    name: "SDXL Turbo",
+    unit: "img",
+    price: 0.002,
+    color: "#f472b6",
+    base: 22,
+    drift: 1.1,
+    noise: 0.6,
+  },
 ];
 
 function fmt(n: number): string {
@@ -126,20 +171,18 @@ function UsageStrip({
       <div className="flex flex-wrap items-baseline justify-between gap-4 text-[12px] text-fg-muted">
         {willExceed ? (
           <span className="font-mono">
-            Forecast{" "}
-            <b className="font-medium text-fg">{fmt(forecast)}</b>
-            {" "}by {RESETS_AT} · over limit in{" "}
+            Forecast <b className="font-medium text-fg">{fmt(forecast)}</b> by{" "}
+            {RESETS_AT} · over limit in{" "}
             <b className="font-medium text-warm">~{daysToLimit}d</b>
           </span>
         ) : (
           <span className="font-mono">
-            <b className="font-medium text-fg">{fmt(left)}</b> calls left ·
-            pace looks fine.
+            <b className="font-medium text-fg">{fmt(left)}</b> calls left · pace
+            looks fine.
           </span>
         )}
         <span className="font-mono text-[11.5px] text-fg-faint">
-          Last period {fmt(priorPeriodTotal)} ·{" "}
-          {periodDelta >= 0 ? "+" : ""}
+          Last period {fmt(priorPeriodTotal)} · {periodDelta >= 0 ? "+" : ""}
           {periodDelta.toFixed(0)}%
         </span>
       </div>
@@ -169,7 +212,7 @@ export default function UsageView({
         ...c,
         data60: genCapSeries(c.base * weight, c.drift, c.noise, 60),
       })),
-    [weight],
+    [weight]
   );
 
   const sliced = caps.map((c) => ({
@@ -187,13 +230,13 @@ export default function UsageView({
   const grandReq = totals.reduce((a, c) => a + c.sum, 0);
   const grandSpend = totals.reduce((a, c) => a + c.spend, 0);
   const totalsByDay = sliced[0].data.map((_, i) =>
-    sliced.reduce((a, c) => a + c.data[i], 0),
+    sliced.reduce((a, c) => a + c.data[i], 0)
   );
   const priorTotalsByDay = sliced[0].prior.map((_, i) =>
-    sliced.reduce((a, c) => a + c.prior[i], 0),
+    sliced.reduce((a, c) => a + c.prior[i], 0)
   );
   const priorPeriodTotal = Math.round(
-    priorTotalsByDay.reduce((a, b) => a + b, 0),
+    priorTotalsByDay.reduce((a, b) => a + b, 0)
   );
   const periodDelta =
     priorPeriodTotal > 0
@@ -201,8 +244,7 @@ export default function UsageView({
       : 0;
 
   // Forecast: trailing 7-day average × days remaining in period
-  const last7Avg =
-    totalsByDay.slice(-7).reduce((a, b) => a + b, 0) / 7;
+  const last7Avg = totalsByDay.slice(-7).reduce((a, b) => a + b, 0) / 7;
   const forecast = Math.round(freeUsed + last7Avg * DAYS_LEFT_IN_PERIOD);
   const willExceed = forecast > FREE_LIMIT;
   const left = FREE_LIMIT - freeUsed;
@@ -280,19 +322,14 @@ export default function UsageView({
       <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
           <div>
-            <p className="text-[17px] font-bold text-fg">
-              Activity by app
-            </p>
+            <p className="text-[17px] font-bold text-fg">Activity by app</p>
             <p className="mt-0.5 text-[12px] text-fg-muted">
               Last {PERIOD_LABEL.toLowerCase()} · {fmt(grandReq)} calls
             </p>
           </div>
           <div className="flex flex-wrap gap-3.5 justify-end text-[11.5px] text-fg-muted">
             {sortedTotals.map((c) => (
-              <span
-                key={c.id}
-                className="inline-flex items-center gap-1.5"
-              >
+              <span key={c.id} className="inline-flex items-center gap-1.5">
                 <span
                   className="h-2 w-2 rounded-[2px]"
                   style={{ background: c.color }}

@@ -10,7 +10,9 @@ function readStarred(): string[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : [];
   } catch {
     return [];
   }
@@ -28,7 +30,10 @@ export function useStarredApps() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const isStarred = useCallback((id: string) => starredIds.includes(id), [starredIds]);
+  const isStarred = useCallback(
+    (id: string) => starredIds.includes(id),
+    [starredIds]
+  );
 
   const toggleStar = useCallback((id: string) => {
     setStarredIds((prev) => {

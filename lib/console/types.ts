@@ -114,7 +114,12 @@ export type PlaygroundFieldType =
   | "select"
   | "boolean";
 
-export type PlaygroundOutputType = "image" | "text" | "video" | "audio" | "json";
+export type PlaygroundOutputType =
+  | "image"
+  | "text"
+  | "video"
+  | "audio"
+  | "json";
 
 export interface PlaygroundField {
   name: string;

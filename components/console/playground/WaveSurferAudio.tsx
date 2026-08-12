@@ -96,8 +96,13 @@ export default function WaveSurferAudio({ url }: { url: string }) {
         )}
         {loadState === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center">
-            <TriangleAlert className="h-4 w-4 text-fg-label" aria-hidden="true" />
-            <p className="text-[11px] text-fg-faint">Couldn&apos;t load audio</p>
+            <TriangleAlert
+              className="h-4 w-4 text-fg-label"
+              aria-hidden="true"
+            />
+            <p className="text-[11px] text-fg-faint">
+              Couldn&apos;t load audio
+            </p>
             <p className="text-[10px] text-fg-disabled">
               The host may be blocking cross-origin requests.
             </p>

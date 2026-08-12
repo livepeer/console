@@ -85,7 +85,13 @@ function AppNotFound() {
 
 // ── Detail rows ───────────────────────────────────────────────────────────────
 
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid grid-cols-[140px_1fr] items-center gap-3 border-b border-hairline px-4 py-2.5 last:border-b-0">
       <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-disabled">
@@ -132,7 +138,9 @@ export function OverviewTab({ app }: { app: App }) {
   // Call endpoint — the deployed pipelineId when we have it, else the catalog
   // slug. Live apps stream over a websocket; batch apps are request/response.
   const slug = deployment?.pipelineId ?? app.id;
-  const isLive = deployment ? deployment.kind === "live" : Boolean(app.realtime);
+  const isLive = deployment
+    ? deployment.kind === "live"
+    : Boolean(app.realtime);
   const baseUrl = isLive
     ? `wss://api.livepeer.org/live/${slug}`
     : `https://api.livepeer.org/run/${slug}`;
@@ -150,7 +158,7 @@ export function OverviewTab({ app }: { app: App }) {
           params: { type: "object", additionalProperties: true },
         },
         null,
-        2,
+        2
       );
     }
     return JSON.stringify(
@@ -161,7 +169,7 @@ export function OverviewTab({ app }: { app: App }) {
         streaming: app.name.includes("SSE"),
       },
       null,
-      2,
+      2
     );
   }, [deployment, app.name]);
 
@@ -177,19 +185,20 @@ export function OverviewTab({ app }: { app: App }) {
           unit={app.latency > 0 ? "ms" : undefined}
         />
         <KpiCard label="Uptime" value={app.uptime.toFixed(1)} unit="%" />
-        <KpiCard
-          label="Warm orchestrators"
-          value={String(app.orchestrators)}
-        />
+        <KpiCard label="Warm orchestrators" value={String(app.orchestrators)} />
       </KpiStrip>
 
       {deployment ? (
         <Card title="Deployment" icon={Box}>
           <MetaRow label="Pipeline ID">
-            <span className="font-mono text-[12.5px]">{deployment.pipelineId}</span>
+            <span className="font-mono text-[12.5px]">
+              {deployment.pipelineId}
+            </span>
           </MetaRow>
           <MetaRow label="Entrypoint">
-            <span className="font-mono text-[12.5px]">{deployment.entrypoint}</span>
+            <span className="font-mono text-[12.5px]">
+              {deployment.entrypoint}
+            </span>
           </MetaRow>
           <MetaRow label="Image">
             <span className="font-mono text-[12px] text-fg-muted">
@@ -197,7 +206,9 @@ export function OverviewTab({ app }: { app: App }) {
             </span>
           </MetaRow>
           <MetaRow label="Version">
-            <span className="font-mono text-[12.5px]">{deployment.version}</span>
+            <span className="font-mono text-[12.5px]">
+              {deployment.version}
+            </span>
           </MetaRow>
           <MetaRow label="GPU">
             {deployment.gpu ? (
@@ -315,36 +326,80 @@ function buildLogs(app: Pipeline): LogLine[] {
   const deployment = app.deployment;
   if (deployment.status === "building") {
     return [
-      { t: "08:55:02", level: "info", msg: `Building image for ${deployment.pipelineId}…` },
+      {
+        t: "08:55:02",
+        level: "info",
+        msg: `Building image for ${deployment.pipelineId}…`,
+      },
       { t: "08:55:04", level: "info", msg: "Resolving python packages" },
-      { t: "08:55:39", level: "info", msg: "Running prepare step (caching weights)" },
+      {
+        t: "08:55:39",
+        level: "info",
+        msg: "Running prepare step (caching weights)",
+      },
       { t: "08:56:10", level: "info", msg: "Pushing layers to registry" },
-      { t: "08:56:22", level: "warn", msg: "Image is large (4.2 GB) — first cold start may be slow" },
+      {
+        t: "08:56:22",
+        level: "warn",
+        msg: "Image is large (4.2 GB) — first cold start may be slow",
+      },
     ];
   }
   if (deployment.status === "error") {
     return [
-      { t: "22:01:00", level: "info", msg: "Session started — events channel open" },
-      { t: "22:01:00", level: "info", msg: `setup() complete · model=whisper-tiny.en` },
+      {
+        t: "22:01:00",
+        level: "info",
+        msg: "Session started — events channel open",
+      },
+      {
+        t: "22:01:00",
+        level: "info",
+        msg: `setup() complete · model=whisper-tiny.en`,
+      },
       { t: "22:01:08", level: "info", msg: "emit_data: transcript segment 1" },
-      { t: "22:01:09", level: "error", msg: "data SSE proxy torn down before final emit_data (go-livepeer#3922)" },
+      {
+        t: "22:01:09",
+        level: "error",
+        msg: "data SSE proxy torn down before final emit_data (go-livepeer#3922)",
+      },
       { t: "22:01:09", level: "error", msg: "5 records emitted → 3 delivered" },
     ];
   }
   if (deployment.kind === "live") {
     return [
-      { t: "17:30:00", level: "info", msg: "Session started — allocating video track" },
+      {
+        t: "17:30:00",
+        level: "info",
+        msg: "Session started — allocating video track",
+      },
       { t: "17:30:00", level: "info", msg: "heartbeat task started" },
-      { t: "17:30:01", level: "info", msg: "process_video: 24.0 fps in / 23.8 fps out" },
+      {
+        t: "17:30:01",
+        level: "info",
+        msg: "process_video: 24.0 fps in / 23.8 fps out",
+      },
       { t: "17:30:11", level: "info", msg: "heartbeat" },
-      { t: "17:30:21", level: "info", msg: "process_video: 24.0 fps in / 23.9 fps out" },
+      {
+        t: "17:30:21",
+        level: "info",
+        msg: "process_video: 24.0 fps in / 23.9 fps out",
+      },
     ];
   }
   return [
-    { t: "14:09:00", level: "info", msg: `POST /predict · 200 · ${deployment.p50LatencyMs}ms` },
+    {
+      t: "14:09:00",
+      level: "info",
+      msg: `POST /predict · 200 · ${deployment.p50LatencyMs}ms`,
+    },
     { t: "14:09:01", level: "info", msg: "POST /predict · 200 · 71ms" },
     { t: "14:09:02", level: "info", msg: "POST /predict · 200 · 59ms" },
-    { t: "14:09:03", level: "warn", msg: "POST /predict · 200 · 184ms (slow — orchestrator cold)" },
+    {
+      t: "14:09:03",
+      level: "warn",
+      msg: "POST /predict · 200 · 184ms (slow — orchestrator cold)",
+    },
     { t: "14:09:04", level: "info", msg: "POST /predict · 200 · 63ms" },
   ];
 }
@@ -360,7 +415,10 @@ export function LogsTab({ app }: { app: Pipeline }) {
     <div className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="flex items-center justify-between border-b border-hairline px-4 py-2.5">
         <span className="inline-flex items-center gap-2 text-[13px] font-medium text-fg">
-          <ScrollText className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
+          <ScrollText
+            className="h-3.5 w-3.5 text-fg-faint"
+            aria-hidden="true"
+          />
           Logs
         </span>
         {app.deployment.status === "deployed" && (
@@ -373,7 +431,9 @@ export function LogsTab({ app }: { app: Pipeline }) {
       <div className="bg-dark px-4 py-3 font-mono text-[12px] leading-[1.8]">
         {logs.map((l, i) => (
           <div key={i} className="flex gap-3 whitespace-pre-wrap">
-            <span className="shrink-0 text-fg-disabled tabular-nums">{l.t}</span>
+            <span className="shrink-0 text-fg-disabled tabular-nums">
+              {l.t}
+            </span>
             <span className={`shrink-0 w-10 uppercase ${levelColor[l.level]}`}>
               {l.level}
             </span>
@@ -558,88 +618,94 @@ export function AppDetailHeader({
         <div className="min-w-0 flex-1">
           {/* Title row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
-          {app.name}
-        </h1>
-        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-          <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
-          {status.label}
-        </span>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
-          title={
-            app.deployment.kind === "live"
-              ? "LivePipeline · trickle transport"
-              : "Pipeline · request/response"
-          }
-        >
-          {app.deployment.kind === "live" ? (
-            <Radio className="h-3 w-3 text-blue-bright" aria-hidden="true" />
-          ) : (
-            <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
-          )}
-          {app.deployment.kind === "live" ? "Live" : "Batch"}
-        </span>
-        {visibility === "public" && (
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
-            title="Listed in Explore"
-          >
-            Public
-            <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-          </Link>
-        )}
-
-        <button
-          type="button"
-          onClick={onOpenPlayground}
-          className="ml-auto inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-subtle bg-dark-card px-2.5 text-[12px] font-medium text-fg-strong transition-colors hover:border-strong hover:bg-hover hover:text-fg"
-          title="Open the playground for this app"
-        >
-          <Play className="h-3 w-3 text-green-bright" aria-hidden="true" />
-          Open playground
-        </button>
-      </div>
-      <p className="mt-2 max-w-[680px] text-[13.5px] leading-[1.5] text-fg-muted">
-        {app.description}
-      </p>
-
-      {/* Deployed in — the environments this app is deployed to. */}
-      {deployments.length > 1 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-disabled">
-            Deployed in
-          </span>
-          {deployments.map((d) => {
-            const env = getEnvironmentById(d.deployment!.environmentId);
-            const active = d.id === app.id;
-            const dotColor =
-              env?.kind === "production"
-                ? "var(--color-green-bright)"
-                : "var(--color-blue-bright)";
-            return (
-              <Link
-                key={d.id}
-                href={`/apps/${d.id}`}
-                aria-current={active ? "true" : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11.5px] transition-colors ${
-                  active
-                    ? "border-subtle bg-dark-card text-fg-strong"
-                    : "border-hairline text-fg-faint hover:border-subtle hover:text-fg-strong"
-                }`}
-              >
-                <span
-                  className="h-[5px] w-[5px] rounded-full"
-                  style={{ background: dotColor }}
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-fg">
+              {app.name}
+            </h1>
+            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
+              <StatusDot
+                tone={status.tone}
+                static={app.deployment.status !== "deployed"}
+              />
+              {status.label}
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-1.5 py-0.5 text-[11px] text-fg-strong"
+              title={
+                app.deployment.kind === "live"
+                  ? "LivePipeline · trickle transport"
+                  : "Pipeline · request/response"
+              }
+            >
+              {app.deployment.kind === "live" ? (
+                <Radio
+                  className="h-3 w-3 text-blue-bright"
                   aria-hidden="true"
                 />
-                {env?.name ?? d.deployment!.environmentId}
+              ) : (
+                <Box className="h-3 w-3 text-fg-faint" aria-hidden="true" />
+              )}
+              {app.deployment.kind === "live" ? "Live" : "Batch"}
+            </span>
+            {visibility === "public" && (
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
+                title="Listed in Explore"
+              >
+                Public
+                <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
               </Link>
-            );
-          })}
-        </div>
-      )}
+            )}
+
+            <button
+              type="button"
+              onClick={onOpenPlayground}
+              className="ml-auto inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-subtle bg-dark-card px-2.5 text-[12px] font-medium text-fg-strong transition-colors hover:border-strong hover:bg-hover hover:text-fg"
+              title="Open the playground for this app"
+            >
+              <Play className="h-3 w-3 text-green-bright" aria-hidden="true" />
+              Open playground
+            </button>
+          </div>
+          <p className="mt-2 max-w-[680px] text-[13.5px] leading-[1.5] text-fg-muted">
+            {app.description}
+          </p>
+
+          {/* Deployed in — the environments this app is deployed to. */}
+          {deployments.length > 1 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-disabled">
+                Deployed in
+              </span>
+              {deployments.map((d) => {
+                const env = getEnvironmentById(d.deployment!.environmentId);
+                const active = d.id === app.id;
+                const dotColor =
+                  env?.kind === "production"
+                    ? "var(--color-green-bright)"
+                    : "var(--color-blue-bright)";
+                return (
+                  <Link
+                    key={d.id}
+                    href={`/apps/${d.id}`}
+                    aria-current={active ? "true" : undefined}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11.5px] transition-colors ${
+                      active
+                        ? "border-subtle bg-dark-card text-fg-strong"
+                        : "border-hairline text-fg-faint hover:border-subtle hover:text-fg-strong"
+                    }`}
+                  >
+                    <span
+                      className="h-[5px] w-[5px] rounded-full"
+                      style={{ background: dotColor }}
+                      aria-hidden="true"
+                    />
+                    {env?.name ?? d.deployment!.environmentId}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -657,7 +723,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
     : undefined;
   const [tab, setTab] = useState<TabKey>("overview");
   const [visibility, setVisibility] = useState<PipelineVisibility>(
-    app?.deployment.visibility ?? "private",
+    app?.deployment.visibility ?? "private"
   );
 
   // Hydrate visibility from the persisted override after mount (avoids SSR
@@ -707,7 +773,10 @@ export default function AppDetailView({ appId }: { appId: string }) {
             {app.name}
           </h1>
           <span className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-strong">
-            <StatusDot tone={status.tone} static={app.deployment.status !== "deployed"} />
+            <StatusDot
+              tone={status.tone}
+              static={app.deployment.status !== "deployed"}
+            />
             {status.label}
           </span>
           <span

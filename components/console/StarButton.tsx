@@ -42,9 +42,7 @@ export default function StarButton({
           className={`h-3.5 w-3.5 shrink-0 ${starred ? "fill-warm" : ""}`}
           aria-hidden="true"
         />
-        <span className="hidden sm:inline">
-          {starred ? "Starred" : "Star"}
-        </span>
+        <span className="hidden sm:inline">{starred ? "Starred" : "Star"}</span>
       </button>
     );
   }

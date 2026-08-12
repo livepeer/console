@@ -181,7 +181,11 @@ function CopyField({ value }: { value: string }) {
         }`}
         aria-hidden="true"
       >
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
       </span>
     </button>
   );
@@ -231,7 +235,7 @@ export default function KeysView() {
   };
 
   const staleKeys = keys.filter(
-    (k) => k.daysSinceRotation >= ROTATE_DAYS_THRESHOLD,
+    (k) => k.daysSinceRotation >= ROTATE_DAYS_THRESHOLD
   );
   const showAlert = staleKeys.length > 0 && !alertDismissed;
 
@@ -378,9 +382,8 @@ export default function KeysView() {
           </div>
           {keys.length === 0 && (
             <div className="px-4 py-12 text-center text-[13px] text-fg-faint">
-              No keys in{" "}
-              <span className="text-fg-strong">{scopeLabel}</span> yet. Create
-              one to start making calls.
+              No keys in <span className="text-fg-strong">{scopeLabel}</span>{" "}
+              yet. Create one to start making calls.
             </div>
           )}
           {keys.map((k) => {
@@ -404,7 +407,10 @@ export default function KeysView() {
                         className="tone-amber ml-2 inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-mono text-[10.5px] font-medium align-[2px]"
                         title={`Last rotated ${k.daysSinceRotation} days ago`}
                       >
-                        <AlertTriangle className="h-[9px] w-[9px]" aria-hidden="true" />
+                        <AlertTriangle
+                          className="h-[9px] w-[9px]"
+                          aria-hidden="true"
+                        />
                         {k.daysSinceRotation}d
                       </span>
                     )}
@@ -446,7 +452,9 @@ export default function KeysView() {
 
                 {/* Created */}
                 <div>
-                  <div className="text-[12.5px] text-fg-strong">{k.created}</div>
+                  <div className="text-[12.5px] text-fg-strong">
+                    {k.created}
+                  </div>
                   <div className="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-fg-faint">
                     <span
                       // `text-white` constant — these monogram tiles sit on

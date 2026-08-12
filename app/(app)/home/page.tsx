@@ -58,13 +58,13 @@ export default function HomePage() {
   // server-side run history, but in mock mode the flag alone is the source
   // of truth (MOCK_RECENT_REQUESTS is always non-empty for the organization demo).
   const [firstRunDismissed, setFirstRunDismissed] = useState<boolean | null>(
-    null,
+    null
   );
   useEffect(() => {
     if (typeof window === "undefined") return;
     const read = () =>
       setFirstRunDismissed(
-        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1",
+        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1"
       );
     read();
     // Cross-tab updates via storage; same-tab updates (e.g. Quickstart click in

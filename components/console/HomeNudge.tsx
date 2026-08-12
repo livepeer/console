@@ -40,8 +40,8 @@ export default function HomeNudge() {
     }
 
     // 2. Realtime — capability nudge for users who haven't tried streaming.
-    const usedRealtime = MOCK_RECENT_REQUESTS.some((r) =>
-      APPS.find((m) => m.name === r.model)?.realtime,
+    const usedRealtime = MOCK_RECENT_REQUESTS.some(
+      (r) => APPS.find((m) => m.name === r.model)?.realtime
     );
     if (!usedRealtime) {
       const realtimeModel = APPS.find((m) => m.realtime && m.featured);
@@ -59,9 +59,7 @@ export default function HomeNudge() {
     // 3. Single-model usage — surface a different capability.
     const distinctModels = new Set(MOCK_RECENT_REQUESTS.map((r) => r.model));
     if (distinctModels.size <= 2) {
-      const next = APPS.find(
-        (m) => m.featured && !distinctModels.has(m.name),
-      );
+      const next = APPS.find((m) => m.featured && !distinctModels.has(m.name));
       if (next) {
         return {
           eyebrow: "Try this",

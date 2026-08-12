@@ -6,8 +6,7 @@ import { AuthProvider } from "@/components/console/AuthContext";
 
 export const metadata: Metadata = {
   title: "Sign in — Livepeer Console",
-  description:
-    "Sign in or create an account to access the Livepeer Console.",
+  description: "Sign in or create an account to access the Livepeer Console.",
 };
 
 // Auth pages share the console's Geist typography rather than the marketing

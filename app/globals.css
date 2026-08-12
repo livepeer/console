@@ -58,7 +58,7 @@ html[data-theme="light"] {
   --color-foreground: #121212;
   --color-surface: #f6f7f5;
   --color-card: #fafbfa;
-  --color-border: rgba(18, 18, 18, 0.10);
+  --color-border: rgba(18, 18, 18, 0.1);
   --color-muted-foreground: rgba(18, 18, 18, 0.65);
   --color-subtle-foreground: rgba(18, 18, 18, 0.45);
 
@@ -128,7 +128,7 @@ body {
   --color-hover: rgba(255, 255, 255, 0.04);
   --color-tint: rgba(255, 255, 255, 0.06);
   --color-active: rgba(255, 255, 255, 0.07);
-  --color-pop: rgba(255, 255, 255, 0.10);
+  --color-pop: rgba(255, 255, 255, 0.1);
   --color-overlay: rgba(0, 0, 0, 0.5);
 
   /* Sidebar card */
@@ -175,14 +175,15 @@ body {
 
   /* Elevation */
   --shadow-card: 0 0 0 0 transparent;
-  --shadow-popover: 0 8px 24px -4px rgb(0 0 0 / 0.45), 0 2px 6px -1px rgb(0 0 0 / 0.30);
+  --shadow-popover:
+    0 8px 24px -4px rgb(0 0 0 / 0.45), 0 2px 6px -1px rgb(0 0 0 / 0.3);
 }
 
 /* Light-mode console token overrides */
 html[data-theme="light"] {
   --color-fg-disabled: rgba(24, 24, 27, 0.25);
-  --color-border-hairline: rgba(24, 24, 27, 0.10);
-  --color-border-strong: rgba(24, 24, 27, 0.20);
+  --color-border-hairline: rgba(24, 24, 27, 0.1);
+  --color-border-strong: rgba(24, 24, 27, 0.2);
 
   /* Flip the literal-dark surface vocabulary in light mode */
   --color-dark: #fafafa;
@@ -198,7 +199,7 @@ html[data-theme="light"] {
   --color-hover: rgba(24, 24, 27, 0.05);
   --color-tint: rgba(24, 24, 27, 0.06);
   --color-active: rgba(24, 24, 27, 0.08);
-  --color-pop: rgba(24, 24, 27, 0.10);
+  --color-pop: rgba(24, 24, 27, 0.1);
   --color-overlay: rgba(24, 24, 27, 0.32);
 
   --color-sidebar-card-bg: transparent;
@@ -214,7 +215,8 @@ html[data-theme="light"] {
   --color-green-bright: #1e9960;
   --color-blue-bright: #0e7490;
 
-  --shadow-popover: 0 8px 16px -4px rgb(24 24 27 / 0.12), 0 2px 4px -1px rgb(24 24 27 / 0.06);
+  --shadow-popover:
+    0 8px 16px -4px rgb(24 24 27 / 0.12), 0 2px 4px -1px rgb(24 24 27 / 0.06);
 }
 
 /* ─── Branded text selection + caret ─── */

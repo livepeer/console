@@ -56,8 +56,7 @@ export default function ConsolePageHeader({
   const { isConnected, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
   const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/signup");
+    pathname.startsWith("/login") || pathname.startsWith("/signup");
   // Hide auth CTAs while auth state is still resolving (one frame on first
   // paint) to avoid flashing them in for connected users.
   const showAuthCTAs = !isLoading && !isConnected && !isAuthRoute;

@@ -28,7 +28,7 @@ function makeMockToken(prefix: string): string {
 function generateSnippets(
   model: App,
   token: string,
-  runValues?: Record<string, unknown>,
+  runValues?: Record<string, unknown>
 ): Record<Lang, string> {
   const baseUrl = model.apiEndpoint ?? "https://gateway.livepeer.org/v1";
   const endpoint =
@@ -192,13 +192,12 @@ export default function CodeSnippets({
     setMockToken(makeMockToken(STARTER_API_KEY.prefix));
   }, []);
 
-  const token = useToken && isConnected && mockToken
-    ? mockToken
-    : PLACEHOLDER_TOKEN;
+  const token =
+    useToken && isConnected && mockToken ? mockToken : PLACEHOLDER_TOKEN;
 
   const snippets = useMemo(
     () => generateSnippets(model, token, runValues),
-    [model, token, runValues],
+    [model, token, runValues]
   );
   const activeLang = fixedLang ?? lang;
 

@@ -33,7 +33,7 @@ export default function ActivityPanel() {
   const rows = [...MOCK_RECENT_REQUESTS]
     .sort(
       (a, b) =>
-        (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1),
+        (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1)
     )
     .slice(0, 12);
 

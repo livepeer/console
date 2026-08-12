@@ -2,10 +2,7 @@
 
 import { Check } from "lucide-react";
 import CopyButton from "@/components/console/CopyButton";
-import {
-  MOCK_RECENT_REQUESTS,
-  STARTER_API_KEY,
-} from "@/lib/console/mock-data";
+import { MOCK_RECENT_REQUESTS, STARTER_API_KEY } from "@/lib/console/mock-data";
 
 export const FIRST_RUN_DISMISSED_KEY = "livepeer.firstRunDismissed";
 /** Fired in-tab whenever the dismissal flag changes (storage events only fire
@@ -81,7 +78,8 @@ export default function FirstRunChecklist({ onDismiss }: Props) {
             <span className="grid h-5 w-5 place-items-center rounded-full bg-green text-white">
               <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
             </span>
-            You&apos;ve got a key and made your first call — you&apos;re all set.
+            You&apos;ve got a key and made your first call — you&apos;re all
+            set.
           </p>
           <button
             type="button"

@@ -68,7 +68,7 @@ export default function ConsoleSubNav({
       setShowLeftFade(hasOverflow && strip.scrollLeft > 1);
       setShowRightFade(
         hasOverflow &&
-          strip.scrollLeft < strip.scrollWidth - strip.clientWidth - 1,
+          strip.scrollLeft < strip.scrollWidth - strip.clientWidth - 1
       );
     };
 

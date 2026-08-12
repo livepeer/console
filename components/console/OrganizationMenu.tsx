@@ -114,7 +114,7 @@ export default function OrganizationMenu({
 }: OrganizationMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(
-    ORGANIZATIONS.find((w) => w.active)?.id ?? ORGANIZATIONS[0].id,
+    ORGANIZATIONS.find((w) => w.active)?.id ?? ORGANIZATIONS[0].id
   );
   const ref = useRef<HTMLDivElement>(null);
 
@@ -136,7 +136,8 @@ export default function OrganizationMenu({
     };
   }, [open]);
 
-  const active = ORGANIZATIONS.find((w) => w.id === activeId) ?? ORGANIZATIONS[0];
+  const active =
+    ORGANIZATIONS.find((w) => w.id === activeId) ?? ORGANIZATIONS[0];
 
   return (
     <div className="relative" ref={ref}>
@@ -204,15 +205,10 @@ export default function OrganizationMenu({
                     setOpen(false);
                   }}
                   className={`flex items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-left transition-colors ${
-                    ws.id === activeId
-                      ? "bg-hover"
-                      : "hover:bg-hover"
+                    ws.id === activeId ? "bg-hover" : "hover:bg-hover"
                   }`}
                 >
-                  <WsAvatar
-                    initials={ws.initials}
-                    color={ws.avatarColor}
-                  />
+                  <WsAvatar initials={ws.initials} color={ws.avatarColor} />
                   <span className="flex min-w-0 flex-1 flex-col leading-tight">
                     <span className="truncate text-[13px] font-medium text-fg">
                       {ws.name}
@@ -235,7 +231,10 @@ export default function OrganizationMenu({
                 onClick={() => setOpen(false)}
                 className="mt-px flex items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-[13px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
               >
-                <Plus className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
+                <Plus
+                  className="h-3.5 w-3.5 text-fg-faint"
+                  aria-hidden="true"
+                />
                 <span>Create organization</span>
               </button>
             </div>

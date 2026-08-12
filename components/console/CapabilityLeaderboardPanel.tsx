@@ -45,13 +45,90 @@ interface CapRow {
 // telemetry lands, replace `useCapabilityData` with a hook that fetches the
 // same shape, ranking the org's apps by runs.
 const SHAPES = [
-  { id: "frameworks-transcoding", name: "Frameworks Transcoding", group: "video", color: "#18794E", runs30: 248_600, prior30: 212_400, spend:    149.16, p95:  64, growth: 1.32, noise: 0.14 },
-  { id: "daydream-video",         name: "Daydream Video API",     group: "video", color: "#40BF86", runs30: 184_200, prior30: 142_600, spend: 1_840.20, p95: 142, growth: 1.7,  noise: 0.18 },
-  { id: "stable-video-diffusion", name: "Stable Video Diffusion", group: "video", color: "#1E9960", runs30:  62_400, prior30:  41_800, spend:    624.00, p95: 188, growth: 1.85, noise: 0.22 },
-  { id: "live-portrait",          name: "LivePortrait",           group: "video", color: "#25ABD0", runs30:   8_400, prior30:   6_100, spend:     84.00, p95: 290, growth: 1.56, noise: 0.45 },
-  { id: "llama-3-70b",            name: "Llama 3 70B",            group: "other", color: "#f97373", runs30: 142_800, prior30: 110_200, spend:    214.20, p95: 880, growth: 1.45, noise: 0.14 },
-  { id: "flux-schnell",           name: "FLUX.1 [schnell]",       group: "other", color: "#a78bfa", runs30:  96_400, prior30: 102_100, spend:    482.00, p95: 612, growth: 0.92, noise: 0.22 },
-  { id: "whisper-v3",             name: "Whisper v3 Large",       group: "other", color: "#fbbf24", runs30:  41_600, prior30:  47_300, spend:    124.80, p95: 460, growth: 0.84, noise: 0.30 },
+  {
+    id: "frameworks-transcoding",
+    name: "Frameworks Transcoding",
+    group: "video",
+    color: "#18794E",
+    runs30: 248_600,
+    prior30: 212_400,
+    spend: 149.16,
+    p95: 64,
+    growth: 1.32,
+    noise: 0.14,
+  },
+  {
+    id: "daydream-video",
+    name: "Daydream Video API",
+    group: "video",
+    color: "#40BF86",
+    runs30: 184_200,
+    prior30: 142_600,
+    spend: 1_840.2,
+    p95: 142,
+    growth: 1.7,
+    noise: 0.18,
+  },
+  {
+    id: "stable-video-diffusion",
+    name: "Stable Video Diffusion",
+    group: "video",
+    color: "#1E9960",
+    runs30: 62_400,
+    prior30: 41_800,
+    spend: 624.0,
+    p95: 188,
+    growth: 1.85,
+    noise: 0.22,
+  },
+  {
+    id: "live-portrait",
+    name: "LivePortrait",
+    group: "video",
+    color: "#25ABD0",
+    runs30: 8_400,
+    prior30: 6_100,
+    spend: 84.0,
+    p95: 290,
+    growth: 1.56,
+    noise: 0.45,
+  },
+  {
+    id: "llama-3-70b",
+    name: "Llama 3 70B",
+    group: "other",
+    color: "#f97373",
+    runs30: 142_800,
+    prior30: 110_200,
+    spend: 214.2,
+    p95: 880,
+    growth: 1.45,
+    noise: 0.14,
+  },
+  {
+    id: "flux-schnell",
+    name: "FLUX.1 [schnell]",
+    group: "other",
+    color: "#a78bfa",
+    runs30: 96_400,
+    prior30: 102_100,
+    spend: 482.0,
+    p95: 612,
+    growth: 0.92,
+    noise: 0.22,
+  },
+  {
+    id: "whisper-v3",
+    name: "Whisper v3 Large",
+    group: "other",
+    color: "#fbbf24",
+    runs30: 41_600,
+    prior30: 47_300,
+    spend: 124.8,
+    p95: 460,
+    growth: 0.84,
+    noise: 0.3,
+  },
 ] as const;
 
 // Build the 30-day distribution by combining a linear trend and two sine
@@ -67,8 +144,7 @@ function useCapabilityData(): CapRow[] {
         const t = i / (N - 1);
         const trend = 1 + (s.growth - 1) * t;
         const wobble =
-          Math.sin((i + seed) * 0.7) * 0.6 +
-          Math.sin((i + seed) * 0.21) * 0.4;
+          Math.sin((i + seed) * 0.7) * 0.6 + Math.sin((i + seed) * 0.21) * 0.4;
         const v = trend * (1 + wobble * s.noise);
         arr.push(Math.max(0.05, v));
       }
@@ -111,7 +187,7 @@ function MiniSpark({
   const linePath = data
     .map(
       (v, i) =>
-        `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`,
+        `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`
     )
     .join(" ");
   const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
@@ -257,9 +333,7 @@ export default function CapabilityLeaderboardPanel() {
       {/* Panel head — title + sub on the left, "View usage" link on the right. */}
       <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
         <div>
-          <p className="text-[17px] font-bold text-fg">
-            Usage by app
-          </p>
+          <p className="text-[17px] font-bold text-fg">Usage by app</p>
           <p className="mt-0.5 text-[12px] text-fg-muted">
             Last 30 days · sorted by volume
           </p>
@@ -273,9 +347,7 @@ export default function CapabilityLeaderboardPanel() {
       </div>
 
       {/* Column header strip — shares the row grid template */}
-      <div
-        className={`${cols} bg-dark py-2.5 text-fg-disabled`}
-      >
+      <div className={`${cols} bg-dark py-2.5 text-fg-disabled`}>
         <span aria-hidden="true" />
         <SortHead
           label="App"

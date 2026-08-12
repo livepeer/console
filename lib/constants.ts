@@ -17,12 +17,43 @@
 // Settings carries a chev-right (rendered by NavLink via `submenu: true`)
 // instead of a count, signaling that it leads into a sub-experience.
 export const PORTAL_NAV_ITEMS = [
-  { label: "Home", href: "/home", icon: "House" as const, kbd: "G H", zone: "home" as const },
-  { label: "Explore", href: "/explore", icon: "LayoutGrid" as const, zone: "network" as const },
-  { label: "Stats", href: "/network", icon: "Globe" as const, zone: "network" as const },
-  { label: "API keys", href: "/keys", icon: "Key" as const, zone: "environment" as const },
-  { label: "Usage", href: "/usage", icon: "BarChart3" as const, zone: "organization" as const },
-  { label: "Calls", href: "/calls", icon: "Activity" as const, zone: "organization" as const },
+  {
+    label: "Home",
+    href: "/home",
+    icon: "House" as const,
+    kbd: "G H",
+    zone: "home" as const,
+  },
+  {
+    label: "Explore",
+    href: "/explore",
+    icon: "LayoutGrid" as const,
+    zone: "network" as const,
+  },
+  {
+    label: "Stats",
+    href: "/network",
+    icon: "Globe" as const,
+    zone: "network" as const,
+  },
+  {
+    label: "API keys",
+    href: "/keys",
+    icon: "Key" as const,
+    zone: "environment" as const,
+  },
+  {
+    label: "Usage",
+    href: "/usage",
+    icon: "BarChart3" as const,
+    zone: "organization" as const,
+  },
+  {
+    label: "Calls",
+    href: "/calls",
+    icon: "Activity" as const,
+    zone: "organization" as const,
+  },
   {
     label: "Settings",
     href: "/settings",

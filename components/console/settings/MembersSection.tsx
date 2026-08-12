@@ -28,13 +28,41 @@ interface Invite {
 }
 
 const MEMBERS: Member[] = [
-  { name: "Zain Mehta", email: "zain@flipbook.page", role: "Owner", joined: "4mo ago", avatar: "ZM", color: "#1E9960" },
-  { name: "Aliyah Park", email: "aliyah@flipbook.page", role: "Admin", joined: "3mo ago", avatar: "AP", color: "#25ABD0" },
-  { name: "Marcos Diaz", email: "marcos@flipbook.page", role: "Developer", joined: "2mo ago", avatar: "MD", color: "#7A6BD9" },
+  {
+    name: "Zain Mehta",
+    email: "zain@flipbook.page",
+    role: "Owner",
+    joined: "4mo ago",
+    avatar: "ZM",
+    color: "#1E9960",
+  },
+  {
+    name: "Aliyah Park",
+    email: "aliyah@flipbook.page",
+    role: "Admin",
+    joined: "3mo ago",
+    avatar: "AP",
+    color: "#25ABD0",
+  },
+  {
+    name: "Marcos Diaz",
+    email: "marcos@flipbook.page",
+    role: "Developer",
+    joined: "2mo ago",
+    avatar: "MD",
+    color: "#7A6BD9",
+  },
   // `#fbbf24` (amber-300) was too light to carry white initials (~1.6:1).
   // `#d97706` (amber-600) keeps the warm/yellow identity and lifts contrast
   // to ~3.5:1 in both themes — same family, legible everywhere.
-  { name: "Tomi Akinwale", email: "tomi@flipbook.page", role: "Developer", joined: "12d ago", avatar: "TA", color: "#d97706" },
+  {
+    name: "Tomi Akinwale",
+    email: "tomi@flipbook.page",
+    role: "Developer",
+    joined: "12d ago",
+    avatar: "TA",
+    color: "#d97706",
+  },
 ];
 
 const INVITES: Invite[] = [

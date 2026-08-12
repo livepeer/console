@@ -35,10 +35,7 @@ export default function ProfileSection() {
           <SettingsInput defaultValue="zain@flipbook.page" type="email" />
         </SettingsField>
 
-        <SettingsField
-          label="Username"
-          hint="Used in mentions and audit logs."
-        >
+        <SettingsField label="Username" hint="Used in mentions and audit logs.">
           <SettingsInputGroup>
             <InputAffix dim>@</InputAffix>
             <GroupInput defaultValue="zain" />

@@ -69,10 +69,14 @@ export default function PaymentsTab() {
   const [page, setPage] = useState(0);
 
   const chartData = useMemo(() => {
-    const days = period === "30d" ? 30 : period === "3m" ? 90 : PAYMENT_HISTORY.length;
+    const days =
+      period === "30d" ? 30 : period === "3m" ? 90 : PAYMENT_HISTORY.length;
     return PAYMENT_HISTORY.slice(-days);
   }, [period]);
-  const xTicks = useMemo(() => computeAxisTicks(chartData, "date", 6), [chartData]);
+  const xTicks = useMemo(
+    () => computeAxisTicks(chartData, "date", 6),
+    [chartData]
+  );
 
   const filteredTxs = useMemo(() => {
     if (!search) return PAYMENT_TRANSACTIONS;
@@ -81,7 +85,7 @@ export default function PaymentsTab() {
       (tx) =>
         tx.orchestrator.toLowerCase().includes(q) ||
         tx.pipeline.toLowerCase().includes(q) ||
-        tx.txHash.toLowerCase().includes(q),
+        tx.txHash.toLowerCase().includes(q)
     );
   }, [search]);
 
@@ -101,13 +105,21 @@ export default function PaymentsTab() {
               Network revenue
             </p>
             <p className="mt-1.5 font-mono text-[28px] font-semibold leading-[1.05] tracking-[-0.02em] tabular-nums text-fg">
-              ${(chartData.reduce((s, r) => s + r.volumeUsd, 0) / 1000).toFixed(1)}k
+              $
+              {(chartData.reduce((s, r) => s + r.volumeUsd, 0) / 1000).toFixed(
+                1
+              )}
+              k
             </p>
             <p className="mt-1 text-[12px] text-fg-muted">
               Daily fees paid to orchestrators for inference work.
             </p>
           </div>
-          <PeriodToggle value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+          <PeriodToggle
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+          />
         </div>
 
         <div className="mt-4">
@@ -130,7 +142,10 @@ export default function PaymentsTab() {
                 width={50}
                 tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
               />
-              <Tooltip content={<SimpleChartTooltip />} cursor={{ fill: "var(--color-zebra)" }} />
+              <Tooltip
+                content={<SimpleChartTooltip />}
+                cursor={{ fill: "var(--color-zebra)" }}
+              />
               <Bar
                 dataKey="volumeUsd"
                 fill="var(--chart-revenue)"
@@ -171,16 +186,23 @@ export default function PaymentsTab() {
             <div>
               <p className="text-[17px] font-bold text-fg">Recent payments</p>
               <p className="mt-0.5 text-[12px] text-fg-muted">
-                {filteredTxs.length} payments{search ? ` matching "${search}"` : " · all-time"}
+                {filteredTxs.length} payments
+                {search ? ` matching "${search}"` : " · all-time"}
               </p>
             </div>
           </div>
           <div className="mt-3 flex h-[26px] w-full items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-2.5 sm:max-w-[280px]">
-            <Search className="h-3 w-3 shrink-0 text-fg-faint" aria-hidden="true" />
+            <Search
+              className="h-3 w-3 shrink-0 text-fg-faint"
+              aria-hidden="true"
+            />
             <input
               type="search"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
               placeholder="Search payments…"
               className="flex-1 bg-transparent text-[11.5px] text-fg-strong placeholder:text-fg-faint outline-none"
             />
@@ -197,79 +219,87 @@ export default function PaymentsTab() {
             />
           </div>
         ) : (
-        <div className="md:overflow-x-auto">
-          {/* Header — desktop only */}
-          <div className="hidden md:flex min-w-[700px] items-center gap-4 border-b border-hairline px-4 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">
-            <span className="w-36">Date</span>
-            <span className="w-28">Orchestrator</span>
-            <span className="flex-1">Pipeline</span>
-            <span className="w-24 text-right">ETH</span>
-            <span className="w-24 text-right">USD</span>
-            <span className="w-28 text-right">Block</span>
-            <span className="w-8" />
-          </div>
+          <div className="md:overflow-x-auto">
+            {/* Header — desktop only */}
+            <div className="hidden md:flex min-w-[700px] items-center gap-4 border-b border-hairline px-4 py-2 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">
+              <span className="w-36">Date</span>
+              <span className="w-28">Orchestrator</span>
+              <span className="flex-1">Pipeline</span>
+              <span className="w-24 text-right">ETH</span>
+              <span className="w-24 text-right">USD</span>
+              <span className="w-28 text-right">Block</span>
+              <span className="w-8" />
+            </div>
 
-          {/* Rows */}
-          <div className="divide-y divide-[var(--color-border-hairline)]">
-            {pageTxs.map((tx) => {
-              const dateStr = new Date(tx.date).toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-              return (
-                <div key={tx.id}>
-                  {/* Desktop row */}
-                  <div className="hidden md:flex min-w-[700px] items-center gap-4 px-4 py-2.5 transition-colors hover:bg-zebra">
-                    <span className="w-36 text-xs tabular-nums text-fg-faint">{dateStr}</span>
-                    <span className="w-28 truncate text-xs text-fg-muted">{tx.orchestrator}</span>
-                    <span className="flex-1 text-xs text-fg-faint">{tx.pipeline}</span>
-                    <span className="w-24 text-right text-xs tabular-nums text-fg-strong">
-                      {tx.amountEth.toFixed(4)}
-                    </span>
-                    <span className="w-24 text-right text-xs tabular-nums text-fg-faint">
-                      ${tx.amountUsd.toFixed(2)}
-                    </span>
-                    <span className="w-28 text-right text-[11px] tabular-nums text-fg-label">
-                      {tx.block.toLocaleString()}
-                    </span>
+            {/* Rows */}
+            <div className="divide-y divide-[var(--color-border-hairline)]">
+              {pageTxs.map((tx) => {
+                const dateStr = new Date(tx.date).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                return (
+                  <div key={tx.id}>
+                    {/* Desktop row */}
+                    <div className="hidden md:flex min-w-[700px] items-center gap-4 px-4 py-2.5 transition-colors hover:bg-zebra">
+                      <span className="w-36 text-xs tabular-nums text-fg-faint">
+                        {dateStr}
+                      </span>
+                      <span className="w-28 truncate text-xs text-fg-muted">
+                        {tx.orchestrator}
+                      </span>
+                      <span className="flex-1 text-xs text-fg-faint">
+                        {tx.pipeline}
+                      </span>
+                      <span className="w-24 text-right text-xs tabular-nums text-fg-strong">
+                        {tx.amountEth.toFixed(4)}
+                      </span>
+                      <span className="w-24 text-right text-xs tabular-nums text-fg-faint">
+                        ${tx.amountUsd.toFixed(2)}
+                      </span>
+                      <span className="w-28 text-right text-[11px] tabular-nums text-fg-label">
+                        {tx.block.toLocaleString()}
+                      </span>
+                      <a
+                        href={`https://arbiscan.io/tx/${tx.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex h-6 w-8 items-center justify-center text-fg-disabled transition-colors hover:text-fg-muted"
+                        title="View on Arbiscan"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    {/* Mobile card */}
                     <a
                       href={`https://arbiscan.io/tx/${tx.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex h-6 w-8 items-center justify-center text-fg-disabled transition-colors hover:text-fg-muted"
-                      title="View on Arbiscan"
+                      className="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-zebra md:hidden"
                     >
-                      <ExternalLink className="h-3 w-3" />
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="min-w-0 flex-1 truncate text-xs text-fg-strong">
+                          {tx.pipeline}
+                        </span>
+                        <span className="shrink-0 text-sm text-fg">
+                          {tx.amountEth.toFixed(4)}{" "}
+                          <span className="text-xs text-fg-label">ETH</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-[11px] text-fg-label">
+                        <span>
+                          {dateStr} · {tx.orchestrator}
+                        </span>
+                        <span>${tx.amountUsd.toFixed(2)}</span>
+                      </div>
                     </a>
                   </div>
-                  {/* Mobile card */}
-                  <a
-                    href={`https://arbiscan.io/tx/${tx.txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-zebra md:hidden"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="min-w-0 flex-1 truncate text-xs text-fg-strong">
-                        {tx.pipeline}
-                      </span>
-                      <span className="shrink-0 text-sm text-fg">
-                        {tx.amountEth.toFixed(4)}{" "}
-                        <span className="text-xs text-fg-label">ETH</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 text-[11px] text-fg-label">
-                      <span>{dateStr} · {tx.orchestrator}</span>
-                      <span>${tx.amountUsd.toFixed(2)}</span>
-                    </div>
-                  </a>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Pagination */}

@@ -27,7 +27,7 @@ export interface OrgFleet {
 export function getOrgFleet(): OrgFleet {
   // The org's own deployed apps — every one carries a deployment manifest.
   const owned = APPS.filter(
-    (a): a is Pipeline => PIPELINE_APP_IDS.has(a.id) && !!a.deployment,
+    (a): a is Pipeline => PIPELINE_APP_IDS.has(a.id) && !!a.deployment
   );
 
   const seen = new Set<string>();
@@ -43,10 +43,7 @@ export function getOrgFleet(): OrgFleet {
     deployed: apps.filter((a) => a.deployment.status === "deployed").length,
     building: apps.filter((a) => a.deployment.status === "building").length,
     errored: apps.filter((a) => a.deployment.status === "error").length,
-    totalCalls7d: apps.reduce(
-      (sum, a) => sum + (a.deployment.calls7d || 0),
-      0,
-    ),
+    totalCalls7d: apps.reduce((sum, a) => sum + (a.deployment.calls7d || 0), 0),
   };
 }
 

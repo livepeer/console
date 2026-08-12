@@ -65,7 +65,9 @@ interface LoginPageProps {
   initialMode?: "signin" | "signup";
 }
 
-export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {}) {
+export default function LoginPage({
+  initialMode = "signin",
+}: LoginPageProps = {}) {
   // Mode is owned by the route, not by local state — sibling pages
   // `/login` and `/signup` re-mount this component
   // with the appropriate `initialMode`. The footer toggle is a `<Link>`
@@ -92,7 +94,10 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
 
   function handleOAuthSubmit(provider: AuthProvider) {
     // Mock OAuth — pretend the provider returned a profile.
-    const mockProfiles: Record<"github" | "google", { name: string; email: string }> = {
+    const mockProfiles: Record<
+      "github" | "google",
+      { name: string; email: string }
+    > = {
       github: { name: "Rick Staa", email: "rick.staa@github.com" },
       google: { name: "Rick Staa", email: "rick.staa@gmail.com" },
     };
@@ -230,7 +235,9 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              autoComplete={
+                mode === "signin" ? "current-password" : "new-password"
+              }
               className={inputClass}
             />
 
@@ -242,7 +249,9 @@ export default function LoginPage({ initialMode = "signin" }: LoginPageProps = {
               type="submit"
               className="btn-primary inline-flex h-10 w-full items-center justify-center gap-2 rounded-full text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-bright/40"
             >
-              <span>{mode === "signin" ? "Log in with email" : "Create account"}</span>
+              <span>
+                {mode === "signin" ? "Log in with email" : "Create account"}
+              </span>
               <kbd
                 aria-hidden="true"
                 className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[4px] bg-overlay px-1 text-[11px] font-medium leading-none text-white/85"

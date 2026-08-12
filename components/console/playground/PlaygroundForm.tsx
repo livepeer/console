@@ -21,9 +21,7 @@ function TypeBadge({ type }: { type: string }) {
 }
 
 function RequiredBadge() {
-  return (
-    <span className="ml-1 text-[10px] font-medium text-red-400">*</span>
-  );
+  return <span className="ml-1 text-[10px] font-medium text-red-400">*</span>;
 }
 
 function FieldRenderer({
@@ -85,7 +83,9 @@ function FieldRenderer({
 
     case "range": {
       const numVal =
-        value !== undefined ? (value as number) : (field.defaultValue as number) ?? field.min ?? 0;
+        value !== undefined
+          ? (value as number)
+          : ((field.defaultValue as number) ?? field.min ?? 0);
       return (
         <div className="flex items-center gap-3">
           <input
@@ -119,11 +119,16 @@ function FieldRenderer({
 
     case "boolean":
       return (
-        <label htmlFor={`field-${field.name}`} className="flex items-center gap-2.5 cursor-pointer">
+        <label
+          htmlFor={`field-${field.name}`}
+          className="flex items-center gap-2.5 cursor-pointer"
+        >
           <input
             id={`field-${field.name}`}
             type="checkbox"
-            checked={(value as boolean) ?? (field.defaultValue as boolean) ?? false}
+            checked={
+              (value as boolean) ?? (field.defaultValue as boolean) ?? false
+            }
             onChange={(e) => onChange(e.target.checked)}
             aria-required={field.required}
             className="h-4 w-4 rounded border-strong bg-zebra accent-green-bright"
@@ -138,7 +143,9 @@ function FieldRenderer({
           <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-subtle bg-zebra py-6 transition-colors hover:border-strong hover:bg-hover">
             <label className="cursor-pointer text-center">
               <p className="text-sm text-fg-label">
-                {value ? (value as File).name : "Drop a file or click to upload"}
+                {value
+                  ? (value as File).name
+                  : "Drop a file or click to upload"}
               </p>
               <p className="mt-1 text-[11px] text-fg-label">
                 {field.description || "Supports common file formats"}
@@ -198,11 +205,16 @@ export default function PlaygroundForm({
         {config.fields.map((field) => (
           <div key={field.name}>
             <div className="mb-1.5 flex items-center">
-              <label htmlFor={`field-${field.name}`} className="text-xs font-medium text-fg-faint">
+              <label
+                htmlFor={`field-${field.name}`}
+                className="text-xs font-medium text-fg-faint"
+              >
                 {field.label}
               </label>
               {field.required && <RequiredBadge />}
-              <TypeBadge type={field.type === "textarea" ? "string" : field.type} />
+              <TypeBadge
+                type={field.type === "textarea" ? "string" : field.type}
+              />
             </div>
             <FieldRenderer
               field={field}
@@ -213,10 +225,7 @@ export default function PlaygroundForm({
               <p className="mt-1 text-[11px] text-fg-label">
                 {field.description}
                 {field.defaultValue !== undefined && (
-                  <span>
-                    {" "}
-                    Default: {String(field.defaultValue)}
-                  </span>
+                  <span> Default: {String(field.defaultValue)}</span>
                 )}
               </p>
             )}
@@ -248,7 +257,9 @@ export default function PlaygroundForm({
           )}
         </button>
         <CostTag mode="free" />
-        <span className="ml-auto hidden text-[10px] text-fg-label sm:inline">ctrl+enter</span>
+        <span className="ml-auto hidden text-[10px] text-fg-label sm:inline">
+          ctrl+enter
+        </span>
       </div>
     </form>
   );

@@ -47,13 +47,7 @@ export interface ModelStats {
   uptimeGrid: ("up" | "down")[];
 }
 
-const REGIONS = [
-  "NA-East",
-  "NA-West",
-  "EU-West",
-  "EU-Central",
-  "Asia-Pacific",
-];
+const REGIONS = ["NA-East", "NA-West", "EU-West", "EU-Central", "Asia-Pacific"];
 
 function hashString(str: string): number {
   let h = 2166136261;
@@ -129,10 +123,7 @@ function bucketLabel(period: StatsPeriod, i: number, total: number): string {
   return `D${i + 1}`;
 }
 
-function trend(
-  delta: number,
-  positiveIsUp: boolean,
-): "up" | "down" | "flat" {
+function trend(delta: number, positiveIsUp: boolean): "up" | "down" | "flat" {
   if (Math.abs(delta) < 0.5) return "flat";
   const direction = delta > 0 ? "up" : "down";
   if (positiveIsUp) return direction;
@@ -141,7 +132,7 @@ function trend(
 
 export function generateModelStats(
   model: App,
-  period: StatsPeriod,
+  period: StatsPeriod
 ): ModelStats {
   const rng = mulberry32(hashString(`${model.id}:${period}`));
   const count = bucketCount(period);
@@ -199,15 +190,13 @@ export function generateModelStats(
   const regions: RegionBreakdown[] = REGIONS.map((region, i) => {
     const share = shares[i];
     const orchestrators = Math.max(1, Math.round(model.orchestrators * share));
-    const regionLatency = Math.round(
-      baseP50 * (0.9 + i * 0.18 + rng() * 0.15),
-    );
+    const regionLatency = Math.round(baseP50 * (0.9 + i * 0.18 + rng() * 0.15));
     return { region, orchestrators, latency: regionLatency, share };
   });
 
   // Uptime heatmap — 90 days
   const uptimeGrid: ("up" | "down")[] = Array.from({ length: 90 }, () =>
-    rng() > 0.03 ? "up" : "down",
+    rng() > 0.03 ? "up" : "down"
   );
 
   return {
@@ -219,7 +208,7 @@ export function generateModelStats(
 
       throughputLabel: `${tp.label} (${tp.unit})`,
       throughputValue: throughputNow.toFixed(
-        tp.unit === "img/s" || tp.unit === "req/s" ? 1 : 0,
+        tp.unit === "img/s" || tp.unit === "req/s" ? 1 : 0
       ),
       throughputDelta: `${throughputDeltaPct >= 0 ? "+" : ""}${throughputDeltaPct.toFixed(1)}%`,
       throughputTrend: trend(throughputDeltaPct, true),

@@ -92,10 +92,7 @@ export default function AppCard({
             style={{ background: generateCardBackground(model.id) }}
             aria-hidden="true"
           >
-            <Icon
-              className="h-7 w-7 text-fg-faint"
-              strokeWidth={1.5}
-            />
+            <Icon className="h-7 w-7 text-fg-faint" strokeWidth={1.5} />
           </div>
         )}
 
@@ -186,13 +183,7 @@ export default function AppCard({
   );
 }
 
-function Stat({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="font-mono text-[10px] uppercase tracking-[0.05em] text-fg-faint">

@@ -91,7 +91,9 @@ export default function CopyButton({
     <button
       type="button"
       onClick={handleCopy}
-      aria-label={copied ? "Copied" : (ariaLabel ?? `Copy ${label.toLowerCase()}`)}
+      aria-label={
+        copied ? "Copied" : (ariaLabel ?? `Copy ${label.toLowerCase()}`)
+      }
       aria-live="polite"
       className={`inline-flex shrink-0 items-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-bright/40 ${sizing} ${stateStyles} ${className}`}
     >

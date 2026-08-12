@@ -11,7 +11,11 @@ interface JsonInputProps {
   isRunning: boolean;
 }
 
-export default function JsonInput({ config, onRun, isRunning }: JsonInputProps) {
+export default function JsonInput({
+  config,
+  onRun,
+  isRunning,
+}: JsonInputProps) {
   const defaultJson = useMemo(() => {
     const defaults: Record<string, unknown> = {};
     config.fields.forEach((f) => {
@@ -53,9 +57,7 @@ export default function JsonInput({ config, onRun, isRunning }: JsonInputProps) 
           rows={16}
           className="w-full resize-y rounded-md border border-subtle bg-zebra px-4 py-3 font-mono text-xs leading-relaxed text-fg-strong placeholder:text-fg-label focus:border-strong focus:bg-hover focus:outline-none"
         />
-        {error && (
-          <p className="mt-2 text-[11px] text-red-400">{error}</p>
-        )}
+        {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
       </div>
 
       <div className="flex items-center gap-2 border-t border-hairline pt-4">

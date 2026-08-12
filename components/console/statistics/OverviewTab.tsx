@@ -48,7 +48,10 @@ const PERIOD_OPTIONS: { key: Period; label: string }[] = [
   { key: "3m", label: "3M" },
 ];
 
-function filterByPeriod<T extends { date: string }>(data: T[], period: Period): T[] {
+function filterByPeriod<T extends { date: string }>(
+  data: T[],
+  period: Period
+): T[] {
   const now = new Date();
   const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
   const cutoff = new Date(now);
@@ -60,15 +63,11 @@ function filterByPeriod<T extends { date: string }>(data: T[], period: Period): 
 
 function TopPipelinesGrid() {
   const sorted = useMemo(
-    () =>
-      [...APPS]
-        .sort((a, b) => b.runs7d - a.runs7d)
-        .slice(0, 9),
-    [],
+    () => [...APPS].sort((a, b) => b.runs7d - a.runs7d).slice(0, 9),
+    []
   );
 
-  const othersRuns = APPS
-    .sort((a, b) => b.runs7d - a.runs7d)
+  const othersRuns = APPS.sort((a, b) => b.runs7d - a.runs7d)
     .slice(9)
     .reduce((s, m) => s + m.runs7d, 0);
 
@@ -89,9 +88,15 @@ function TopPipelinesGrid() {
       <div className="flex items-center gap-3 border-b border-hairline px-4 py-2">
         <span className="w-5" />
         <span className="w-7" />
-        <span className="min-w-0 flex-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">Pipeline</span>
-        <span className="hidden w-12 shrink-0 text-right font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled sm:block">Share</span>
-        <span className="w-16 shrink-0 text-right font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">Requests</span>
+        <span className="min-w-0 flex-1 font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">
+          Pipeline
+        </span>
+        <span className="hidden w-12 shrink-0 text-right font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled sm:block">
+          Share
+        </span>
+        <span className="w-16 shrink-0 text-right font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-disabled">
+          Requests
+        </span>
       </div>
 
       <div className="divide-y divide-[var(--color-border-hairline)]">
@@ -150,15 +155,22 @@ function TopPipelinesGrid() {
 
 export default function OverviewTab() {
   const [period, setPeriod] = useState<Period>("3m");
-  const chartData = useMemo(() => filterByPeriod(API_REQUEST_SERIES, period), [period]);
-  const xTicks = useMemo(() => computeAxisTicks(chartData, "date", 6), [chartData]);
+  const chartData = useMemo(
+    () => filterByPeriod(API_REQUEST_SERIES, period),
+    [period]
+  );
+  const xTicks = useMemo(
+    () => computeAxisTicks(chartData, "date", 6),
+    [chartData]
+  );
 
   // Compute total requests from chart data
   const totalRequests = useMemo(() => {
     let sum = 0;
     for (const row of chartData) {
       for (const key of Object.keys(row)) {
-        if (key !== "date" && typeof row[key] === "number") sum += row[key] as number;
+        if (key !== "date" && typeof row[key] === "number")
+          sum += row[key] as number;
       }
     }
     return sum;
@@ -216,7 +228,11 @@ export default function OverviewTab() {
               Total inference requests across all APIs on the network.
             </p>
           </div>
-          <PeriodToggle value={period} onChange={setPeriod} options={PERIOD_OPTIONS} />
+          <PeriodToggle
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+          />
         </div>
 
         <div className="mt-4">
@@ -233,14 +249,19 @@ export default function OverviewTab() {
                 padding={{ left: 8, right: 8 }}
               />
               <YAxis hide />
-              <Tooltip content={<StackedChartTooltip />} cursor={{ fill: "var(--color-zebra)" }} />
+              <Tooltip
+                content={<StackedChartTooltip />}
+                cursor={{ fill: "var(--color-zebra)" }}
+              />
               {TOP_APIS.map((api, i) => (
                 <Bar
                   key={api}
                   dataKey={api}
                   stackId="requests"
                   fill={API_COLORS[i]}
-                  radius={i === TOP_APIS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  radius={
+                    i === TOP_APIS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
+                  }
                   animationDuration={600}
                   animationEasing="ease-out"
                 />

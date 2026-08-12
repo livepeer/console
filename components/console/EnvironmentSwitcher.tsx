@@ -224,7 +224,10 @@ export default function EnvironmentSwitcher({
                   onClick={() => setCreating(true)}
                   className="mt-px flex items-center gap-2.5 rounded-[4px] px-2 py-1.5 text-[13px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
                 >
-                  <Plus className="h-3.5 w-3.5 text-fg-faint" aria-hidden="true" />
+                  <Plus
+                    className="h-3.5 w-3.5 text-fg-faint"
+                    aria-hidden="true"
+                  />
                   <span>Create environment</span>
                 </button>
               )}

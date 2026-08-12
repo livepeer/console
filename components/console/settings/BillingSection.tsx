@@ -31,212 +31,216 @@ export default function BillingSection() {
         className="pointer-events-none select-none blur-sm"
         aria-hidden="true"
       >
-      <SettingsHeader
-        title="Plan"
-        sub="You're on the free tier · 10,000 jobs/month"
-      />
+        <SettingsHeader
+          title="Plan"
+          sub="You're on the free tier · 10,000 jobs/month"
+        />
 
-      <SettingsCard>
-        <div className="grid grid-cols-1 md:grid-cols-3">
-          {/* Free — current plan: 2px accent rail on the left + a vertical
+        <SettingsCard>
+          <div className="grid grid-cols-1 md:grid-cols-3">
+            {/* Free — current plan: 2px accent rail on the left + a vertical
               `rgba(64,191,134,0.06) → transparent` wash, per the v7
               prototype's `.plan-active` rule. The gradient subtly tints the
               top of the card so the "current plan" reads at a glance even
               before the eyebrow is parsed. */}
-          <div
-            className="relative border-b border-hairline p-[18px] md:border-b-0 md:border-r"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(64, 191, 134, 0.06), transparent)",
-            }}
-          >
-            <span
-              className="absolute top-0 bottom-0 left-0 w-[2px] bg-green"
+            <div
+              className="relative border-b border-hairline p-[18px] md:border-b-0 md:border-r"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(64, 191, 134, 0.06), transparent)",
+              }}
+            >
+              <span
+                className="absolute top-0 bottom-0 left-0 w-[2px] bg-green"
+                aria-hidden="true"
+              />
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-green-bright">
+                Current plan
+              </p>
+              <p className="mt-1 text-[16px] font-medium text-fg">Free</p>
+              <p className="mt-1 text-[13px] text-fg-strong">
+                <span className="text-[22px] font-medium tracking-[-0.01em] text-fg">
+                  $0
+                </span>
+                <span className="text-fg-faint"> / month</span>
+              </p>
+              <ul className="mt-3.5 flex flex-col gap-1.5">
+                {[
+                  "10,000 jobs / month",
+                  "3 concurrent streams",
+                  "5 GB storage retention",
+                  "Community support",
+                ].map((line) => (
+                  <li
+                    key={line}
+                    className="flex items-center gap-1.5 text-[12.5px] text-fg-strong"
+                  >
+                    <Check
+                      className="h-3 w-3 shrink-0 text-green-bright"
+                      aria-hidden="true"
+                    />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pro — upgrade option */}
+            <PlanCard
+              name="Pro"
+              price="$29"
+              priceSub=" / month + usage"
+              features={[
+                "Unlimited jobs · pay-as-you-go",
+                "25 concurrent streams",
+                "100 GB storage retention",
+                "Priority support · 24h SLA",
+              ]}
+              cta="Upgrade to Pro"
+            />
+
+            {/* Scale — enterprise */}
+            <PlanCard
+              name="Scale"
+              price="Custom"
+              priceSub=" · contact us"
+              features={[
+                "Reserved GPU pools",
+                "Dedicated solutions engineer",
+                "Single-tenant inference",
+                "99.99% SLA",
+              ]}
+              cta="Talk to sales"
+              ctaOutline
+              isLast
+            />
+          </div>
+        </SettingsCard>
+
+        <SettingsHeader
+          title="Payment method"
+          sub="Card on file for usage above the free tier"
+          action={
+            <IconButton primary>
+              <Plus className="h-3 w-3" aria-hidden="true" />
+              Add card
+            </IconButton>
+          }
+        />
+        <SettingsCard>
+          <div className="px-5 py-9 text-center">
+            <Box
+              className="mx-auto h-[22px] w-[22px] text-fg-disabled"
+              strokeWidth={1.5}
               aria-hidden="true"
             />
-            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-green-bright">
-              Current plan
+            <p className="mt-2 text-[13.5px] font-medium text-fg">
+              No payment method
             </p>
-            <p className="mt-1 text-[16px] font-medium text-fg">Free</p>
-            <p className="mt-1 text-[13px] text-fg-strong">
-              <span className="text-[22px] font-medium tracking-[-0.01em] text-fg">
-                $0
-              </span>
-              <span className="text-fg-faint"> / month</span>
+            <p className="mt-1 text-[12.5px] text-fg-faint">
+              Add a card to keep capabilities running past the free quota.
             </p>
-            <ul className="mt-3.5 flex flex-col gap-1.5">
-              {[
-                "10,000 jobs / month",
-                "3 concurrent streams",
-                "5 GB storage retention",
-                "Community support",
-              ].map((line) => (
-                <li
-                  key={line}
-                  className="flex items-center gap-1.5 text-[12.5px] text-fg-strong"
-                >
-                  <Check
-                    className="h-3 w-3 shrink-0 text-green-bright"
-                    aria-hidden="true"
-                  />
-                  {line}
-                </li>
-              ))}
-            </ul>
           </div>
+        </SettingsCard>
 
-          {/* Pro — upgrade option */}
-          <PlanCard
-            name="Pro"
-            price="$29"
-            priceSub=" / month + usage"
-            features={[
-              "Unlimited jobs · pay-as-you-go",
-              "25 concurrent streams",
-              "100 GB storage retention",
-              "Priority support · 24h SLA",
-            ]}
-            cta="Upgrade to Pro"
-          />
-
-          {/* Scale — enterprise */}
-          <PlanCard
-            name="Scale"
-            price="Custom"
-            priceSub=" · contact us"
-            features={[
-              "Reserved GPU pools",
-              "Dedicated solutions engineer",
-              "Single-tenant inference",
-              "99.99% SLA",
-            ]}
-            cta="Talk to sales"
-            ctaOutline
-            isLast
-          />
-        </div>
-      </SettingsCard>
-
-      <SettingsHeader
-        title="Payment method"
-        sub="Card on file for usage above the free tier"
-        action={
-          <IconButton primary>
-            <Plus className="h-3 w-3" aria-hidden="true" />
-            Add card
-          </IconButton>
-        }
-      />
-      <SettingsCard>
-        <div className="px-5 py-9 text-center">
-          <Box
-            className="mx-auto h-[22px] w-[22px] text-fg-disabled"
-            strokeWidth={1.5}
-            aria-hidden="true"
-          />
-          <p className="mt-2 text-[13.5px] font-medium text-fg">
-            No payment method
-          </p>
-          <p className="mt-1 text-[12.5px] text-fg-faint">
-            Add a card to keep capabilities running past the free quota.
-          </p>
-        </div>
-      </SettingsCard>
-
-      <SettingsHeader
-        title="Billing details"
-        sub="Used on invoices and receipts"
-      />
-      <SettingsCard>
-        <SettingsField
-          label="Company name"
-          hint="Optional — appears on invoices."
-        >
-          <SettingsInput defaultValue="Flipbook, Inc." />
-        </SettingsField>
-        <SettingsField label="Billing email">
-          <SettingsInput defaultValue="billing@flipbook.page" />
-        </SettingsField>
-        <SettingsField
-          label="Tax ID"
-          hint="VAT, GST, ABN — formatting depends on country."
-        >
-          <SettingsInput placeholder="Add tax ID" />
-        </SettingsField>
-        <SettingsField
-          label="Billing address"
-          hint="Used for tax calculation."
-        >
-          <SettingsTextarea
-            rows={3}
-            defaultValue={"2261 Market St #4090\nSan Francisco, CA 94114\nUnited States"}
-          />
-        </SettingsField>
-      </SettingsCard>
-
-      <SettingsHeader
-        title="Invoices"
-        action={
-          <IconButton>
-            <Download className="h-3 w-3" aria-hidden="true" />
-            Download all
-          </IconButton>
-        }
-      />
-      <SettingsCard>
-        <div className={`${ST_COLS_5} ${ST_HEAD_CLASS}`}>
-          <span>Invoice</span>
-          <span>Date</span>
-          <span>Amount</span>
-          <span>Description</span>
-          <span aria-hidden="true" />
-        </div>
-        {[
-          {
-            id: "INV-2024-04",
-            date: "Apr 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 9,127 jobs",
-          },
-          {
-            id: "INV-2024-03",
-            date: "Mar 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 4,820 jobs",
-          },
-          {
-            id: "INV-2024-02",
-            date: "Feb 1, 2025",
-            amount: "$0.00",
-            desc: "Free tier · 1,602 jobs",
-          },
-        ].map((inv) => (
-          <div
-            key={inv.id}
-            className={`${ST_COLS_5} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
+        <SettingsHeader
+          title="Billing details"
+          sub="Used on invoices and receipts"
+        />
+        <SettingsCard>
+          <SettingsField
+            label="Company name"
+            hint="Optional — appears on invoices."
           >
-            <div className="font-mono text-[12.5px] text-fg">{inv.id}</div>
-            <div className="text-[12.5px] text-fg-faint">{inv.date}</div>
-            <div className="font-mono text-[12.5px] text-fg">{inv.amount}</div>
-            <div className="text-[12px] text-fg-faint">{inv.desc}</div>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                className="text-[12px] text-fg-strong transition-colors hover:text-fg"
-              >
-                View
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg"
-              >
-                <Download className="h-3 w-3" aria-hidden="true" />
-                PDF
-              </button>
-            </div>
+            <SettingsInput defaultValue="Flipbook, Inc." />
+          </SettingsField>
+          <SettingsField label="Billing email">
+            <SettingsInput defaultValue="billing@flipbook.page" />
+          </SettingsField>
+          <SettingsField
+            label="Tax ID"
+            hint="VAT, GST, ABN — formatting depends on country."
+          >
+            <SettingsInput placeholder="Add tax ID" />
+          </SettingsField>
+          <SettingsField
+            label="Billing address"
+            hint="Used for tax calculation."
+          >
+            <SettingsTextarea
+              rows={3}
+              defaultValue={
+                "2261 Market St #4090\nSan Francisco, CA 94114\nUnited States"
+              }
+            />
+          </SettingsField>
+        </SettingsCard>
+
+        <SettingsHeader
+          title="Invoices"
+          action={
+            <IconButton>
+              <Download className="h-3 w-3" aria-hidden="true" />
+              Download all
+            </IconButton>
+          }
+        />
+        <SettingsCard>
+          <div className={`${ST_COLS_5} ${ST_HEAD_CLASS}`}>
+            <span>Invoice</span>
+            <span>Date</span>
+            <span>Amount</span>
+            <span>Description</span>
+            <span aria-hidden="true" />
           </div>
-        ))}
-      </SettingsCard>
+          {[
+            {
+              id: "INV-2024-04",
+              date: "Apr 1, 2025",
+              amount: "$0.00",
+              desc: "Free tier · 9,127 jobs",
+            },
+            {
+              id: "INV-2024-03",
+              date: "Mar 1, 2025",
+              amount: "$0.00",
+              desc: "Free tier · 4,820 jobs",
+            },
+            {
+              id: "INV-2024-02",
+              date: "Feb 1, 2025",
+              amount: "$0.00",
+              desc: "Free tier · 1,602 jobs",
+            },
+          ].map((inv) => (
+            <div
+              key={inv.id}
+              className={`${ST_COLS_5} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
+            >
+              <div className="font-mono text-[12.5px] text-fg">{inv.id}</div>
+              <div className="text-[12.5px] text-fg-faint">{inv.date}</div>
+              <div className="font-mono text-[12.5px] text-fg">
+                {inv.amount}
+              </div>
+              <div className="text-[12px] text-fg-faint">{inv.desc}</div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="text-[12px] text-fg-strong transition-colors hover:text-fg"
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-[12px] text-fg-strong transition-colors hover:text-fg"
+                >
+                  <Download className="h-3 w-3" aria-hidden="true" />
+                  PDF
+                </button>
+              </div>
+            </div>
+          ))}
+        </SettingsCard>
       </div>
 
       {/* WIP overlay — sits above the blurred content. Pointer-events-none
@@ -254,8 +258,8 @@ export default function BillingSection() {
             Billing UX is not finalized
           </p>
           <p className="mt-1.5 text-[13px] leading-[1.5] text-fg-muted">
-            This view is still in flux while we settle on the
-            payment-provider model.
+            This view is still in flux while we settle on the payment-provider
+            model.
           </p>
         </div>
       </div>

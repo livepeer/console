@@ -2,7 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { BarChart3, Activity, Globe, Wallet, Cpu, ArrowUpRight } from "lucide-react";
+import {
+  BarChart3,
+  Activity,
+  Globe,
+  Wallet,
+  Cpu,
+  ArrowUpRight,
+} from "lucide-react";
 import OverviewTab from "@/components/console/statistics/OverviewTab";
 import UtilizationTab from "@/components/console/statistics/UtilizationTab";
 import PaymentsTab from "@/components/console/statistics/PaymentsTab";
@@ -42,7 +49,12 @@ function LastUpdatedPill() {
 
 type NetworkTab = "overview" | "utilization" | "payments" | "gpus";
 
-const VALID_TABS: NetworkTab[] = ["overview", "utilization", "payments", "gpus"];
+const VALID_TABS: NetworkTab[] = [
+  "overview",
+  "utilization",
+  "payments",
+  "gpus",
+];
 
 const TABS: { key: NetworkTab; label: string; icon: React.ElementType }[] = [
   { key: "overview", label: "Overview", icon: BarChart3 },
@@ -82,7 +94,7 @@ function NetworkContent() {
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     },
-    [searchParams, router, pathname],
+    [searchParams, router, pathname]
   );
 
   // Network is public — orchestrators, payments, and GPU inventory are

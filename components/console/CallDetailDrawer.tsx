@@ -2,10 +2,7 @@
 
 import Drawer from "@/components/design-system/Drawer";
 import EnvTag from "@/components/console/EnvTag";
-import {
-  formatCallMetric,
-  formatRunRelativeTime,
-} from "@/lib/console/utils";
+import { formatCallMetric, formatRunRelativeTime } from "@/lib/console/utils";
 import type {
   AccountActivityRow,
   AccountActivityStatus,
@@ -40,34 +37,86 @@ function samplePayload(row: AccountActivityRow): {
   const failed = row.status === "failed" || row.status === "timeout";
   const error =
     row.status === "timeout"
-      ? { error: "deadline_exceeded", message: "No orchestrator responded in time." }
-      : { error: "inference_failed", message: "The pipeline returned a non-2xx status." };
+      ? {
+          error: "deadline_exceeded",
+          message: "No orchestrator responded in time.",
+        }
+      : {
+          error: "inference_failed",
+          message: "The pipeline returned a non-2xx status.",
+        };
 
   switch (row.pipeline) {
     case "text-to-image":
       return {
-        request: { prompt: "a neon-lit city street at night, cinematic", steps: 4, seed: 41207 },
-        response: failed ? error : { image_url: "https://gateway.livepeer/out/41207.png", width: 1024, height: 1024 },
+        request: {
+          prompt: "a neon-lit city street at night, cinematic",
+          steps: 4,
+          seed: 41207,
+        },
+        response: failed
+          ? error
+          : {
+              image_url: "https://gateway.livepeer/out/41207.png",
+              width: 1024,
+              height: 1024,
+            },
       };
     case "language":
       return {
-        request: { messages: [{ role: "user", content: "Summarize the Livepeer whitepaper in 3 bullets." }], max_tokens: 512 },
-        response: failed ? error : { text: "• Decentralized GPU network…\n• Pay-per-use inference…\n• Open, permissionless apps.", tokens: 187 },
+        request: {
+          messages: [
+            {
+              role: "user",
+              content: "Summarize the Livepeer whitepaper in 3 bullets.",
+            },
+          ],
+          max_tokens: 512,
+        },
+        response: failed
+          ? error
+          : {
+              text: "• Decentralized GPU network…\n• Pay-per-use inference…\n• Open, permissionless apps.",
+              tokens: 187,
+            },
       };
     case "audio-to-text":
       return {
-        request: { audio_url: "https://gateway.livepeer/in/clip.wav", language: "en" },
-        response: failed ? error : { text: "Welcome back to the show — today we're talking real-time AI video.", duration_s: 12.4 },
+        request: {
+          audio_url: "https://gateway.livepeer/in/clip.wav",
+          language: "en",
+        },
+        response: failed
+          ? error
+          : {
+              text: "Welcome back to the show — today we're talking real-time AI video.",
+              duration_s: 12.4,
+            },
       };
     case "text-to-speech":
       return {
         request: { text: "Hello from the Livepeer network.", voice: "am_onyx" },
-        response: failed ? error : { audio_url: "https://gateway.livepeer/out/tts-8821.wav", duration_s: 2.1 },
+        response: failed
+          ? error
+          : {
+              audio_url: "https://gateway.livepeer/out/tts-8821.wav",
+              duration_s: 2.1,
+            },
       };
     case "video-understanding":
       return {
-        request: { video_url: "https://gateway.livepeer/in/feed.mp4", task: "detect" },
-        response: failed ? error : { detections: [{ label: "person", confidence: 0.98 }, { label: "bicycle", confidence: 0.83 }] },
+        request: {
+          video_url: "https://gateway.livepeer/in/feed.mp4",
+          task: "detect",
+        },
+        response: failed
+          ? error
+          : {
+              detections: [
+                { label: "person", confidence: 0.98 },
+                { label: "bicycle", confidence: 0.83 },
+              ],
+            },
       };
     default:
       return {
@@ -181,7 +230,8 @@ export default function CallDetailDrawer({
             <Section title="Session">
               <Json
                 value={{
-                  transport: row.pipeline === "live-transcoding" ? "HLS" : "trickle",
+                  transport:
+                    row.pipeline === "live-transcoding" ? "HLS" : "trickle",
                   channels: ["video", "events", "data"],
                   status: row.status === "active" ? "streaming" : "ended",
                   duration: formatCallMetric(row),

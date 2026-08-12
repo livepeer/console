@@ -84,7 +84,9 @@ function ShimmerLoader({
   return (
     <PlaceholderFrame outputType={outputType}>
       <div className="h-10 w-10 animate-spin rounded-full border-2 border-subtle border-t-green-bright" />
-      <p className="mt-3 animate-pulse text-xs text-fg-faint">Running inference…</p>
+      <p className="mt-3 animate-pulse text-xs text-fg-faint">
+        Running inference…
+      </p>
     </PlaceholderFrame>
   );
 }
@@ -143,7 +145,9 @@ function EmptyState({
   modelName?: string;
 }) {
   const Icon = category ? getAppIcon(category) : null;
-  const label = modelName ? `Run ${modelName} to see output here` : "Fill in the form and click Run";
+  const label = modelName
+    ? `Run ${modelName} to see output here`
+    : "Fill in the form and click Run";
 
   // Chat-like empty state for LLM outputs — matches Replicate/Chutes convention
   if (outputType === "text") {
@@ -151,7 +155,9 @@ function EmptyState({
       <div className="flex min-h-[320px] w-full flex-col justify-end gap-3 rounded-xl border border-hairline bg-zebra p-4">
         <div className="flex items-start gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-hover">
-            {Icon && <Icon className="h-3.5 w-3.5 text-fg-muted" strokeWidth={2} />}
+            {Icon && (
+              <Icon className="h-3.5 w-3.5 text-fg-muted" strokeWidth={2} />
+            )}
           </div>
           <div className="flex min-h-[48px] flex-1 items-center rounded-lg bg-zebra px-3 py-2 text-xs text-fg-label">
             {label}
@@ -170,7 +176,11 @@ function EmptyState({
     <PlaceholderFrame outputType={outputType}>
       {Icon && (
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-hover">
-          <Icon className="h-6 w-6 text-fg-muted" strokeWidth={2} aria-hidden="true" />
+          <Icon
+            className="h-6 w-6 text-fg-muted"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
         </div>
       )}
       <p className="mt-3 text-sm text-fg-faint">Ready to run</p>
@@ -271,7 +281,9 @@ function StreamingTextOutput({ text }: { text: string }) {
 }
 
 function AudioOutput({ modelName, url }: { modelName?: string; url?: string }) {
-  return <AudioPlaygroundOutput state="result" modelName={modelName} url={url} />;
+  return (
+    <AudioPlaygroundOutput state="result" modelName={modelName} url={url} />
+  );
 }
 
 function JsonOutput({ data }: { data: string }) {
@@ -324,7 +336,7 @@ export default function PlaygroundOutput({
 
   const costDisplay = useMemo(
     () => (model ? estimateCallCost(model, inferenceTime) : null),
-    [model, inferenceTime],
+    [model, inferenceTime]
   );
 
   return (
@@ -361,9 +373,15 @@ export default function PlaygroundOutput({
         </button>
       </div>
 
-      {state === "loading" && <ShimmerLoader outputType={outputType} modelName={modelName} />}
+      {state === "loading" && (
+        <ShimmerLoader outputType={outputType} modelName={modelName} />
+      )}
       {state === "empty" && (
-        <EmptyState outputType={outputType} category={category} modelName={modelName} />
+        <EmptyState
+          outputType={outputType}
+          category={category}
+          modelName={modelName}
+        />
       )}
       {state === "result" && viewMode === "json" && (
         <JsonOutput
@@ -377,7 +395,7 @@ export default function PlaygroundOutput({
               },
             },
             null,
-            2,
+            2
           )}
         />
       )}
@@ -385,7 +403,9 @@ export default function PlaygroundOutput({
         <>
           {outputType === "image" && <ImageOutput url={result} />}
           {outputType === "text" && <StreamingTextOutput text={result} />}
-          {outputType === "audio" && <AudioOutput modelName={modelName} url={result} />}
+          {outputType === "audio" && (
+            <AudioOutput modelName={modelName} url={result} />
+          )}
           {outputType === "video" && <VideoOutput url={result} />}
           {outputType === "json" && <JsonOutput data={result} />}
         </>
@@ -395,9 +415,7 @@ export default function PlaygroundOutput({
           is shown; pieces are independent so each appears as data is available. */}
       {state === "result" && (costDisplay || inferenceTime || requestId) && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-fg-faint">
-          {costDisplay && (
-            <CostTag mode="cost" cost={costDisplay} />
-          )}
+          {costDisplay && <CostTag mode="cost" cost={costDisplay} />}
           {inferenceTime && (
             <span className="font-mono tabular-nums text-fg-faint">
               {inferenceTime}s
@@ -408,24 +426,28 @@ export default function PlaygroundOutput({
       )}
 
       {/* Action buttons */}
-      {state === "result" && (outputType === "image" || outputType === "audio") && (
-        <div className="flex flex-wrap gap-2">
-          <button className="flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-fg-label transition-colors hover:bg-hover hover:text-fg-muted focus:outline-none">
-            <Download className="h-3 w-3" />
-            Download
-          </button>
-        </div>
-      )}
+      {state === "result" &&
+        (outputType === "image" || outputType === "audio") && (
+          <div className="flex flex-wrap gap-2">
+            <button className="flex items-center gap-1.5 rounded-lg border border-subtle px-3 py-1.5 text-xs text-fg-label transition-colors hover:bg-hover hover:text-fg-muted focus:outline-none">
+              <Download className="h-3 w-3" />
+              Download
+            </button>
+          </div>
+        )}
 
       {/* Copy code for this run — bridges click-to-test to copy-paste production code */}
-      {state === "result" && model && lastRunValues && Object.keys(lastRunValues).length > 0 && (
-        <div className="mt-2">
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-label">
-            Use this in your code
-          </p>
-          <CodeSnippets model={model} runValues={lastRunValues} />
-        </div>
-      )}
+      {state === "result" &&
+        model &&
+        lastRunValues &&
+        Object.keys(lastRunValues).length > 0 && (
+          <div className="mt-2">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-label">
+              Use this in your code
+            </p>
+            <CodeSnippets model={model} runValues={lastRunValues} />
+          </div>
+        )}
     </div>
   );
 }

@@ -27,11 +27,17 @@ export default function ConsolePageSkeleton({
   maxWidth = "6xl",
 }: ConsolePageSkeletonProps) {
   const widthClass =
-    maxWidth === "5xl" ? "max-w-5xl" : maxWidth === "7xl" ? "max-w-7xl" : "max-w-6xl";
+    maxWidth === "5xl"
+      ? "max-w-5xl"
+      : maxWidth === "7xl"
+        ? "max-w-7xl"
+        : "max-w-6xl";
 
   return (
     <main className="flex flex-1 flex-col bg-dark">
-      <div className={`mx-auto w-full ${widthClass} px-5 pt-6 pb-10 lg:px-6 lg:pt-10`}>
+      <div
+        className={`mx-auto w-full ${widthClass} px-5 pt-6 pb-10 lg:px-6 lg:pt-10`}
+      >
         {/* Page header — title + description */}
         <div className="space-y-2">
           <Skeleton width="w-32" height="h-4" />

@@ -41,7 +41,9 @@ export default function SectionHeader({
     // className is additive — extends the default flex layout rather than
     // replacing it, so callers can tweak margins without losing the mono row.
     return (
-      <div className={`flex items-baseline gap-2 pt-7 pb-2.5 ${className ?? ""}`}>
+      <div
+        className={`flex items-baseline gap-2 pt-7 pb-2.5 ${className ?? ""}`}
+      >
         <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
           {title}
         </h2>

@@ -15,12 +15,42 @@ interface NotificationRow {
 }
 
 const ROWS: NotificationRow[] = [
-  { name: "Run failures", desc: "A run errors out or times out.", email: true, slack: true },
-  { name: "Quota thresholds", desc: "Free tier at 80% / 95%.", email: true, slack: false },
-  { name: "Billing receipts", desc: "Monthly invoice and payment confirmations.", email: true, slack: false },
-  { name: "App updates", desc: "New apps added to the marketplace.", email: false, slack: false },
-  { name: "Security events", desc: "New device sign-ins, key rotations.", email: true, slack: false },
-  { name: "Weekly digest", desc: "Summary of last week's usage.", email: false, slack: false },
+  {
+    name: "Run failures",
+    desc: "A run errors out or times out.",
+    email: true,
+    slack: true,
+  },
+  {
+    name: "Quota thresholds",
+    desc: "Free tier at 80% / 95%.",
+    email: true,
+    slack: false,
+  },
+  {
+    name: "Billing receipts",
+    desc: "Monthly invoice and payment confirmations.",
+    email: true,
+    slack: false,
+  },
+  {
+    name: "App updates",
+    desc: "New apps added to the marketplace.",
+    email: false,
+    slack: false,
+  },
+  {
+    name: "Security events",
+    desc: "New device sign-ins, key rotations.",
+    email: true,
+    slack: false,
+  },
+  {
+    name: "Weekly digest",
+    desc: "Summary of last week's usage.",
+    email: false,
+    slack: false,
+  },
 ];
 
 // 3-column layout for the notif table — Event / Email toggle / Slack toggle.

@@ -8,10 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Environment, EnvironmentKind } from "@/lib/console/types";
-import {
-  ENVIRONMENTS,
-  DEFAULT_ENVIRONMENT,
-} from "@/lib/console/mock-data";
+import { ENVIRONMENTS, DEFAULT_ENVIRONMENT } from "@/lib/console/mock-data";
 
 // Persisted selection key. Mirrors the localStorage conventions used for the
 // theme and first-run flag. Stores the environment id.
@@ -49,7 +46,7 @@ function slugify(name: string): string {
 export function EnvironmentProvider({ children }: { children: ReactNode }) {
   const [environments, setEnvironments] = useState<Environment[]>(ENVIRONMENTS);
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string>(
-    DEFAULT_ENVIRONMENT.id,
+    DEFAULT_ENVIRONMENT.id
   );
 
   // Restore the persisted selection. Falls back to the default if the stored
@@ -71,7 +68,7 @@ export function EnvironmentProvider({ children }: { children: ReactNode }) {
 
   const createEnvironment = (
     name: string,
-    kind: EnvironmentKind = "development",
+    kind: EnvironmentKind = "development"
   ): Environment => {
     const env: Environment = {
       id: `env-${slugify(name)}-${Date.now()}`,

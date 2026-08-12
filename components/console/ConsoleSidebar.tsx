@@ -26,7 +26,10 @@ import {
   Users as UsersIcon,
   type LucideIcon,
 } from "lucide-react";
-import { LivepeerWordmark, LivepeerSymbol } from "@/components/design-system/LivepeerLogo";
+import {
+  LivepeerWordmark,
+  LivepeerSymbol,
+} from "@/components/design-system/LivepeerLogo";
 import { PORTAL_NAV_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/components/console/AuthContext";
 import Drawer from "@/components/design-system/Drawer";
@@ -169,7 +172,7 @@ function SignedOutSidebarContent({
                 new KeyboardEvent("keydown", {
                   key: "k",
                   [isMac ? "metaKey" : "ctrlKey"]: true,
-                }),
+                })
               );
             }}
             className="mx-auto flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-fg-muted transition-colors hover:bg-hover hover:text-fg"
@@ -200,7 +203,7 @@ function SignedOutSidebarContent({
                 new KeyboardEvent("keydown", {
                   key: "k",
                   [isMac ? "metaKey" : "ctrlKey"]: true,
-                }),
+                })
               );
             }}
             className="flex w-full items-center gap-2 rounded-[8px] border border-hairline bg-dark-lighter px-2.5 py-1.5 text-[12.5px] text-fg-faint transition-colors hover:border-subtle hover:text-fg-strong"
@@ -361,8 +364,13 @@ function SignedOutSidebarContent({
             className="flex h-7 w-full items-center gap-2 rounded-md px-2 font-mono text-[11px] tracking-[0.02em] text-fg-faint transition-colors hover:bg-zebra hover:text-fg-muted"
           >
             <StatusDot tone="green" />
-            <span className="min-w-0 flex-1 truncate">All systems operational</span>
-            <ExternalLink className="h-3 w-3 shrink-0 text-fg-disabled" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              All systems operational
+            </span>
+            <ExternalLink
+              className="h-3 w-3 shrink-0 text-fg-disabled"
+              aria-hidden="true"
+            />
           </a>
         )}
       </div>
@@ -519,7 +527,6 @@ function SettingsRail({
   );
 }
 
-
 function SidebarContent({
   collapsed,
   onToggleCollapsed,
@@ -599,7 +606,11 @@ function SidebarContent({
       >
         <div className={collapsed ? "" : "min-w-0 flex-1"}>
           {isConnected && user ? (
-            <OrganizationMenu user={user} disconnect={disconnect} collapsed={collapsed} />
+            <OrganizationMenu
+              user={user}
+              disconnect={disconnect}
+              collapsed={collapsed}
+            />
           ) : (
             <Link
               href="/home"
@@ -608,9 +619,15 @@ function SidebarContent({
               onClick={onNavigate}
             >
               {collapsed ? (
-                <LivepeerSymbol className="h-5 w-5 text-fg" aria-hidden="true" />
+                <LivepeerSymbol
+                  className="h-5 w-5 text-fg"
+                  aria-hidden="true"
+                />
               ) : (
-                <LivepeerWordmark className="h-3.5 w-auto text-fg" aria-hidden="true" />
+                <LivepeerWordmark
+                  className="h-3.5 w-auto text-fg"
+                  aria-hidden="true"
+                />
               )}
             </Link>
           )}
@@ -624,9 +641,14 @@ function SidebarContent({
             type="button"
             aria-label="Search"
             onClick={() => {
-              const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC");
+              const isMac =
+                typeof navigator !== "undefined" &&
+                navigator.platform.toUpperCase().includes("MAC");
               document.dispatchEvent(
-                new KeyboardEvent("keydown", { key: "k", [isMac ? "metaKey" : "ctrlKey"]: true }),
+                new KeyboardEvent("keydown", {
+                  key: "k",
+                  [isMac ? "metaKey" : "ctrlKey"]: true,
+                })
               );
             }}
             className="mx-auto flex h-[26px] w-[26px] items-center justify-center rounded-[4px] text-fg-muted transition-colors hover:bg-hover hover:text-fg"
@@ -657,7 +679,7 @@ function SidebarContent({
                 new KeyboardEvent("keydown", {
                   key: "k",
                   [isMac ? "metaKey" : "ctrlKey"]: true,
-                }),
+                })
               );
             }}
             className="flex w-full items-center gap-2 rounded-[8px] border border-hairline bg-dark-lighter px-2.5 py-1.5 text-[12.5px] text-fg-faint transition-colors hover:border-subtle hover:text-fg-strong"
@@ -733,7 +755,9 @@ function SidebarContent({
       {/* Footer: Docs. (Settings now sits under Usage in the primary list.)
           Logged-out users get a separate footer rendered by
           `SignedOutSidebarContent`; this one is signed-in only. */}
-      <div className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-px`}>
+      <div
+        className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-px`}
+      >
         <NavLink
           href="https://docs.livepeer.org"
           icon={BookOpen}
@@ -772,8 +796,13 @@ function SidebarContent({
             className="flex h-7 w-full items-center gap-2 rounded-md px-2 font-mono text-[11px] tracking-[0.02em] text-fg-faint transition-colors hover:bg-zebra hover:text-fg-muted"
           >
             <StatusDot tone="green" />
-            <span className="min-w-0 flex-1 truncate">All systems operational</span>
-            <ExternalLink className="h-3 w-3 shrink-0 text-fg-disabled" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              All systems operational
+            </span>
+            <ExternalLink
+              className="h-3 w-3 shrink-0 text-fg-disabled"
+              aria-hidden="true"
+            />
           </a>
         )}
       </div>
@@ -836,7 +865,10 @@ export default function ConsoleSidebar() {
       <aside
         className={`hidden md:flex sticky top-0 z-30 h-screen shrink-0 flex-col ${desktopWidth} ${transition}`}
       >
-        <SidebarContent collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
+        <SidebarContent
+          collapsed={collapsed}
+          onToggleCollapsed={toggleCollapsed}
+        />
       </aside>
 
       {/* Mobile top bar with hamburger */}
@@ -861,7 +893,11 @@ export default function ConsoleSidebar() {
         ariaLabel="Navigation"
         side="left"
       >
-        <SidebarContent collapsed={false} hideToggle onNavigate={() => setDrawerOpen(false)} />
+        <SidebarContent
+          collapsed={false}
+          hideToggle
+          onNavigate={() => setDrawerOpen(false)}
+        />
       </Drawer>
     </>
   );

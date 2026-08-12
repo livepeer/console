@@ -24,7 +24,9 @@ interface WaveformStaticProps {
  * placeholder → result transition keeps identical bar geometry — only the
  * colour swaps.
  */
-export default function WaveformStatic({ dimmed = false }: WaveformStaticProps) {
+export default function WaveformStatic({
+  dimmed = false,
+}: WaveformStaticProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

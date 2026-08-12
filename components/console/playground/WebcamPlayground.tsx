@@ -18,7 +18,8 @@ const STYLE_FILTERS: Record<string, string> = {
   "style-transfer": "saturate(1.7) contrast(1.2) hue-rotate(20deg)",
   "depth-estimation": "grayscale(1) contrast(1.7) brightness(1.1) invert(0.05)",
   segmentation: "saturate(2.5) contrast(1.4) hue-rotate(180deg)",
-  compositing: "contrast(1.3) saturate(1.5) brightness(1.05) hue-rotate(-15deg)",
+  compositing:
+    "contrast(1.3) saturate(1.5) brightness(1.05) hue-rotate(-15deg)",
 };
 
 const INPUT_MODES = [
@@ -39,19 +40,19 @@ export default function WebcamPlayground({ model }: { model: App }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const styleField = cfg.fields.find(
-    (f) => f.name === "style" || f.name === "pipeline",
+    (f) => f.name === "style" || f.name === "pipeline"
   );
   const promptField = cfg.fields.find((f) => f.name === "prompt");
   const strengthField = cfg.fields.find((f) => f.name === "strength");
 
   const [selectedStyle, setSelectedStyle] = useState<string>(
-    (styleField?.defaultValue as string) ?? "none",
+    (styleField?.defaultValue as string) ?? "none"
   );
   const [prompt, setPrompt] = useState<string>(
-    (promptField?.defaultValue as string) ?? "",
+    (promptField?.defaultValue as string) ?? ""
   );
   const [strength, setStrength] = useState<number>(
-    (strengthField?.defaultValue as number) ?? 0.6,
+    (strengthField?.defaultValue as number) ?? 0.6
   );
 
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
@@ -80,7 +81,7 @@ export default function WebcamPlayground({ model }: { model: App }) {
     } catch (err) {
       setStatus("error");
       setErrorMsg(
-        err instanceof Error ? err.message : "Camera access was denied",
+        err instanceof Error ? err.message : "Camera access was denied"
       );
     }
   }, []);
@@ -107,7 +108,7 @@ export default function WebcamPlayground({ model }: { model: App }) {
   }, []);
 
   const filter =
-    status === "applied" ? STYLE_FILTERS[selectedStyle] ?? "" : "";
+    status === "applied" ? (STYLE_FILTERS[selectedStyle] ?? "") : "";
   const isLive = status === "live" || status === "applied";
 
   const payloadJson = useMemo(() => {
@@ -118,7 +119,15 @@ export default function WebcamPlayground({ model }: { model: App }) {
     if (styleField) payload[styleField.name] = selectedStyle;
     if (strengthField) payload.strength = strength;
     return JSON.stringify(payload, null, 2);
-  }, [model.id, promptField, styleField, strengthField, prompt, selectedStyle, strength]);
+  }, [
+    model.id,
+    promptField,
+    styleField,
+    strengthField,
+    prompt,
+    selectedStyle,
+    strength,
+  ]);
 
   return (
     <div>
@@ -236,7 +245,10 @@ export default function WebcamPlayground({ model }: { model: App }) {
                   <Select
                     id="webcam-style"
                     value={selectedStyle}
-                    options={styleField.options.map((o) => ({ value: o, label: o }))}
+                    options={styleField.options.map((o) => ({
+                      value: o,
+                      label: o,
+                    }))}
                     onChange={setSelectedStyle}
                   />
                 </div>
@@ -330,41 +342,41 @@ export default function WebcamPlayground({ model }: { model: App }) {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium text-fg-faint">Output</h3>
-              {status === "applied" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green-bright/10 px-2 py-0.5 text-[11px] font-medium text-green-bright">
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-bright" />
-                  Effect active
-                </span>
-              )}
-            </div>
-            <div className="relative aspect-video overflow-hidden rounded-lg border border-hairline bg-black">
-              <video
-                ref={outputVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`h-full w-full object-cover transition-[filter] duration-300 ${hasStream ? "" : "hidden"}`}
-                style={{ filter }}
-              />
-              {!hasStream && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
-                  <p className="text-xs text-fg-label">
-                    Output preview appears here
-                  </p>
-                  <p className="text-[11px] text-fg-disabled">
-                    {model.orchestrators} GPUs ready
-                  </p>
-                </div>
-              )}
-            </div>
-            {hasStream && (
-              <p className="mt-3 text-xs text-fg-faint">
-                {status === "applied" ? "Streaming through " : "Pass-through · "}
-                <span className="font-mono text-fg-strong">{model.name}</span>
-              </p>
+            {status === "applied" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-bright/10 px-2 py-0.5 text-[11px] font-medium text-green-bright">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-bright" />
+                Effect active
+              </span>
             )}
           </div>
+          <div className="relative aspect-video overflow-hidden rounded-lg border border-hairline bg-black">
+            <video
+              ref={outputVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`h-full w-full object-cover transition-[filter] duration-300 ${hasStream ? "" : "hidden"}`}
+              style={{ filter }}
+            />
+            {!hasStream && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
+                <p className="text-xs text-fg-label">
+                  Output preview appears here
+                </p>
+                <p className="text-[11px] text-fg-disabled">
+                  {model.orchestrators} GPUs ready
+                </p>
+              </div>
+            )}
+          </div>
+          {hasStream && (
+            <p className="mt-3 text-xs text-fg-faint">
+              {status === "applied" ? "Streaming through " : "Pass-through · "}
+              <span className="font-mono text-fg-strong">{model.name}</span>
+            </p>
+          )}
         </div>
+      </div>
     </div>
   );
 }

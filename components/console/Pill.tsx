@@ -11,7 +11,10 @@ interface PillProps {
   children: ReactNode;
 }
 
-const TONE_CLASSES: Record<Tone, { wrap: string; dot: string; pulse: boolean }> = {
+const TONE_CLASSES: Record<
+  Tone,
+  { wrap: string; dot: string; pulse: boolean }
+> = {
   live: {
     wrap: "border-green-bright/30 bg-green/15 text-green-bright",
     dot: "bg-green-bright",
@@ -47,7 +50,11 @@ const TONE_CLASSES: Record<Tone, { wrap: string; dot: string; pulse: boolean }> 
  * to signal real-time activity. Used for capability status (live / warm /
  * cold), run status (success / fail / timeout), and similar.
  */
-export default function Pill({ tone = "default", dot = true, children }: PillProps) {
+export default function Pill({
+  tone = "default",
+  dot = true,
+  children,
+}: PillProps) {
   const t = TONE_CLASSES[tone];
   return (
     <span

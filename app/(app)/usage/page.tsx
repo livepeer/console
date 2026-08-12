@@ -35,7 +35,9 @@ function UsageContent() {
   const weight =
     envFilter === ALL ? 1 : selected?.kind === "production" ? 0.91 : 0.09;
   const filterName =
-    envFilter === ALL ? "all environments" : (selected?.name ?? "all environments");
+    envFilter === ALL
+      ? "all environments"
+      : (selected?.name ?? "all environments");
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">

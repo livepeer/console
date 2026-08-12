@@ -54,7 +54,8 @@ function gpuShortName(name: string): string {
 // Sorted by count descending, "Other" always last
 const GPU_TYPE_KEYS = (() => {
   const latest = GPU_GROWTH[GPU_GROWTH.length - 1];
-  if (!latest?.byType) return ["H100", "A100", "A6000", "RTX 4090", "L40", "Other"];
+  if (!latest?.byType)
+    return ["H100", "A100", "A6000", "RTX 4090", "L40", "Other"];
   return Object.entries(latest.byType)
     .filter(([k]) => k !== "Other")
     .sort(([, a], [, b]) => b - a)
@@ -92,7 +93,10 @@ export default function GpusTab() {
     };
   }, [openIndex]);
 
-  const totalGpus = useMemo(() => GPU_NODES.reduce((s, n) => s + n.count, 0), []);
+  const totalGpus = useMemo(
+    () => GPU_NODES.reduce((s, n) => s + n.count, 0),
+    []
+  );
   const totalVram = useMemo(() => {
     // Extract numeric GB from memory strings like "141 GB HBM3e"
     return GPU_NODES.reduce((s, n) => {
@@ -100,19 +104,44 @@ export default function GpusTab() {
       return s + (isNaN(gb) ? 0 : gb * n.count);
     }, 0);
   }, []);
-  const gpuGrowthTicks = useMemo(() => computeAxisTicks(GPU_GROWTH, "date", 6), []);
+  const gpuGrowthTicks = useMemo(
+    () => computeAxisTicks(GPU_GROWTH, "date", 6),
+    []
+  );
   const latestGrowth = GPU_GROWTH[GPU_GROWTH.length - 1];
   const earliestGrowth = GPU_GROWTH[0];
   const growthPct = (
-    ((latestGrowth.total - earliestGrowth.total) / earliestGrowth.total) * 100
+    ((latestGrowth.total - earliestGrowth.total) / earliestGrowth.total) *
+    100
   ).toFixed(1);
 
-  const kpi: NetworkStat[] = useMemo(() => [
-    { label: "Total GPUs", value: totalGpus.toLocaleString(), delta: `+${growthPct}%`, trend: "up" as const },
-    { label: "GPU Types", value: `${GPU_NODES.length}`, trend: "flat" as const },
-    { label: "Total VRAM", value: `${(totalVram / 1000).toFixed(0)} TB`, trend: "flat" as const },
-    { label: "90D Growth", value: `${growthPct}%`, delta: `+${latestGrowth.total - earliestGrowth.total}`, trend: "up" as const },
-  ], [totalGpus, totalVram, growthPct, latestGrowth.total, earliestGrowth.total]);
+  const kpi: NetworkStat[] = useMemo(
+    () => [
+      {
+        label: "Total GPUs",
+        value: totalGpus.toLocaleString(),
+        delta: `+${growthPct}%`,
+        trend: "up" as const,
+      },
+      {
+        label: "GPU Types",
+        value: `${GPU_NODES.length}`,
+        trend: "flat" as const,
+      },
+      {
+        label: "Total VRAM",
+        value: `${(totalVram / 1000).toFixed(0)} TB`,
+        trend: "flat" as const,
+      },
+      {
+        label: "90D Growth",
+        value: `${growthPct}%`,
+        delta: `+${latestGrowth.total - earliestGrowth.total}`,
+        trend: "up" as const,
+      },
+    ],
+    [totalGpus, totalVram, growthPct, latestGrowth.total, earliestGrowth.total]
+  );
 
   // Mock sparklines for the 4 GPU KPIs — generated client-side only since
   // `generateSparklineData` uses `Math.random()` (would mismatch SSR/hydration
@@ -152,7 +181,7 @@ export default function GpusTab() {
       setTooltipShifts((prev) =>
         prev.length === next.length && prev.every((v, i) => v === next[i])
           ? prev
-          : next,
+          : next
       );
     };
     compute();
@@ -237,14 +266,37 @@ export default function GpusTab() {
           <AreaChart data={GPU_GROWTH}>
             <defs>
               <linearGradient id="gpuTotalFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                <stop
+                  offset="0%"
+                  stopColor="var(--chart-1)"
+                  stopOpacity={0.15}
+                />
+                <stop
+                  offset="100%"
+                  stopColor="var(--chart-1)"
+                  stopOpacity={0}
+                />
               </linearGradient>
               {chartMode === "byType" &&
                 GPU_TYPE_KEYS.map((key, i) => (
-                  <linearGradient key={key} id={`gpuFill-${i}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={GPU_COLORS[i]} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={GPU_COLORS[i]} stopOpacity={0.02} />
+                  <linearGradient
+                    key={key}
+                    id={`gpuFill-${i}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={GPU_COLORS[i]}
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={GPU_COLORS[i]}
+                      stopOpacity={0.02}
+                    />
                   </linearGradient>
                 ))}
             </defs>
@@ -261,7 +313,13 @@ export default function GpusTab() {
             <YAxis hide />
             {chartMode === "total" ? (
               <>
-                <Tooltip content={<SimpleChartTooltip formatValue={(v) => `${v.toLocaleString()} GPUs`} />} />
+                <Tooltip
+                  content={
+                    <SimpleChartTooltip
+                      formatValue={(v) => `${v.toLocaleString()} GPUs`}
+                    />
+                  }
+                />
                 <Area
                   type="monotone"
                   dataKey="total"
@@ -346,7 +404,14 @@ export default function GpusTab() {
                     width: `${pct}%`,
                     backgroundColor: GPU_COLORS[i % GPU_COLORS.length],
                     opacity: isOpen ? 1 : 0.75,
-                    borderRadius: isFirst && isLast ? "0.5rem" : isFirst ? "0.5rem 0 0 0.5rem" : isLast ? "0 0.5rem 0.5rem 0" : undefined,
+                    borderRadius:
+                      isFirst && isLast
+                        ? "0.5rem"
+                        : isFirst
+                          ? "0.5rem 0 0 0.5rem"
+                          : isLast
+                            ? "0 0.5rem 0.5rem 0"
+                            : undefined,
                   }}
                 >
                   {pct > 3 && (
@@ -366,7 +431,9 @@ export default function GpusTab() {
                       transform: `translateX(calc(-50% + ${shift}px))`,
                     }}
                   >
-                    <p className="whitespace-nowrap text-xs font-medium text-fg">{node.name}</p>
+                    <p className="whitespace-nowrap text-xs font-medium text-fg">
+                      {node.name}
+                    </p>
                     <p className="mt-0.5 whitespace-nowrap text-[11px] text-fg-faint">
                       {node.count} GPUs · {pct.toFixed(1)}%
                     </p>
@@ -392,11 +459,16 @@ export default function GpusTab() {
           {GPU_NODES.map((node, i) => {
             const pct = ((node.count / totalGpus) * 100).toFixed(1);
             return (
-              <div key={node.name} className="flex items-center gap-3 px-4 py-2.5">
+              <div
+                key={node.name}
+                className="flex items-center gap-3 px-4 py-2.5"
+              >
                 <span className="flex flex-1 items-center gap-2 text-sm text-fg-strong">
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: GPU_COLORS[i % GPU_COLORS.length] }}
+                    style={{
+                      backgroundColor: GPU_COLORS[i % GPU_COLORS.length],
+                    }}
                   />
                   <span className="truncate">{node.name}</span>
                 </span>
@@ -422,11 +494,15 @@ export default function GpusTab() {
 
         {/* Total row */}
         <div className="flex items-center gap-3 border-t border-subtle bg-zebra px-4 py-2.5">
-          <span className="flex-1 text-sm font-medium text-fg-muted">Total</span>
+          <span className="flex-1 text-sm font-medium text-fg-muted">
+            Total
+          </span>
           <span className="w-14 text-right text-sm font-semibold text-fg">
             {totalGpus.toLocaleString()}
           </span>
-          <span className="w-12 text-right text-[11px] text-fg-disabled">100%</span>
+          <span className="w-12 text-right text-[11px] text-fg-disabled">
+            100%
+          </span>
           <span className="hidden w-24 text-right text-xs text-fg-label sm:block">
             {(totalVram / 1000).toFixed(0)} TB
           </span>

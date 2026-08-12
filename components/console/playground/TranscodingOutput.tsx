@@ -38,7 +38,8 @@ const DEFAULT_LADDER: Rendition[] = [
 function randHex(len: number) {
   let out = "";
   const chars = "abcdef0123456789";
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < len; i++)
+    out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
 
@@ -56,7 +57,9 @@ function CopyChip({ label, value }: { label: string; value: string }) {
           size="xs"
         />
       </div>
-      <code className="break-all font-mono text-xs text-fg-strong">{value}</code>
+      <code className="break-all font-mono text-xs text-fg-strong">
+        {value}
+      </code>
     </div>
   );
 }
@@ -106,7 +109,9 @@ function HlsPlayerMock({
       {/* Live badge */}
       <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-md bg-overlay px-2 py-1 backdrop-blur-sm">
         <StatusDot tone="red" />
-        <span className="text-[10px] font-semibold tracking-wider text-fg">LIVE</span>
+        <span className="text-[10px] font-semibold tracking-wider text-fg">
+          LIVE
+        </span>
       </div>
 
       {/* Rendition switcher */}
@@ -130,7 +135,9 @@ function HlsPlayerMock({
                   setMenuOpen(false);
                 }}
                 className={`flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-tint focus:outline-none ${
-                  r.label === activeRendition.label ? "text-fg" : "text-fg-muted"
+                  r.label === activeRendition.label
+                    ? "text-fg"
+                    : "text-fg-muted"
                 }`}
               >
                 <span className="font-mono">{r.label}</span>
@@ -150,7 +157,8 @@ function HlsPlayerMock({
 
       {/* Resolution stamp */}
       <div className="absolute bottom-3 right-3 rounded-md bg-overlay px-2 py-1 font-mono text-[10px] text-fg-strong backdrop-blur-sm">
-        {activeRendition.width}×{activeRendition.height} · {activeRendition.fps}fps
+        {activeRendition.width}×{activeRendition.height} · {activeRendition.fps}
+        fps
       </div>
     </PlayerFrame>
   );
@@ -161,7 +169,11 @@ function TranscodingEmpty({ modelName }: { modelName?: string }) {
     <PlayerFrame>
       <div className="relative flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-hover">
-          <Radio className="h-6 w-6 text-fg-muted" strokeWidth={2} aria-hidden="true" />
+          <Radio
+            className="h-6 w-6 text-fg-muted"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
         </div>
         <p className="text-sm text-fg-faint">Ready to create a stream</p>
         <p className="max-w-sm text-xs text-fg-label">
@@ -179,7 +191,9 @@ function TranscodingLoading() {
     <PlayerFrame>
       <div className="relative flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-subtle border-t-green-bright" />
-        <p className="animate-pulse text-xs text-fg-faint">Provisioning stream…</p>
+        <p className="animate-pulse text-xs text-fg-faint">
+          Provisioning stream…
+        </p>
       </div>
     </PlayerFrame>
   );
@@ -193,7 +207,9 @@ export default function TranscodingOutput({
   posterUrl,
 }: TranscodingOutputProps) {
   const [viewMode, setViewMode] = useState<"preview" | "json">("preview");
-  const [activeRendition, setActiveRendition] = useState<Rendition>(DEFAULT_LADDER[0]);
+  const [activeRendition, setActiveRendition] = useState<Rendition>(
+    DEFAULT_LADDER[0]
+  );
 
   // Regenerate mock IDs per successful result so copy chips don't look static.
   const ids = useMemo(() => {
@@ -242,7 +258,7 @@ export default function TranscodingOutput({
           createdAt: new Date().toISOString(),
         },
         null,
-        2,
+        2
       )
     : "";
 

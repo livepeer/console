@@ -153,6 +153,6 @@ export default function Drawer({
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

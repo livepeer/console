@@ -57,19 +57,19 @@ lib/
 
 ## Routes
 
-| URL                | Auth     | Surface                          |
-| ------------------ | -------- | -------------------------------- |
-| `/`                | public   | Explore — redirects to `/home` when signed in |
-| `/explore`         | public   | Explore — app catalog            |
-| `/home`            | required | Console home (your runs / KPIs)  |
-| `/calls`           | required | Call history                     |
-| `/usage`           | required | Account usage                    |
-| `/keys`            | required | API keys                         |
-| `/settings`        | required | Account settings                 |
-| `/apps/[id]`       | public   | App detail + playground          |
-| `/orgs/[slug]`     | public   | Organization's published apps    |
-| `/network`         | public   | Network stats (sidebar: "Stats") |
-| `/login`           | public   | Sign in                          |
-| `/signup`          | public   | Sign up                          |
+| URL            | Auth     | Surface                                       |
+| -------------- | -------- | --------------------------------------------- |
+| `/`            | public   | Explore — redirects to `/home` when signed in |
+| `/explore`     | public   | Explore — app catalog                         |
+| `/home`        | required | Console home (your runs / KPIs)               |
+| `/calls`       | required | Call history                                  |
+| `/usage`       | required | Account usage                                 |
+| `/keys`        | required | API keys                                      |
+| `/settings`    | required | Account settings                              |
+| `/apps/[id]`   | public   | App detail + playground                       |
+| `/orgs/[slug]` | public   | Organization's published apps                 |
+| `/network`     | public   | Network stats (sidebar: "Stats")              |
+| `/login`       | public   | Sign in                                       |
+| `/signup`      | public   | Sign up                                       |
 
 See `CLAUDE.md` for console conventions (KPI rows, tables, motion tokens, color rules).

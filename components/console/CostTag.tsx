@@ -33,7 +33,7 @@ const LABELS: Record<CostMode, string> = {
  * with a primary action button, so it should be small and quiet.
  */
 export default function CostTag({ mode, cost, icon }: CostTagProps) {
-  const label = mode === "cost" ? cost ?? "" : LABELS[mode];
+  const label = mode === "cost" ? (cost ?? "") : LABELS[mode];
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${STYLES[mode]}`}

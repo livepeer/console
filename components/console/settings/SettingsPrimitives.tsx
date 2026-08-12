@@ -124,11 +124,11 @@ export function SettingsHeader({
         <h2 className="text-[17px] font-medium leading-tight tracking-[-0.01em] text-fg">
           {title}
         </h2>
-        {sub && (
-          <p className="mt-[3px] text-[12.5px] text-fg-faint">{sub}</p>
-        )}
+        {sub && <p className="mt-[3px] text-[12.5px] text-fg-faint">{sub}</p>}
       </div>
-      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+      {action && (
+        <div className="flex shrink-0 items-center gap-2">{action}</div>
+      )}
     </div>
   );
 }
@@ -222,10 +222,10 @@ export function IconButton({
   dim?: boolean;
 }) {
   const tone = primary
-    // `.btn-primary` is the theme-aware CTA recipe — green in dark, neutral
-    // zinc-900 in light. Recipe paints its own edge-highlight border
-    // (`--color-cta-border` = one step lighter than the bg).
-    ? "btn-primary"
+    ? // `.btn-primary` is the theme-aware CTA recipe — green in dark, neutral
+      // zinc-900 in light. Recipe paints its own edge-highlight border
+      // (`--color-cta-border` = one step lighter than the bg).
+      "btn-primary"
     : danger
       ? "border-red-400/30 bg-transparent text-red-400 hover:bg-red-400/[0.08]"
       : ghost
@@ -260,14 +260,11 @@ export type RolePillTone =
 // theme overrides because `text-green-bright` already steps down in light
 // mode (see globals.css `[data-theme="light"]` accent override).
 const ROLE_PILL_STYLES: Record<RolePillTone, string> = {
-  owner:
-    "border-green/30 bg-green/15 text-green-bright",
+  owner: "border-green/30 bg-green/15 text-green-bright",
   admin: "tone-violet",
   developer: "tone-cyan",
-  viewer:
-    "border-transparent text-fg-faint",
-  active:
-    "border-green/30 bg-green/15 text-green-bright",
+  viewer: "border-transparent text-fg-faint",
+  active: "border-green/30 bg-green/15 text-green-bright",
   paused: "tone-amber",
 };
 
@@ -314,9 +311,11 @@ export function SettingsAvatar({
       style={{
         width: size,
         height: size,
-        background: variant === "lp" ? "var(--color-green)" : color ?? "#3a3a3c",
+        background:
+          variant === "lp" ? "var(--color-green)" : (color ?? "#3a3a3c"),
         fontSize: size <= 24 ? 10.5 : 12.5,
-        border: variant === "lp" ? "1px solid var(--color-green-light)" : undefined,
+        border:
+          variant === "lp" ? "1px solid var(--color-green-light)" : undefined,
       }}
       aria-hidden="true"
     >

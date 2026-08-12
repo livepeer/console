@@ -65,7 +65,7 @@ function CallsViewInner() {
   const envScoped = useMemo(
     () =>
       allEnvs ? MOCK_RECENT_REQUESTS : recentRequestsForEnvironment(envFilter),
-    [allEnvs, envFilter],
+    [allEnvs, envFilter]
   );
   const counts = useMemo(
     () => ({
@@ -73,25 +73,26 @@ function CallsViewInner() {
       batch: envScoped.filter((r) => r.kind === "batch").length,
       live: envScoped.filter((r) => r.kind === "live").length,
     }),
-    [envScoped],
+    [envScoped]
   );
 
   const rows = useMemo(() => {
-    let scoped = kind === "all" ? envScoped : envScoped.filter((r) => r.kind === kind);
+    let scoped =
+      kind === "all" ? envScoped : envScoped.filter((r) => r.kind === kind);
     const q = query.trim().toLowerCase();
     if (q) {
       scoped = scoped.filter(
         (r) =>
           r.id.toLowerCase().includes(q) ||
           r.model.toLowerCase().includes(q) ||
-          r.pipeline.toLowerCase().includes(q),
+          r.pipeline.toLowerCase().includes(q)
       );
     }
     // Live, in-progress sessions float to the top — they're happening now.
     // (Array.sort is stable, so terminal rows keep their newest-first order.)
     return [...scoped].sort(
       (a, b) =>
-        (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1),
+        (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1)
     );
   }, [envScoped, kind, query]);
 

@@ -140,7 +140,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         // ignore — preference still applies for the session.
       }
     },
-    [applyResolved],
+    [applyResolved]
   );
 
   return (

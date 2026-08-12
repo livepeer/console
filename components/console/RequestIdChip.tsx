@@ -16,7 +16,10 @@ interface RequestIdChipProps {
  * The chip is the canonical surface for "the thing you'd quote to support."
  * Always full-width visible at sm:; truncates with the last 8 chars on mobile.
  */
-export default function RequestIdChip({ id, className = "" }: RequestIdChipProps) {
+export default function RequestIdChip({
+  id,
+  className = "",
+}: RequestIdChipProps) {
   // Truncated form for narrow screens — last 8 chars after the prefix so the
   // shape ("req_…abcd1234") is recognizable even when collapsed.
   const tail = id.length > 12 ? `…${id.slice(-8)}` : id;
@@ -29,12 +32,7 @@ export default function RequestIdChip({ id, className = "" }: RequestIdChipProps
         <span className="hidden sm:inline">{id}</span>
         <span className="sm:hidden">{tail}</span>
       </span>
-      <CopyButton
-        value={id}
-        iconOnly
-        size="xs"
-        ariaLabel="Copy request ID"
-      />
+      <CopyButton value={id} iconOnly size="xs" ariaLabel="Copy request ID" />
     </span>
   );
 }

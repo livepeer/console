@@ -1,7 +1,10 @@
 "use client";
 
 import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
-import { useTheme, type ThemePreference } from "@/components/console/ThemeContext";
+import {
+  useTheme,
+  type ThemePreference,
+} from "@/components/console/ThemeContext";
 import {
   SettingsCard,
   SettingsField,

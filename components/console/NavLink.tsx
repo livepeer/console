@@ -64,18 +64,16 @@ export default function NavLink({
     : locked
       ? "text-fg-faint hover:bg-hover hover:text-fg-strong"
       : "text-fg-strong hover:bg-hover hover:text-fg";
-  const layout = collapsed ? "mx-auto w-[26px] justify-center" : "w-full gap-2 px-2.5";
+  const layout = collapsed
+    ? "mx-auto w-[26px] justify-center"
+    : "w-full gap-2 px-2.5";
   const className = `${base} ${state} ${layout}`;
 
   const content = (
     <>
       <Icon
         className={`h-3.5 w-3.5 shrink-0 ${
-          active
-            ? "text-fg"
-            : locked
-              ? "text-fg-disabled"
-              : "text-fg-label"
+          active ? "text-fg" : locked ? "text-fg-disabled" : "text-fg-label"
         }`}
         aria-hidden="true"
       />

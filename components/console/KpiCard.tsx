@@ -28,7 +28,13 @@ const TREND_CLASS: Record<Trend, string> = {
   flat: "text-fg-faint bg-hover",
 };
 
-function Sparkline({ data, color = "#40bf86" }: { data: number[]; color?: string }) {
+function Sparkline({
+  data,
+  color = "#40bf86",
+}: {
+  data: number[];
+  color?: string;
+}) {
   const w = 100;
   const h = 22;
   const max = Math.max(...data);
@@ -88,7 +94,9 @@ export default function KpiCard({
       </p>
       <p className="flex items-baseline gap-1 text-[26px] font-semibold leading-normal tabular-nums tracking-[-0.02em] text-fg">
         <span>{value}</span>
-        {unit && <span className="text-[12px] font-normal text-fg-faint">{unit}</span>}
+        {unit && (
+          <span className="text-[12px] font-normal text-fg-faint">{unit}</span>
+        )}
       </p>
       {(delta || spark) && (
         <div className="flex items-center justify-between gap-3">

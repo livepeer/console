@@ -84,8 +84,7 @@ const ROUTE_COPY: Record<SignInWallRoute, RouteCopy> = {
   settings: {
     icon: Settings,
     title: "Settings — sign in",
-    description:
-      "Organization and account settings live behind sign-in.",
+    description: "Organization and account settings live behind sign-in.",
   },
 };
 
@@ -97,7 +96,11 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
       <div className="mx-auto flex w-full max-w-[480px] flex-col items-center px-7 pt-20 pb-20 text-center">
         {/* Icon tile — 48×48 rounded square, dim icon */}
         <div className="mb-5 grid h-12 w-12 place-items-center rounded-md border border-hairline bg-dark-card text-fg-muted">
-          <Icon className="h-[22px] w-[22px]" strokeWidth={1.5} aria-hidden="true" />
+          <Icon
+            className="h-[22px] w-[22px]"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
         </div>
 
         {/* Mono uppercase eyebrow — "ORGANIZATION · PRIVATE" */}

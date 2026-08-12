@@ -69,7 +69,9 @@ export default function EmptyState({
         )}
         <p className="text-sm font-medium text-fg text-balance">{title}</p>
         {description && (
-          <p className="mt-1 text-xs text-fg-faint text-balance">{description}</p>
+          <p className="mt-1 text-xs text-fg-faint text-balance">
+            {description}
+          </p>
         )}
         {action && (
           <ActionLink action={action} variant={variant} className="mt-4" />

@@ -45,7 +45,10 @@ export default function StackedAreaChart({
   }
 
   const topStroke = totals
-    .map((v, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`)
+    .map(
+      (v, i) =>
+        `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`
+    )
     .join(" ");
 
   const ticks = [
@@ -118,7 +121,7 @@ export function genCapSeries(
   base: number,
   drift: number,
   noise: number,
-  days = 30,
+  days = 30
 ): number[] {
   const arr: number[] = [];
   for (let i = days - 1; i >= 0; i--) {

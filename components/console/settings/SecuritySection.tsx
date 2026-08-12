@@ -20,9 +20,24 @@ interface SessionRow {
 }
 
 const SESSIONS: SessionRow[] = [
-  { device: "MacBook Pro · Chrome", where: "San Francisco, CA", when: "Active now", current: true },
-  { device: "iPhone 15 · Safari", where: "San Francisco, CA", when: "2 hours ago", current: false },
-  { device: "Linux · Firefox", where: "Portland, OR", when: "Yesterday", current: false },
+  {
+    device: "MacBook Pro · Chrome",
+    where: "San Francisco, CA",
+    when: "Active now",
+    current: true,
+  },
+  {
+    device: "iPhone 15 · Safari",
+    where: "San Francisco, CA",
+    when: "2 hours ago",
+    current: false,
+  },
+  {
+    device: "Linux · Firefox",
+    where: "Portland, OR",
+    when: "Yesterday",
+    current: false,
+  },
 ];
 
 /**
@@ -104,9 +119,7 @@ export default function SecuritySection() {
             className={`${ST_COLS_4} border-b border-hairline last:border-b-0 transition-colors hover:bg-zebra`}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-[13px] text-fg">
-                {s.device}
-              </span>
+              <span className="truncate text-[13px] text-fg">{s.device}</span>
               {s.current && <RolePill tone="active">this device</RolePill>}
             </div>
             <div className="text-[12.5px] text-fg-faint">{s.where}</div>

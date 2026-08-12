@@ -52,7 +52,7 @@ export function formatRunLatency(ms: number | null): string {
  */
 export function formatCallMetric(
   row: AccountActivityRow,
-  nowMs?: number,
+  nowMs?: number
 ): string {
   if (row.status === "active") {
     const startedMs = new Date(row.timestamp).getTime();
@@ -118,7 +118,7 @@ export function formatPrice(model: App): string {
 // never collapses to "$0.00".
 export function estimateCallCost(
   model: App,
-  inferenceTimeSeconds?: number,
+  inferenceTimeSeconds?: number
 ): string {
   const { amount, unit } = model.pricing;
   let cost: number;
@@ -169,11 +169,16 @@ export function generateMockUsageData(days: number = 30) {
 }
 
 const CATEGORY_GRADIENTS: Record<AppCategory, string> = {
-  "Video Generation": "linear-gradient(135deg, #0a1628 0%, #0d2137 50%, #0f3460 100%)",
-  "Video Editing": "linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #4a1942 100%)",
-  "Video Understanding": "linear-gradient(135deg, #0a1a0a 0%, #1a2e1a 50%, #0f3d2e 100%)",
-  "Live Transcoding": "linear-gradient(135deg, #0a1628 0%, #102030 50%, #1a3040 100%)",
-  "Image Generation": "linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #4a1942 100%)",
+  "Video Generation":
+    "linear-gradient(135deg, #0a1628 0%, #0d2137 50%, #0f3460 100%)",
+  "Video Editing":
+    "linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #4a1942 100%)",
+  "Video Understanding":
+    "linear-gradient(135deg, #0a1a0a 0%, #1a2e1a 50%, #0f3d2e 100%)",
+  "Live Transcoding":
+    "linear-gradient(135deg, #0a1628 0%, #102030 50%, #1a3040 100%)",
+  "Image Generation":
+    "linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 50%, #4a1942 100%)",
   Speech: "linear-gradient(135deg, #1a1a1a 0%, #2a1f1a 50%, #3d2b1a 100%)",
   Language: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
 };
@@ -185,7 +190,7 @@ export function getCategoryGradient(category: AppCategory): string {
 export function computeAxisTicks<T, K extends keyof T>(
   data: T[],
   key: K,
-  targetCount: number = 6,
+  targetCount: number = 6
 ): Array<T[K]> {
   if (data.length === 0) return [];
   if (data.length <= targetCount) return data.map((d) => d[key]);

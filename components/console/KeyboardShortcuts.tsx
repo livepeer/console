@@ -157,7 +157,7 @@ export default function KeyboardShortcuts() {
                         >
                           {k}
                         </kbd>
-                      ),
+                      )
                     )}
                   </span>
                 </div>

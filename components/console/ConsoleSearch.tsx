@@ -17,31 +17,99 @@ interface SearchResult {
 // ─── Suggestions (shown before typing) ───────────────────────────────────────
 
 const SUGGESTIONS: SearchResult[] = [
-  { title: "Generate a video", subtitle: "Text-to-video and image-to-video on the network", href: "/explore" },
-  { title: "Explore apps", subtitle: "Browse apps available on the network", href: "/explore" },
-  { title: "Get your API key", subtitle: "Authenticate and start sending requests", href: "/settings?tab=tokens" },
-  { title: "Transcode a stream", subtitle: "Live transcoding on GPU infrastructure", href: "/apps/frameworks-transcoding" },
+  {
+    title: "Generate a video",
+    subtitle: "Text-to-video and image-to-video on the network",
+    href: "/explore",
+  },
+  {
+    title: "Explore apps",
+    subtitle: "Browse apps available on the network",
+    href: "/explore",
+  },
+  {
+    title: "Get your API key",
+    subtitle: "Authenticate and start sending requests",
+    href: "/settings?tab=tokens",
+  },
+  {
+    title: "Transcode a stream",
+    subtitle: "Live transcoding on GPU infrastructure",
+    href: "/apps/frameworks-transcoding",
+  },
 ];
 
 // ─── All searchable items ────────────────────────────────────────────────────
 
 const ALL_RESULTS: SearchResult[] = [
   ...SUGGESTIONS,
-  { title: "Daydream Video API", subtitle: "Real-time AI video generation", href: "/apps/daydream-video" },
-  { title: "Frameworks Transcoding", subtitle: "Adaptive bitrate transcoding", href: "/apps/frameworks-transcoding" },
-  { title: "FLUX.1 [schnell]", subtitle: "Fast text-to-image generation", href: "/apps/flux-schnell" },
-  { title: "SDXL Turbo", subtitle: "Real-time image generation", href: "/apps/sdxl-turbo" },
-  { title: "Stable Video Diffusion", subtitle: "Image-to-video synthesis", href: "/apps/stable-video-diffusion" },
-  { title: "LivePortrait", subtitle: "Real-time portrait animation", href: "/apps/live-video-to-video" },
-  { title: "Qwen3 32B", subtitle: "Large language model", href: "/apps/qwen3-32b" },
-  { title: "Llama 3 70B", subtitle: "Open LLM for chat and instructions", href: "/apps/llama-3-70b" },
-  { title: "Whisper v3 Large", subtitle: "Speech-to-text transcription", href: "/apps/whisper-v3" },
-  { title: "Kokoro TTS", subtitle: "Text-to-speech synthesis", href: "/apps/kokoro-tts" },
+  {
+    title: "Daydream Video API",
+    subtitle: "Real-time AI video generation",
+    href: "/apps/daydream-video",
+  },
+  {
+    title: "Frameworks Transcoding",
+    subtitle: "Adaptive bitrate transcoding",
+    href: "/apps/frameworks-transcoding",
+  },
+  {
+    title: "FLUX.1 [schnell]",
+    subtitle: "Fast text-to-image generation",
+    href: "/apps/flux-schnell",
+  },
+  {
+    title: "SDXL Turbo",
+    subtitle: "Real-time image generation",
+    href: "/apps/sdxl-turbo",
+  },
+  {
+    title: "Stable Video Diffusion",
+    subtitle: "Image-to-video synthesis",
+    href: "/apps/stable-video-diffusion",
+  },
+  {
+    title: "LivePortrait",
+    subtitle: "Real-time portrait animation",
+    href: "/apps/live-video-to-video",
+  },
+  {
+    title: "Qwen3 32B",
+    subtitle: "Large language model",
+    href: "/apps/qwen3-32b",
+  },
+  {
+    title: "Llama 3 70B",
+    subtitle: "Open LLM for chat and instructions",
+    href: "/apps/llama-3-70b",
+  },
+  {
+    title: "Whisper v3 Large",
+    subtitle: "Speech-to-text transcription",
+    href: "/apps/whisper-v3",
+  },
+  {
+    title: "Kokoro TTS",
+    subtitle: "Text-to-speech synthesis",
+    href: "/apps/kokoro-tts",
+  },
   { title: "Home", subtitle: "Console overview", href: "/home" },
-  { title: "API Tokens", subtitle: "Manage your API keys", href: "/settings?tab=tokens" },
-  { title: "Billing", subtitle: "Manage billing and payments", href: "/settings?tab=billing" },
+  {
+    title: "API Tokens",
+    subtitle: "Manage your API keys",
+    href: "/settings?tab=tokens",
+  },
+  {
+    title: "Billing",
+    subtitle: "Manage billing and payments",
+    href: "/settings?tab=billing",
+  },
   { title: "Usage", subtitle: "Request volume and spend", href: "/usage" },
-  { title: "Account", subtitle: "Profile and security", href: "/settings?tab=account" },
+  {
+    title: "Account",
+    subtitle: "Profile and security",
+    href: "/settings?tab=account",
+  },
   { title: "Settings", subtitle: "Account settings", href: "/settings" },
 ];
 
@@ -52,7 +120,9 @@ interface ConsoleSearchProps {
   mobile?: boolean;
 }
 
-export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {}) {
+export default function ConsoleSearch({
+  mobile = false,
+}: ConsoleSearchProps = {}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -61,14 +131,20 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
   const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const results = query.trim() === ""
-    ? SUGGESTIONS
-    : ALL_RESULTS.filter((r) => {
-        const q = query.toLowerCase();
-        return r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q);
-      });
+  const results =
+    query.trim() === ""
+      ? SUGGESTIONS
+      : ALL_RESULTS.filter((r) => {
+          const q = query.toLowerCase();
+          return (
+            r.title.toLowerCase().includes(q) ||
+            r.subtitle.toLowerCase().includes(q)
+          );
+        });
 
-  useEffect(() => { setHighlightedIndex(0); }, [query]);
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query]);
 
   useEffect(() => {
     if (!listRef.current) return;
@@ -87,14 +163,17 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
     setQuery("");
   }, []);
 
-  const navigate = useCallback((href: string) => {
-    closeDialog();
-    if (href.startsWith("http")) {
-      window.open(href, "_blank", "noopener,noreferrer");
-    } else {
-      router.push(href);
-    }
-  }, [closeDialog, router]);
+  const navigate = useCallback(
+    (href: string) => {
+      closeDialog();
+      if (href.startsWith("http")) {
+        window.open(href, "_blank", "noopener,noreferrer");
+      } else {
+        router.push(href);
+      }
+    },
+    [closeDialog, router]
+  );
 
   // Global ⌘K / Ctrl+K
   useEffect(() => {
@@ -103,7 +182,8 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
       const trigger = isMac ? e.metaKey : e.ctrlKey;
       if (trigger && e.key === "k") {
         e.preventDefault();
-        if (open) closeDialog(); else openDialog();
+        if (open) closeDialog();
+        else openDialog();
       }
     };
     document.addEventListener("keydown", handler);
@@ -127,7 +207,10 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
         break;
       case "ArrowUp":
         e.preventDefault();
-        setHighlightedIndex((i) => (i - 1 + Math.max(results.length, 1)) % Math.max(results.length, 1));
+        setHighlightedIndex(
+          (i) =>
+            (i - 1 + Math.max(results.length, 1)) % Math.max(results.length, 1)
+        );
         break;
       case "Enter": {
         e.preventDefault();
@@ -214,7 +297,11 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
               <p className="text-xs text-fg-disabled">
                 Try a capability name or keyword
               </p>
-              <Link href="/explore" onClick={closeDialog} className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors">
+              <Link
+                href="/explore"
+                onClick={closeDialog}
+                className="mt-1 text-xs text-green-bright/60 hover:text-fg transition-colors"
+              >
                 Browse all capabilities →
               </Link>
             </div>
@@ -230,16 +317,25 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
                   i === highlightedIndex ? "bg-hover" : ""
                 }`}
               >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-                  i === highlightedIndex
-                    ? "border-subtle bg-tint"
-                    : "border-hairline bg-zebra"
-                }`}>
-                  <ArrowRight className={`h-4 w-4 ${i === highlightedIndex ? "text-fg-muted" : "text-fg-disabled"}`} aria-hidden="true" />
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                    i === highlightedIndex
+                      ? "border-subtle bg-tint"
+                      : "border-hairline bg-zebra"
+                  }`}
+                >
+                  <ArrowRight
+                    className={`h-4 w-4 ${i === highlightedIndex ? "text-fg-muted" : "text-fg-disabled"}`}
+                    aria-hidden="true"
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-medium text-fg">{result.title}</span>
-                  <span className="block truncate text-sm text-fg-label">{result.subtitle}</span>
+                  <span className="block truncate text-[15px] font-medium text-fg">
+                    {result.title}
+                  </span>
+                  <span className="block truncate text-sm text-fg-label">
+                    {result.subtitle}
+                  </span>
                 </div>
               </button>
             ))
@@ -251,10 +347,17 @@ export default function ConsoleSearch({ mobile = false }: ConsoleSearchProps = {
         {/* Footer */}
         <div className="px-6 py-4 text-center text-xs text-fg-disabled">
           Try{" "}
-          <span className="text-green-bright/60">&ldquo;text-to-video&rdquo;</span>,{" "}
-          <span className="text-green-bright/60">&ldquo;live transcoding&rdquo;</span>,{" "}
-          or{" "}
-          <span className="text-green-bright/60">&ldquo;portrait animation&rdquo;</span>
+          <span className="text-green-bright/60">
+            &ldquo;text-to-video&rdquo;
+          </span>
+          ,{" "}
+          <span className="text-green-bright/60">
+            &ldquo;live transcoding&rdquo;
+          </span>
+          , or{" "}
+          <span className="text-green-bright/60">
+            &ldquo;portrait animation&rdquo;
+          </span>
         </div>
       </Dialog>
     </>

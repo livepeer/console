@@ -65,16 +65,32 @@ export const DEFAULT_ENVIRONMENT: Environment =
 // `building` to exercise the non-happy states (matches the SDK doc's ⏳ items).
 
 const BATCH_ENDPOINTS = [
-  { method: "POST", path: "/predict", description: "Request/response inference" },
+  {
+    method: "POST",
+    path: "/predict",
+    description: "Request/response inference",
+  },
   { method: "GET", path: "/health", description: "Health probe" },
 ];
 const SSE_ENDPOINTS = [
-  { method: "POST", path: "/predict", description: "Streaming inference (SSE)" },
+  {
+    method: "POST",
+    path: "/predict",
+    description: "Streaming inference (SSE)",
+  },
   { method: "GET", path: "/health", description: "Health probe" },
 ];
 const LIVE_ENDPOINTS = [
-  { method: "POST", path: "/stream/start", description: "Begin a trickle session" },
-  { method: "POST", path: "/stream/params", description: "Update params mid-stream" },
+  {
+    method: "POST",
+    path: "/stream/start",
+    description: "Begin a trickle session",
+  },
+  {
+    method: "POST",
+    path: "/stream/params",
+    description: "Update params mid-stream",
+  },
   { method: "POST", path: "/stream/stop", description: "End the session" },
   { method: "GET", path: "/health", description: "Health probe" },
 ];
@@ -437,7 +453,11 @@ function legacyToApp(d: LegacyDeployment): App {
 const CATALOG_DEPLOYED_AT = "2025-05-01T12:00:00Z";
 
 const CATALOG_BATCH_ENDPOINTS: PipelineEndpoint[] = [
-  { method: "POST", path: "/predict", description: "Request/response inference" },
+  {
+    method: "POST",
+    path: "/predict",
+    description: "Request/response inference",
+  },
   { method: "GET", path: "/health", description: "Health probe" },
 ];
 const CATALOG_LIVE_ENDPOINTS: PipelineEndpoint[] = [
@@ -557,7 +577,14 @@ const CATALOG_MODELS: App[] = [
           name: "style",
           label: "Style Preset",
           type: "select",
-          options: ["cinematic", "anime", "watercolor", "neon", "sketch", "none"],
+          options: [
+            "cinematic",
+            "anime",
+            "watercolor",
+            "neon",
+            "sketch",
+            "none",
+          ],
           defaultValue: "cinematic",
           description: "Pre-defined style preset to apply.",
         },
@@ -569,7 +596,8 @@ const CATALOG_MODELS: App[] = [
           max: 1,
           step: 0.05,
           defaultValue: 0.7,
-          description: "How strongly the style is applied. 0 = no effect, 1 = full effect.",
+          description:
+            "How strongly the style is applied. 0 = no effect, 1 = full effect.",
         },
       ],
       outputType: "video",
@@ -635,8 +663,10 @@ Full-stack real-time AI video API powered by the Livepeer network.
           name: "source_url",
           label: "Source",
           type: "text",
-          placeholder: "rtmp://rtmp.frameworks.network/live or https://example.com/video.mp4",
-          description: "RTMP/WHIP ingest URL for live, or an HTTPS file URL for VOD.",
+          placeholder:
+            "rtmp://rtmp.frameworks.network/live or https://example.com/video.mp4",
+          description:
+            "RTMP/WHIP ingest URL for live, or an HTTPS file URL for VOD.",
         },
         {
           name: "profile",
@@ -644,14 +674,16 @@ Full-stack real-time AI video API powered by the Livepeer network.
           type: "select",
           options: ["adaptive", "1080p", "720p", "480p"],
           defaultValue: "adaptive",
-          description: "adaptive ladders 240p → 720p. Single values cap the top rendition.",
+          description:
+            "adaptive ladders 240p → 720p. Single values cap the top rendition.",
         },
         {
           name: "record",
           label: "Record to VOD",
           type: "boolean",
           defaultValue: true,
-          description: "Persist the stream as a playable recording after it ends.",
+          description:
+            "Persist the stream as a playable recording after it ends.",
         },
       ],
       outputType: "json",
@@ -778,7 +810,8 @@ Very fast image generation and editing model. 4 steps distilled, sub-second infe
           label: "Prompt",
           type: "textarea",
           required: true,
-          placeholder: "A photorealistic portrait of a cat wearing a top hat...",
+          placeholder:
+            "A photorealistic portrait of a cat wearing a top hat...",
           description: "Text prompt for image generation.",
         },
         {
@@ -844,7 +877,8 @@ Single-step image generation for real-time applications. Based on Stable Diffusi
           label: "Image",
           type: "file",
           required: true,
-          description: "Input image to transform. Must be jpeg, png, gif, or webp.",
+          description:
+            "Input image to transform. Must be jpeg, png, gif, or webp.",
         },
         {
           name: "prompt",
@@ -1057,7 +1091,8 @@ Typical end-to-end: 20-40ms per frame on dedicated orchestrators.`,
           max: 2,
           step: 0.1,
           defaultValue: 0.7,
-          description: "Controls randomness. Lower = more focused, higher = more creative.",
+          description:
+            "Controls randomness. Lower = more focused, higher = more creative.",
         },
         {
           name: "max_tokens",
@@ -1206,7 +1241,8 @@ This implementation has O(log n) time complexity and O(1) space complexity.`,
           label: "Audio File",
           type: "file",
           required: true,
-          description: "Audio file to transcribe. Supports mp3, wav, m4a, webm.",
+          description:
+            "Audio file to transcribe. Supports mp3, wav, m4a, webm.",
         },
         {
           name: "language",
@@ -1280,14 +1316,7 @@ mp3, mp4, mpeg, mpga, m4a, wav, webm
           name: "voice",
           label: "Voice",
           type: "select",
-          options: [
-            "alloy",
-            "echo",
-            "fable",
-            "onyx",
-            "nova",
-            "shimmer",
-          ],
+          options: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
           defaultValue: "nova",
           description: "Voice preset to use.",
         },
@@ -1748,7 +1777,7 @@ export function getPipelineById(id: string): App | undefined {
 
 /** The org's own deployed apps. */
 export const PIPELINE_APP_IDS: ReadonlySet<string> = new Set(
-  APPS.filter((a) => a.provider === OWNED_APP_PROVIDER).map((a) => a.id),
+  APPS.filter((a) => a.provider === OWNED_APP_PROVIDER).map((a) => a.id)
 );
 
 /** All apps sharing a `pipelineId` — the per-environment deployments. */
@@ -1766,7 +1795,7 @@ function readVisibilityOverrides(): Record<string, PipelineVisibility> {
   if (typeof window === "undefined") return {};
   try {
     return JSON.parse(
-      localStorage.getItem(PIPELINE_VISIBILITY_KEY) || "{}",
+      localStorage.getItem(PIPELINE_VISIBILITY_KEY) || "{}"
     ) as Record<string, PipelineVisibility>;
   } catch {
     return {};
@@ -1774,12 +1803,14 @@ function readVisibilityOverrides(): Record<string, PipelineVisibility> {
 }
 
 export function effectiveVisibility(app: App): PipelineVisibility {
-  return readVisibilityOverrides()[app.id] ?? app.deployment?.visibility ?? "private";
+  return (
+    readVisibilityOverrides()[app.id] ?? app.deployment?.visibility ?? "private"
+  );
 }
 
 export function setPipelineVisibility(
   id: string,
-  visibility: PipelineVisibility,
+  visibility: PipelineVisibility
 ): void {
   if (typeof window === "undefined") return;
   const overrides = readVisibilityOverrides();
@@ -1791,7 +1822,7 @@ export function setPipelineVisibility(
 export function publicPipelines(): App[] {
   return APPS.filter(
     (a) =>
-      a.provider === OWNED_APP_PROVIDER && effectiveVisibility(a) === "public",
+      a.provider === OWNED_APP_PROVIDER && effectiveVisibility(a) === "public"
   );
 }
 
@@ -1800,7 +1831,7 @@ export function publicPipelines(): App[] {
 // render agree; a useEffect then swaps in the localStorage-aware set.
 export const SEED_PUBLIC_PIPELINE_APPS: App[] = APPS.filter(
   (a) =>
-    a.provider === OWNED_APP_PROVIDER && a.deployment?.visibility === "public",
+    a.provider === OWNED_APP_PROVIDER && a.deployment?.visibility === "public"
 );
 
 // ─── Organizations (publisher profiles) ──────────────────────────────────────────
@@ -1837,7 +1868,7 @@ function organizationInitials(name: string): string {
 function publicCatalog(): App[] {
   return APPS.filter(
     (a) =>
-      a.provider !== OWNED_APP_PROVIDER || a.deployment?.visibility === "public",
+      a.provider !== OWNED_APP_PROVIDER || a.deployment?.visibility === "public"
   );
 }
 
@@ -1846,7 +1877,9 @@ export function appsForOrganization(slug: string): App[] {
 }
 
 export function getOrganizationBySlug(slug: string): Organization | undefined {
-  const match = publicCatalog().find((a) => organizationSlug(a.provider) === slug);
+  const match = publicCatalog().find(
+    (a) => organizationSlug(a.provider) === slug
+  );
   if (!match) return undefined;
   return {
     slug,
@@ -1865,7 +1898,11 @@ export const SOLUTIONS: SolutionProvider[] = [
     description:
       "Full-stack real-time AI video API with world generation, style transfer, and depth estimation. Built on Livepeer's open network of orchestrators.",
     dashboardUrl: "https://daydream.live/home",
-    capabilities: ["Video Generation", "Image Generation", "Video Understanding"],
+    capabilities: [
+      "Video Generation",
+      "Image Generation",
+      "Video Understanding",
+    ],
     pricingSummary: "Usage-based from $0.006/min",
     trustBadges: ["Managed", "SLA"],
   },
@@ -2037,16 +2074,76 @@ export const ECOSYSTEM_APPS: EcosystemApp[] = [
 // ─── Stats: GPU Nodes ────────────────────────────────────────────────────────
 
 export const GPU_NODES: GpuNode[] = [
-  { name: "NVIDIA H100 80GB SXM", count: 724, memory: "141 GB HBM3e", tflops: 67, maxPower: "700W" },
-  { name: "NVIDIA RTX A6000", count: 103, memory: "48 GB GDDR6", tflops: 38.7, maxPower: "300W" },
-  { name: "NVIDIA A100 80GB SXM", count: 80, memory: "80 GB HBM2e", tflops: 19.5, maxPower: "400W" },
-  { name: "NVIDIA RTX 4090", count: 62, memory: "24 GB GDDR6X", tflops: 82.6, maxPower: "450W" },
-  { name: "NVIDIA L40", count: 45, memory: "48 GB GDDR6", tflops: 90.5, maxPower: "300W" },
-  { name: "NVIDIA A100 40GB", count: 38, memory: "40 GB HBM2e", tflops: 19.5, maxPower: "250W" },
-  { name: "NVIDIA RTX 3090", count: 29, memory: "24 GB GDDR6X", tflops: 35.6, maxPower: "350W" },
-  { name: "NVIDIA L4", count: 22, memory: "24 GB GDDR6", tflops: 30.3, maxPower: "72W" },
-  { name: "NVIDIA RTX 6000 Ada", count: 18, memory: "48 GB GDDR6", tflops: 91.1, maxPower: "300W" },
-  { name: "NVIDIA A10G", count: 15, memory: "24 GB GDDR6", tflops: 31.2, maxPower: "150W" },
+  {
+    name: "NVIDIA H100 80GB SXM",
+    count: 724,
+    memory: "141 GB HBM3e",
+    tflops: 67,
+    maxPower: "700W",
+  },
+  {
+    name: "NVIDIA RTX A6000",
+    count: 103,
+    memory: "48 GB GDDR6",
+    tflops: 38.7,
+    maxPower: "300W",
+  },
+  {
+    name: "NVIDIA A100 80GB SXM",
+    count: 80,
+    memory: "80 GB HBM2e",
+    tflops: 19.5,
+    maxPower: "400W",
+  },
+  {
+    name: "NVIDIA RTX 4090",
+    count: 62,
+    memory: "24 GB GDDR6X",
+    tflops: 82.6,
+    maxPower: "450W",
+  },
+  {
+    name: "NVIDIA L40",
+    count: 45,
+    memory: "48 GB GDDR6",
+    tflops: 90.5,
+    maxPower: "300W",
+  },
+  {
+    name: "NVIDIA A100 40GB",
+    count: 38,
+    memory: "40 GB HBM2e",
+    tflops: 19.5,
+    maxPower: "250W",
+  },
+  {
+    name: "NVIDIA RTX 3090",
+    count: 29,
+    memory: "24 GB GDDR6X",
+    tflops: 35.6,
+    maxPower: "350W",
+  },
+  {
+    name: "NVIDIA L4",
+    count: 22,
+    memory: "24 GB GDDR6",
+    tflops: 30.3,
+    maxPower: "72W",
+  },
+  {
+    name: "NVIDIA RTX 6000 Ada",
+    count: 18,
+    memory: "48 GB GDDR6",
+    tflops: 91.1,
+    maxPower: "300W",
+  },
+  {
+    name: "NVIDIA A10G",
+    count: 15,
+    memory: "24 GB GDDR6",
+    tflops: 31.2,
+    maxPower: "150W",
+  },
 ];
 
 // ─── Stats: GPU Growth ───────────────────────────────────────────────────────
@@ -2064,12 +2161,12 @@ function generateGpuGrowth(): GpuGrowthPoint[] {
       date: date.toISOString().split("T")[0],
       total,
       byType: {
-        "H100": Math.round(total * 0.62),
-        "A6000": Math.round(total * 0.09),
-        "A100": Math.round(total * 0.10),
+        H100: Math.round(total * 0.62),
+        A6000: Math.round(total * 0.09),
+        A100: Math.round(total * 0.1),
         "RTX 4090": Math.round(total * 0.05),
-        "L40": Math.round(total * 0.04),
-        "Other": Math.round(total * 0.10),
+        L40: Math.round(total * 0.04),
+        Other: Math.round(total * 0.1),
       },
     });
   }
@@ -2081,35 +2178,239 @@ export const GPU_GROWTH: GpuGrowthPoint[] = generateGpuGrowth();
 // ─── Stats: Pipeline Utilization ─────────────────────────────────────────────
 
 export const PIPELINE_UTILIZATION: PipelineUtilization[] = [
-  { id: "text-to-image", name: "Text to Image", warmOrchestrators: 47, totalCapacity: 72, utilizationPct: 78, avgLatencyMs: 1800, status: "active", price: 0.005, priceUnit: "/req" },
-  { id: "image-to-image", name: "Image to Image", warmOrchestrators: 38, totalCapacity: 64, utilizationPct: 65, avgLatencyMs: 2100, status: "active", price: 0.008, priceUnit: "/req" },
-  { id: "image-to-video", name: "Image to Video", warmOrchestrators: 29, totalCapacity: 45, utilizationPct: 82, avgLatencyMs: 4200, status: "active", price: 0.05, priceUnit: "/sec" },
-  { id: "live-video-to-video", name: "Live Video to Video", warmOrchestrators: 32, totalCapacity: 52, utilizationPct: 71, avgLatencyMs: 22, status: "active", price: 0.006, priceUnit: "/min" },
-  { id: "text-to-speech", name: "Text to Speech", warmOrchestrators: 18, totalCapacity: 30, utilizationPct: 45, avgLatencyMs: 340, status: "active", price: 0.002, priceUnit: "/req" },
-  { id: "audio-to-text", name: "Audio to Text", warmOrchestrators: 22, totalCapacity: 35, utilizationPct: 52, avgLatencyMs: 890, status: "active", price: 0.003, priceUnit: "/min" },
-  { id: "llm", name: "LLM Inference", warmOrchestrators: 15, totalCapacity: 24, utilizationPct: 88, avgLatencyMs: 120, status: "active", price: 0.01, priceUnit: "/M tok" },
-  { id: "segment-anything", name: "Segment Anything", warmOrchestrators: 8, totalCapacity: 20, utilizationPct: 18, avgLatencyMs: 950, status: "degraded", price: 0.004, priceUnit: "/req" },
-  { id: "object-detection", name: "Object Detection", warmOrchestrators: 3, totalCapacity: 15, utilizationPct: 5, avgLatencyMs: 0, status: "cold", price: 0.003, priceUnit: "/req" },
+  {
+    id: "text-to-image",
+    name: "Text to Image",
+    warmOrchestrators: 47,
+    totalCapacity: 72,
+    utilizationPct: 78,
+    avgLatencyMs: 1800,
+    status: "active",
+    price: 0.005,
+    priceUnit: "/req",
+  },
+  {
+    id: "image-to-image",
+    name: "Image to Image",
+    warmOrchestrators: 38,
+    totalCapacity: 64,
+    utilizationPct: 65,
+    avgLatencyMs: 2100,
+    status: "active",
+    price: 0.008,
+    priceUnit: "/req",
+  },
+  {
+    id: "image-to-video",
+    name: "Image to Video",
+    warmOrchestrators: 29,
+    totalCapacity: 45,
+    utilizationPct: 82,
+    avgLatencyMs: 4200,
+    status: "active",
+    price: 0.05,
+    priceUnit: "/sec",
+  },
+  {
+    id: "live-video-to-video",
+    name: "Live Video to Video",
+    warmOrchestrators: 32,
+    totalCapacity: 52,
+    utilizationPct: 71,
+    avgLatencyMs: 22,
+    status: "active",
+    price: 0.006,
+    priceUnit: "/min",
+  },
+  {
+    id: "text-to-speech",
+    name: "Text to Speech",
+    warmOrchestrators: 18,
+    totalCapacity: 30,
+    utilizationPct: 45,
+    avgLatencyMs: 340,
+    status: "active",
+    price: 0.002,
+    priceUnit: "/req",
+  },
+  {
+    id: "audio-to-text",
+    name: "Audio to Text",
+    warmOrchestrators: 22,
+    totalCapacity: 35,
+    utilizationPct: 52,
+    avgLatencyMs: 890,
+    status: "active",
+    price: 0.003,
+    priceUnit: "/min",
+  },
+  {
+    id: "llm",
+    name: "LLM Inference",
+    warmOrchestrators: 15,
+    totalCapacity: 24,
+    utilizationPct: 88,
+    avgLatencyMs: 120,
+    status: "active",
+    price: 0.01,
+    priceUnit: "/M tok",
+  },
+  {
+    id: "segment-anything",
+    name: "Segment Anything",
+    warmOrchestrators: 8,
+    totalCapacity: 20,
+    utilizationPct: 18,
+    avgLatencyMs: 950,
+    status: "degraded",
+    price: 0.004,
+    priceUnit: "/req",
+  },
+  {
+    id: "object-detection",
+    name: "Object Detection",
+    warmOrchestrators: 3,
+    totalCapacity: 15,
+    utilizationPct: 5,
+    avgLatencyMs: 0,
+    status: "cold",
+    price: 0.003,
+    priceUnit: "/req",
+  },
 ];
 
 // ─── Stats: Live Job Feed ────────────────────────────────────────────────────
 
 export const LIVE_JOBS: LiveJob[] = [
-  { id: "j1", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl-v2v", fpsIn: 24.08, fpsOut: 21.38, age: "0s", status: "online" },
-  { id: "j2", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl-v2v", fpsIn: 23.98, fpsOut: 21.48, age: "0s", status: "online" },
-  { id: "j3", pipeline: "text-to-image", model: "FLUX.1 schnell", latencyMs: 1820, age: "2s", status: "online" },
-  { id: "j4", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 11.64, fpsOut: 4.15, age: "10s", status: "degraded" },
-  { id: "j5", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 14.53, fpsOut: 6.64, age: "10s", status: "degraded" },
-  { id: "j6", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 24.03, fpsOut: 19.73, age: "10s", status: "online" },
-  { id: "j7", pipeline: "text-to-image", model: "SDXL Turbo", latencyMs: 920, age: "15s", status: "completed" },
-  { id: "j8", pipeline: "llm", model: "Qwen3 32B", latencyMs: 85, age: "18s", status: "online" },
-  { id: "j9", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 23.98, fpsOut: 20.08, age: "20s", status: "online" },
-  { id: "j10", pipeline: "image-to-video", model: "Stable Video Diffusion", latencyMs: 4100, age: "22s", status: "online" },
-  { id: "j11", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl-v2v", fpsIn: 23.97, fpsOut: 20.58, age: "20s", status: "online" },
-  { id: "j12", pipeline: "text-to-speech", model: "Whisper v3 Large", latencyMs: 340, age: "25s", status: "completed" },
-  { id: "j13", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 24.01, fpsOut: 17.01, age: "29s", status: "online" },
-  { id: "j14", pipeline: "audio-to-text", model: "Whisper v3 Large", latencyMs: 890, age: "30s", status: "online" },
-  { id: "j15", pipeline: "live-video-to-video", model: "streamdiffusion-sdxl", fpsIn: 20.33, fpsOut: 14.56, age: "30s", status: "degraded" },
+  {
+    id: "j1",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl-v2v",
+    fpsIn: 24.08,
+    fpsOut: 21.38,
+    age: "0s",
+    status: "online",
+  },
+  {
+    id: "j2",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl-v2v",
+    fpsIn: 23.98,
+    fpsOut: 21.48,
+    age: "0s",
+    status: "online",
+  },
+  {
+    id: "j3",
+    pipeline: "text-to-image",
+    model: "FLUX.1 schnell",
+    latencyMs: 1820,
+    age: "2s",
+    status: "online",
+  },
+  {
+    id: "j4",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 11.64,
+    fpsOut: 4.15,
+    age: "10s",
+    status: "degraded",
+  },
+  {
+    id: "j5",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 14.53,
+    fpsOut: 6.64,
+    age: "10s",
+    status: "degraded",
+  },
+  {
+    id: "j6",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 24.03,
+    fpsOut: 19.73,
+    age: "10s",
+    status: "online",
+  },
+  {
+    id: "j7",
+    pipeline: "text-to-image",
+    model: "SDXL Turbo",
+    latencyMs: 920,
+    age: "15s",
+    status: "completed",
+  },
+  {
+    id: "j8",
+    pipeline: "llm",
+    model: "Qwen3 32B",
+    latencyMs: 85,
+    age: "18s",
+    status: "online",
+  },
+  {
+    id: "j9",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 23.98,
+    fpsOut: 20.08,
+    age: "20s",
+    status: "online",
+  },
+  {
+    id: "j10",
+    pipeline: "image-to-video",
+    model: "Stable Video Diffusion",
+    latencyMs: 4100,
+    age: "22s",
+    status: "online",
+  },
+  {
+    id: "j11",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl-v2v",
+    fpsIn: 23.97,
+    fpsOut: 20.58,
+    age: "20s",
+    status: "online",
+  },
+  {
+    id: "j12",
+    pipeline: "text-to-speech",
+    model: "Whisper v3 Large",
+    latencyMs: 340,
+    age: "25s",
+    status: "completed",
+  },
+  {
+    id: "j13",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 24.01,
+    fpsOut: 17.01,
+    age: "29s",
+    status: "online",
+  },
+  {
+    id: "j14",
+    pipeline: "audio-to-text",
+    model: "Whisper v3 Large",
+    latencyMs: 890,
+    age: "30s",
+    status: "online",
+  },
+  {
+    id: "j15",
+    pipeline: "live-video-to-video",
+    model: "streamdiffusion-sdxl",
+    fpsIn: 20.33,
+    fpsOut: 14.56,
+    age: "30s",
+    status: "degraded",
+  },
 ];
 
 // ─── Stats: Payment History ──────────────────────────────────────────────────
@@ -2121,7 +2422,9 @@ function generatePaymentHistory(): PaymentDayData[] {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     const base = 2.5 + (89 - i) * 0.04;
-    const eth = parseFloat((base + Math.random() * 1.5 + Math.sin(i * 0.2) * 0.8).toFixed(4));
+    const eth = parseFloat(
+      (base + Math.random() * 1.5 + Math.sin(i * 0.2) * 0.8).toFixed(4)
+    );
     data.push({
       date: date.toISOString().split("T")[0],
       volumeEth: eth,
@@ -2141,12 +2444,22 @@ export const PAYMENT_STATS: PaymentStats = {
 
 function generatePaymentTransactions(): PaymentTransaction[] {
   const orchestrators = [
-    "0x9C10…3aB7", "0x4F2d…8cE1", "0xA71b…2fD9", "0x3E8a…5bC4",
-    "0xD62f…1eA8", "0x7B4c…9dF3", "0x1F9e…6aC2", "0x8A3d…4bE7",
+    "0x9C10…3aB7",
+    "0x4F2d…8cE1",
+    "0xA71b…2fD9",
+    "0x3E8a…5bC4",
+    "0xD62f…1eA8",
+    "0x7B4c…9dF3",
+    "0x1F9e…6aC2",
+    "0x8A3d…4bE7",
   ];
   const pipelines = [
-    "text-to-image", "live-video-to-video", "image-to-video",
-    "llm", "text-to-speech", "image-to-image",
+    "text-to-image",
+    "live-video-to-video",
+    "image-to-video",
+    "llm",
+    "text-to-speech",
+    "image-to-image",
   ];
   const txs: PaymentTransaction[] = [];
   const now = new Date();
@@ -2168,13 +2481,18 @@ function generatePaymentTransactions(): PaymentTransaction[] {
   return txs;
 }
 
-export const PAYMENT_TRANSACTIONS: PaymentTransaction[] = generatePaymentTransactions();
+export const PAYMENT_TRANSACTIONS: PaymentTransaction[] =
+  generatePaymentTransactions();
 
 // ─── Stats: API Request Series (for stacked bar chart) ───────────────────────
 
 const TOP_APIS = [
-  "FLUX.1 schnell", "SDXL Turbo", "Stable Video Diffusion",
-  "LivePortrait", "Whisper Large", "Daydream Video",
+  "FLUX.1 schnell",
+  "SDXL Turbo",
+  "Stable Video Diffusion",
+  "LivePortrait",
+  "Whisper Large",
+  "Daydream Video",
 ];
 
 // ─── Chart series palette ─────────────────────────────────────────────────────
@@ -2193,8 +2511,16 @@ const API_COLORS = [
 // Optional tonal scale exposed for cases where a single-hue stack reads better
 // (e.g. ranked progress bars). Computed by mixing green-bright with bg-dark.
 export const TONAL_GREEN = [
-  "#40bf86", "#39a979", "#33966c", "#2c8260", "#266e54",
-  "#205b48", "#19473c", "#143830", "#102a25", "#0c1f1c",
+  "#40bf86",
+  "#39a979",
+  "#33966c",
+  "#2c8260",
+  "#266e54",
+  "#205b48",
+  "#19473c",
+  "#143830",
+  "#102a25",
+  "#0c1f1c",
 ];
 
 function generateApiRequestSeries(): ApiRequestSeries[] {
@@ -2214,7 +2540,8 @@ function generateApiRequestSeries(): ApiRequestSeries[] {
   return data;
 }
 
-export const API_REQUEST_SERIES: ApiRequestSeries[] = generateApiRequestSeries();
+export const API_REQUEST_SERIES: ApiRequestSeries[] =
+  generateApiRequestSeries();
 export { TOP_APIS, API_COLORS };
 
 // ─── Settings: API Keys ─────────────────────────────────────────────────────
@@ -2472,38 +2799,326 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
   const specs: Spec[] = [
     // Two live sessions streaming right now — no final duration; elapsed ticks
     // from `minutesAgo` (when they started) and cost is still accruing.
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "active", latencyMs: null, costDisplay: "$0.04", minutesAgo: 3 },
-    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "active", latencyMs: null, costDisplay: "$0.21", minutesAgo: 22 },
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 234, costDisplay: "$0.006", minutesAgo: 2 },
-    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "success", latencyMs: 156, costDisplay: "$0.005", minutesAgo: 5 },
-    { model: "flux/schnell", pipeline: "text-to-image", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 812, costDisplay: "$0.003", minutesAgo: 8 },
-    { model: "qwen/qwen3-32b", pipeline: "language", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 412, costDisplay: "$0.004", minutesAgo: 11 },
-    { model: "stability/sdxl-turbo", pipeline: "text-to-image", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 1180, costDisplay: "$0.011", minutesAgo: 15 },
-    { model: "openai/whisper-v3", pipeline: "audio-to-text", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 2410, costDisplay: "$0.007", minutesAgo: 18 },
-    { model: "flux/schnell", pipeline: "text-to-image", signer: "ethWallet", tokenId: "key-1", status: "failed", latencyMs: null, costDisplay: "—", minutesAgo: 22 },
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 248, costDisplay: "$0.006", minutesAgo: 26 },
-    { model: "meta/llama-3-70b", pipeline: "language", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 389, costDisplay: "$0.012", minutesAgo: 31 },
-    { model: "stability/sdxl-turbo", pipeline: "text-to-image", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 1240, costDisplay: "$0.000", minutesAgo: 36 },
-    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "success", latencyMs: 142, costDisplay: "$0.005", minutesAgo: 41 },
-    { model: "hexgrad/kokoro-tts", pipeline: "text-to-speech", signer: "paymthouse", tokenId: "key-2", status: "success", latencyMs: 318, costDisplay: "$0.004", minutesAgo: 47 },
-    { model: "flux/schnell", pipeline: "text-to-image", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 798, costDisplay: "$0.000", minutesAgo: 53 },
-    { model: "ultralytics/yolov8", pipeline: "video-understanding", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 87, costDisplay: "$0.001", minutesAgo: 58 },
-    { model: "qwen/qwen3-32b", pipeline: "language", signer: "paymthouse", tokenId: "key-1", status: "timeout", latencyMs: null, costDisplay: "—", minutesAgo: 64 },
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 261, costDisplay: "$0.006", minutesAgo: 71 },
-    { model: "stability/sdxl-turbo", pipeline: "text-to-image", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 1095, costDisplay: "$0.011", minutesAgo: 78 },
-    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "success", latencyMs: 169, costDisplay: "$0.005", minutesAgo: 86 },
-    { model: "openai/whisper-v3", pipeline: "audio-to-text", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 2280, costDisplay: "$0.000", minutesAgo: 93 },
-    { model: "meta/llama-3-70b", pipeline: "language", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 401, costDisplay: "$0.012", minutesAgo: 101 },
-    { model: "flux/schnell", pipeline: "text-to-image", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 824, costDisplay: "$0.003", minutesAgo: 109 },
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "ethWallet", tokenId: "key-1", status: "success", latencyMs: 256, costDisplay: "0.0001 ETH", minutesAgo: 117 },
-    { model: "stability/sdxl-turbo", pipeline: "text-to-image", signer: "paymthouse", tokenId: "key-2", status: "failed", latencyMs: null, costDisplay: "—", minutesAgo: 124 },
-    { model: "ultralytics/yolov8", pipeline: "video-understanding", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 92, costDisplay: "$0.001", minutesAgo: 132 },
-    { model: "hexgrad/kokoro-tts", pipeline: "text-to-speech", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 304, costDisplay: "$0.004", minutesAgo: 141 },
-    { model: "qwen/qwen3-32b", pipeline: "language", signer: "freeTier", tokenId: "key-foundation", status: "success", latencyMs: 422, costDisplay: "$0.000", minutesAgo: 150 },
-    { model: "frameworks/transcoding", pipeline: "live-transcoding", signer: "livepeerCloud", tokenId: "key-1", status: "success", latencyMs: 158, costDisplay: "$0.005", minutesAgo: 158 },
-    { model: "meta/llama-3-70b", pipeline: "language", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 376, costDisplay: "$0.012", minutesAgo: 167 },
-    { model: "daydream/video-v2", pipeline: "video-to-video", signer: "paymthouse", tokenId: "key-1", status: "success", latencyMs: 271, costDisplay: "$0.006", minutesAgo: 175 },
-    { model: "flux/schnell", pipeline: "text-to-image", signer: "ethWallet", tokenId: "key-1", status: "success", latencyMs: 833, costDisplay: "0.0000 ETH", minutesAgo: 184 },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "active",
+      latencyMs: null,
+      costDisplay: "$0.04",
+      minutesAgo: 3,
+    },
+    {
+      model: "frameworks/transcoding",
+      pipeline: "live-transcoding",
+      signer: "livepeerCloud",
+      tokenId: "key-1",
+      status: "active",
+      latencyMs: null,
+      costDisplay: "$0.21",
+      minutesAgo: 22,
+    },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 234,
+      costDisplay: "$0.006",
+      minutesAgo: 2,
+    },
+    {
+      model: "frameworks/transcoding",
+      pipeline: "live-transcoding",
+      signer: "livepeerCloud",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 156,
+      costDisplay: "$0.005",
+      minutesAgo: 5,
+    },
+    {
+      model: "flux/schnell",
+      pipeline: "text-to-image",
+      signer: "freeTier",
+      tokenId: "key-foundation",
+      status: "success",
+      latencyMs: 812,
+      costDisplay: "$0.003",
+      minutesAgo: 8,
+    },
+    {
+      model: "qwen/qwen3-32b",
+      pipeline: "language",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 412,
+      costDisplay: "$0.004",
+      minutesAgo: 11,
+    },
+    {
+      model: "stability/sdxl-turbo",
+      pipeline: "text-to-image",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 1180,
+      costDisplay: "$0.011",
+      minutesAgo: 15,
+    },
+    {
+      model: "openai/whisper-v3",
+      pipeline: "audio-to-text",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 2410,
+      costDisplay: "$0.007",
+      minutesAgo: 18,
+    },
+    {
+      model: "flux/schnell",
+      pipeline: "text-to-image",
+      signer: "ethWallet",
+      tokenId: "key-1",
+      status: "failed",
+      latencyMs: null,
+      costDisplay: "—",
+      minutesAgo: 22,
+    },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 248,
+      costDisplay: "$0.006",
+      minutesAgo: 26,
+    },
+    {
+      model: "meta/llama-3-70b",
+      pipeline: "language",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 389,
+      costDisplay: "$0.012",
+      minutesAgo: 31,
+    },
+    {
+      model: "stability/sdxl-turbo",
+      pipeline: "text-to-image",
+      signer: "freeTier",
+      tokenId: "key-foundation",
+      status: "success",
+      latencyMs: 1240,
+      costDisplay: "$0.000",
+      minutesAgo: 36,
+    },
+    {
+      model: "frameworks/transcoding",
+      pipeline: "live-transcoding",
+      signer: "livepeerCloud",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 142,
+      costDisplay: "$0.005",
+      minutesAgo: 41,
+    },
+    {
+      model: "hexgrad/kokoro-tts",
+      pipeline: "text-to-speech",
+      signer: "paymthouse",
+      tokenId: "key-2",
+      status: "success",
+      latencyMs: 318,
+      costDisplay: "$0.004",
+      minutesAgo: 47,
+    },
+    {
+      model: "flux/schnell",
+      pipeline: "text-to-image",
+      signer: "freeTier",
+      tokenId: "key-foundation",
+      status: "success",
+      latencyMs: 798,
+      costDisplay: "$0.000",
+      minutesAgo: 53,
+    },
+    {
+      model: "ultralytics/yolov8",
+      pipeline: "video-understanding",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 87,
+      costDisplay: "$0.001",
+      minutesAgo: 58,
+    },
+    {
+      model: "qwen/qwen3-32b",
+      pipeline: "language",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "timeout",
+      latencyMs: null,
+      costDisplay: "—",
+      minutesAgo: 64,
+    },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 261,
+      costDisplay: "$0.006",
+      minutesAgo: 71,
+    },
+    {
+      model: "stability/sdxl-turbo",
+      pipeline: "text-to-image",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 1095,
+      costDisplay: "$0.011",
+      minutesAgo: 78,
+    },
+    {
+      model: "frameworks/transcoding",
+      pipeline: "live-transcoding",
+      signer: "livepeerCloud",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 169,
+      costDisplay: "$0.005",
+      minutesAgo: 86,
+    },
+    {
+      model: "openai/whisper-v3",
+      pipeline: "audio-to-text",
+      signer: "freeTier",
+      tokenId: "key-foundation",
+      status: "success",
+      latencyMs: 2280,
+      costDisplay: "$0.000",
+      minutesAgo: 93,
+    },
+    {
+      model: "meta/llama-3-70b",
+      pipeline: "language",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 401,
+      costDisplay: "$0.012",
+      minutesAgo: 101,
+    },
+    {
+      model: "flux/schnell",
+      pipeline: "text-to-image",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 824,
+      costDisplay: "$0.003",
+      minutesAgo: 109,
+    },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "ethWallet",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 256,
+      costDisplay: "0.0001 ETH",
+      minutesAgo: 117,
+    },
+    {
+      model: "stability/sdxl-turbo",
+      pipeline: "text-to-image",
+      signer: "paymthouse",
+      tokenId: "key-2",
+      status: "failed",
+      latencyMs: null,
+      costDisplay: "—",
+      minutesAgo: 124,
+    },
+    {
+      model: "ultralytics/yolov8",
+      pipeline: "video-understanding",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 92,
+      costDisplay: "$0.001",
+      minutesAgo: 132,
+    },
+    {
+      model: "hexgrad/kokoro-tts",
+      pipeline: "text-to-speech",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 304,
+      costDisplay: "$0.004",
+      minutesAgo: 141,
+    },
+    {
+      model: "qwen/qwen3-32b",
+      pipeline: "language",
+      signer: "freeTier",
+      tokenId: "key-foundation",
+      status: "success",
+      latencyMs: 422,
+      costDisplay: "$0.000",
+      minutesAgo: 150,
+    },
+    {
+      model: "frameworks/transcoding",
+      pipeline: "live-transcoding",
+      signer: "livepeerCloud",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 158,
+      costDisplay: "$0.005",
+      minutesAgo: 158,
+    },
+    {
+      model: "meta/llama-3-70b",
+      pipeline: "language",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 376,
+      costDisplay: "$0.012",
+      minutesAgo: 167,
+    },
+    {
+      model: "daydream/video-v2",
+      pipeline: "video-to-video",
+      signer: "paymthouse",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 271,
+      costDisplay: "$0.006",
+      minutesAgo: 175,
+    },
+    {
+      model: "flux/schnell",
+      pipeline: "text-to-image",
+      signer: "ethWallet",
+      tokenId: "key-1",
+      status: "success",
+      latencyMs: 833,
+      costDisplay: "0.0000 ETH",
+      minutesAgo: 184,
+    },
   ];
 
   // Live (streaming) pipelines invoke as a session; everything else is a
@@ -2548,7 +3163,7 @@ export const MOCK_RECENT_REQUESTS: import("./types").AccountActivityRow[] =
 
 /** Recent requests scoped to a single environment. Drives Jobs + Home runs. */
 export function recentRequestsForEnvironment(
-  environmentId: string,
+  environmentId: string
 ): import("./types").AccountActivityRow[] {
   return MOCK_RECENT_REQUESTS.filter((r) => r.environmentId === environmentId);
 }

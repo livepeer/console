@@ -44,14 +44,20 @@ const VALID_CATEGORIES: AppCategory[] = [
 
 type AvailabilityFilter = "all" | "warm" | "cold";
 
-const VIDEO_CATEGORIES: { label: AppCategory; icon: ReturnType<typeof getAppIcon> }[] = [
+const VIDEO_CATEGORIES: {
+  label: AppCategory;
+  icon: ReturnType<typeof getAppIcon>;
+}[] = [
   { label: "Video Generation", icon: getAppIcon("Video Generation") },
   { label: "Video Editing", icon: getAppIcon("Video Editing") },
   { label: "Video Understanding", icon: getAppIcon("Video Understanding") },
   { label: "Live Transcoding", icon: getAppIcon("Live Transcoding") },
 ];
 
-const OTHER_CATEGORIES: { label: AppCategory; icon: ReturnType<typeof getAppIcon> }[] = [
+const OTHER_CATEGORIES: {
+  label: AppCategory;
+  icon: ReturnType<typeof getAppIcon>;
+}[] = [
   { label: "Image Generation", icon: getAppIcon("Image Generation") },
   { label: "Speech", icon: getAppIcon("Speech") },
   { label: "Language", icon: getAppIcon("Language") },
@@ -61,16 +67,15 @@ const PRICE_BUCKETS = 20;
 
 // ─── Empty State ───
 
-function ExploreEmptyState({
-  onClearFilters,
-}: {
-  onClearFilters: () => void;
-}) {
+function ExploreEmptyState({ onClearFilters }: { onClearFilters: () => void }) {
   return (
     <div className="flex flex-col items-center py-24 text-center">
       {/* Geometric placeholder — three concentric squares riffing on the
           Livepeer symbol's grid construction. Quiet brand reminder. */}
-      <div className="relative flex h-20 w-20 items-center justify-center" aria-hidden="true">
+      <div
+        className="relative flex h-20 w-20 items-center justify-center"
+        aria-hidden="true"
+      >
         <span className="absolute inset-0 rounded-2xl border border-hairline" />
         <span className="absolute inset-2 rounded-xl border border-subtle" />
         <span className="absolute inset-4 rounded-lg border border-strong" />
@@ -80,7 +85,8 @@ function ExploreEmptyState({
         No capabilities match your filters
       </h3>
       <p className="mt-2 max-w-sm text-sm text-fg-faint">
-        Try loosening your filters or browse everything available on the network.
+        Try loosening your filters or browse everything available on the
+        network.
       </p>
       <div className="mt-6 flex flex-col items-center gap-3">
         <Button onClick={onClearFilters} variant="secondary" size="sm">
@@ -122,11 +128,21 @@ function ListHeaderRow() {
     >
       <div />
       <div role="columnheader">App</div>
-      <div role="columnheader" className="text-right">p50</div>
-      <div role="columnheader" className="text-right">p95</div>
-      <div role="columnheader" className="text-right">GPUs</div>
-      <div role="columnheader" className="text-right">Price</div>
-      <div role="columnheader" className="text-right">7d jobs</div>
+      <div role="columnheader" className="text-right">
+        p50
+      </div>
+      <div role="columnheader" className="text-right">
+        p95
+      </div>
+      <div role="columnheader" className="text-right">
+        GPUs
+      </div>
+      <div role="columnheader" className="text-right">
+        Price
+      </div>
+      <div role="columnheader" className="text-right">
+        7d jobs
+      </div>
     </div>
   );
 }
@@ -166,9 +182,15 @@ function ModelListItem({ model, href }: { model: App; href?: string }) {
           }`}
         >
           {isWarm ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-warm" aria-hidden="true" />
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-warm"
+              aria-hidden="true"
+            />
           ) : (
-            <span className="h-1.5 w-1.5 rounded-full bg-fg-faint" aria-hidden="true" />
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-fg-faint"
+              aria-hidden="true"
+            />
           )}
           {isWarm ? "warm" : "cold"}
         </span>
@@ -234,17 +256,20 @@ function PriceRangeFilter({
   onChange: (min: number, max: number) => void;
   models: App[];
 }) {
-  const { buckets, maxPrice } = useMemo(() => buildPriceHistogram(models), [models]);
+  const { buckets, maxPrice } = useMemo(
+    () => buildPriceHistogram(models),
+    [models]
+  );
   const minPrice = (min / 100) * maxPrice;
   const maxPriceValue = (max / 100) * maxPrice;
 
   const minBucketIdx = Math.min(
     Math.floor((min / 100) * PRICE_BUCKETS),
-    PRICE_BUCKETS - 1,
+    PRICE_BUCKETS - 1
   );
   const maxBucketIdx = Math.min(
     Math.floor((max / 100) * PRICE_BUCKETS),
-    PRICE_BUCKETS - 1,
+    PRICE_BUCKETS - 1
   );
 
   const isFiltered = min > 0 || max < 100;
@@ -267,67 +292,71 @@ function PriceRangeFilter({
         )}
       </div>
       <div className="px-3">
-      <div className="flex h-12 items-end gap-px">
-        {buckets.map((bucket, i) => {
-          const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-          const height = bucket.count > 0 ? Math.max((bucket.count / maxCount) * 100, 8) : 0;
-          const active = i >= minBucketIdx && i <= maxBucketIdx;
-          return (
-            <div
-              key={i}
-              className="flex-1 transition-colors duration-150"
-              style={{
-                height: `${height}%`,
-                backgroundColor: active
-                  ? "rgb(64, 191, 134)"
-                  : "var(--color-pop)",
-              }}
-            />
-          );
-        })}
-      </div>
-      <div className="relative mt-1 h-5">
-        <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-pop" />
-        <div
-          className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full"
-          style={{
-            left: `${min}%`,
-            right: `${100 - max}%`,
-            backgroundColor: "rgba(64, 191, 134, 0.5)",
-          }}
-        />
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={min}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (v < max) onChange(v, max);
-          }}
-          className="price-range-thumb pointer-events-none absolute inset-0 w-full appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:pointer-events-auto"
-          style={{ zIndex: min > 90 ? 4 : 3 }}
-        />
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={max}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (v > min) onChange(min, v);
-          }}
-          className="price-range-thumb pointer-events-none absolute inset-0 w-full appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:pointer-events-auto"
-          style={{ zIndex: 3 }}
-        />
-      </div>
-      <div className="flex justify-between text-[11px] text-fg-faint">
-        <span>${minPrice.toFixed(3)}</span>
-        <span>${maxPriceValue.toFixed(3)}</span>
-      </div>
-      <p className="mt-2 text-[10px] text-fg-disabled">
-        List price per model unit (request, minute, or token). See each card for the exact unit.
-      </p>
+        <div className="flex h-12 items-end gap-px">
+          {buckets.map((bucket, i) => {
+            const maxCount = Math.max(...buckets.map((b) => b.count), 1);
+            const height =
+              bucket.count > 0
+                ? Math.max((bucket.count / maxCount) * 100, 8)
+                : 0;
+            const active = i >= minBucketIdx && i <= maxBucketIdx;
+            return (
+              <div
+                key={i}
+                className="flex-1 transition-colors duration-150"
+                style={{
+                  height: `${height}%`,
+                  backgroundColor: active
+                    ? "rgb(64, 191, 134)"
+                    : "var(--color-pop)",
+                }}
+              />
+            );
+          })}
+        </div>
+        <div className="relative mt-1 h-5">
+          <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-pop" />
+          <div
+            className="absolute top-1/2 h-[2px] -translate-y-1/2 rounded-full"
+            style={{
+              left: `${min}%`,
+              right: `${100 - max}%`,
+              backgroundColor: "rgba(64, 191, 134, 0.5)",
+            }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={min}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (v < max) onChange(v, max);
+            }}
+            className="price-range-thumb pointer-events-none absolute inset-0 w-full appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:pointer-events-auto"
+            style={{ zIndex: min > 90 ? 4 : 3 }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={max}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (v > min) onChange(min, v);
+            }}
+            className="price-range-thumb pointer-events-none absolute inset-0 w-full appearance-none bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:pointer-events-auto"
+            style={{ zIndex: 3 }}
+          />
+        </div>
+        <div className="flex justify-between text-[11px] text-fg-faint">
+          <span>${minPrice.toFixed(3)}</span>
+          <span>${maxPriceValue.toFixed(3)}</span>
+        </div>
+        <p className="mt-2 text-[10px] text-fg-disabled">
+          List price per model unit (request, minute, or token). See each card
+          for the exact unit.
+        </p>
       </div>
     </div>
   );
@@ -368,10 +397,7 @@ function ExploreFilterPill({
           <X className="h-2.5 w-2.5" />
         </span>
       ) : (
-        <ChevronDown
-          className="h-3 w-3 text-fg-faint"
-          aria-hidden="true"
-        />
+        <ChevronDown className="h-3 w-3 text-fg-faint" aria-hidden="true" />
       )}
     </button>
   );
@@ -417,7 +443,8 @@ function ExplorePageInner() {
   // Sort is locked to the recommended ordering (warm + realtime tier, then runs7d desc).
   // The v3 design exposes no sort selector — ordering happens by default.
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>("all");
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState<AvailabilityFilter>("all");
   const [favoritesOnly, setFavoritesOnly] = useState(initialFavorites);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
@@ -427,7 +454,7 @@ function ExplorePageInner() {
   // localStorage-backed publish state after mount so toggling an app's
   // visibility on its Settings tab is reflected here on next navigation.
   const [pipelineModels, setPipelineModels] = useState<App[]>(
-    SEED_PUBLIC_PIPELINE_APPS,
+    SEED_PUBLIC_PIPELINE_APPS
   );
   useEffect(() => {
     setPipelineModels(publicPipelines());
@@ -438,17 +465,17 @@ function ExplorePageInner() {
   // private deployments never leak into Explore and nothing is duplicated.
   const catalogModels = useMemo(
     () => APPS.filter((m) => !PIPELINE_APP_IDS.has(m.id)),
-    [],
+    []
   );
 
   const allModels = useMemo(
     () => [...catalogModels, ...pipelineModels],
-    [catalogModels, pipelineModels],
+    [catalogModels, pipelineModels]
   );
 
   const dataMaxPrice = useMemo(
     () => Math.max(...allModels.map((m) => m.pricing.amount), 0.01),
-    [allModels],
+    [allModels]
   );
 
   const filtered = useMemo(() => {
@@ -462,7 +489,9 @@ function ExplorePageInner() {
         m.provider.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = !category || m.category === category;
       const price = m.pricing.amount;
-      const matchesPrice = price >= (priceMin / 100) * dataMaxPrice && price <= (priceMax / 100) * dataMaxPrice;
+      const matchesPrice =
+        price >= (priceMin / 100) * dataMaxPrice &&
+        price <= (priceMax / 100) * dataMaxPrice;
       return matchesSearch && matchesCategory && matchesPrice;
     });
 
@@ -471,21 +500,37 @@ function ExplorePageInner() {
     // is always-on and deterministic.
     result.sort((a, b) => {
       if (a.featured !== b.featured) return a.featured ? -1 : 1;
-      const tier = (m: App) => (m.realtime ? 0 : 2) + (m.status === "hot" ? 0 : 1);
+      const tier = (m: App) =>
+        (m.realtime ? 0 : 2) + (m.status === "hot" ? 0 : 1);
       const tierDiff = tier(a) - tier(b);
       if (tierDiff !== 0) return tierDiff;
       return b.runs7d - a.runs7d;
     });
 
     return result;
-  }, [allModels, search, category, availabilityFilter, favoritesOnly, isStarred, priceMin, priceMax, dataMaxPrice]);
+  }, [
+    allModels,
+    search,
+    category,
+    availabilityFilter,
+    favoritesOnly,
+    isStarred,
+    priceMin,
+    priceMax,
+    dataMaxPrice,
+  ]);
 
   const activeFilters = [
     ...(category
       ? [{ label: category, onClear: () => setCategory(null) }]
       : []),
     ...(availabilityFilter !== "all"
-      ? [{ label: availabilityFilter === "warm" ? "Warm" : "Cold", onClear: () => setAvailabilityFilter("all") }]
+      ? [
+          {
+            label: availabilityFilter === "warm" ? "Warm" : "Cold",
+            onClear: () => setAvailabilityFilter("all"),
+          },
+        ]
       : []),
     ...(favoritesOnly
       ? [{ label: "Starred", onClear: () => setFavoritesOnly(false) }]
@@ -494,7 +539,10 @@ function ExplorePageInner() {
 
   const ALL_CATEGORIES = [...VIDEO_CATEGORIES, ...OTHER_CATEGORIES];
 
-  const tabKeys: ({ key: "all"; label: string } | { key: AppCategory; label: string })[] = [
+  const tabKeys: (
+    | { key: "all"; label: string }
+    | { key: AppCategory; label: string }
+  )[] = [
     { key: "all", label: "All" },
     ...ALL_CATEGORIES.map((c) => ({ key: c.label, label: c.label })),
   ];
@@ -560,7 +608,8 @@ function ExplorePageInner() {
         aria-label="App category"
       >
         {tabKeys.map((tab) => {
-          const isActive = (tab.key === "all" && category === null) || tab.key === category;
+          const isActive =
+            (tab.key === "all" && category === null) || tab.key === category;
           return (
             <button
               key={tab.key}
@@ -706,7 +755,11 @@ function ExplorePageInner() {
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => setAvailabilityFilter(availabilityFilter === "warm" ? "all" : "warm")}
+                onClick={() =>
+                  setAvailabilityFilter(
+                    availabilityFilter === "warm" ? "all" : "warm"
+                  )
+                }
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   availabilityFilter === "warm"
                     ? "bg-warm-subtle font-medium text-warm"
@@ -717,7 +770,11 @@ function ExplorePageInner() {
                 Warm
               </button>
               <button
-                onClick={() => setAvailabilityFilter(availabilityFilter === "cold" ? "all" : "cold")}
+                onClick={() =>
+                  setAvailabilityFilter(
+                    availabilityFilter === "cold" ? "all" : "cold"
+                  )
+                }
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   availabilityFilter === "cold"
                     ? "bg-blue/10 font-medium text-blue-bright"
@@ -746,10 +803,14 @@ function ExplorePageInner() {
                   : "text-fg-strong hover:bg-tint disabled:cursor-not-allowed disabled:opacity-40"
               }`}
             >
-              <Star className={`h-3.5 w-3.5 ${favoritesOnly ? "fill-warm" : ""}`} />
+              <Star
+                className={`h-3.5 w-3.5 ${favoritesOnly ? "fill-warm" : ""}`}
+              />
               Starred only
               {starredIds.length > 0 && (
-                <span className={`ml-auto text-[11px] ${favoritesOnly ? "text-warm/70" : "text-fg-label"}`}>
+                <span
+                  className={`ml-auto text-[11px] ${favoritesOnly ? "text-warm/70" : "text-fg-label"}`}
+                >
                   {starredIds.length}
                 </span>
               )}
@@ -762,7 +823,10 @@ function ExplorePageInner() {
           <PriceRangeFilter
             min={priceMin}
             max={priceMax}
-            onChange={(min, max) => { setPriceMin(min); setPriceMax(max); }}
+            onChange={(min, max) => {
+              setPriceMin(min);
+              setPriceMax(max);
+            }}
             models={allModels}
           />
         </div>
@@ -788,7 +852,8 @@ function ExplorePageInner() {
             onClick={() => setFilterDrawerOpen(false)}
             className="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
-            Show {filtered.length} {filtered.length === 1 ? "result" : "results"}
+            Show {filtered.length}{" "}
+            {filtered.length === 1 ? "result" : "results"}
           </button>
         </div>
       </Drawer>
