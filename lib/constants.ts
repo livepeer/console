@@ -1,5 +1,5 @@
-// Primary nav for the dashboard sidebar, grouped into three tiers by scope:
-//   - "home"        → Home (the ungrouped dashboard root)
+// Primary nav for the console sidebar, grouped into three tiers by scope:
+//   - "home"        → Home (the ungrouped console root)
 //   - "network"     → Explore (the global capability catalog you *consume*) and
 //                     Stats (network-wide orchestrator/GPU/payment health).
 //                     Network-wide, not environment-scoped.

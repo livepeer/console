@@ -18,7 +18,7 @@
   --color-blue-dark: #145571;
   --color-blue-subtle: rgba(20, 106, 143, 0.15);
 
-  /* Legacy literal-dark tokens — used as the dashboard's primary surface
+  /* Legacy literal-dark tokens — used as the console's primary surface
      vocabulary (`bg-dark` / `bg-dark-lighter` / `bg-dark-card` /
      `bg-dark-border`, 78+ usages). Flip to light values via the
      html[data-theme="light"] block below. */
@@ -98,9 +98,9 @@ body {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- * DASHBOARD TOKEN LAYER
+ * CONSOLE TOKEN LAYER
  *
- * Dashboard-specific vocabulary aliased to the semantic tokens above so
+ * Console-specific vocabulary aliased to the semantic tokens above so
  * flipping `data-theme` propagates everywhere consistently.
  * ════════════════════════════════════════════════════════════════════════════ */
 
@@ -178,7 +178,7 @@ body {
   --shadow-popover: 0 8px 24px -4px rgb(0 0 0 / 0.45), 0 2px 6px -1px rgb(0 0 0 / 0.30);
 }
 
-/* Light-mode dashboard token overrides */
+/* Light-mode console token overrides */
 html[data-theme="light"] {
   --color-fg-disabled: rgba(24, 24, 27, 0.25);
   --color-border-hairline: rgba(24, 24, 27, 0.10);
@@ -312,7 +312,7 @@ html[data-theme="light"] .text-tone-amber {
   color: #b45309;
 }
 
-/* ─── Dashboard keyframes + animations ─── */
+/* ─── Console keyframes + animations ─── */
 @keyframes breathe {
   0%,
   100% {

@@ -15,12 +15,12 @@ import {
   ArrowUpRight,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardSubNav from "@/components/dashboard/DashboardSubNav";
-import CostTag from "@/components/dashboard/CostTag";
-import KeyBadge from "@/components/dashboard/KeyBadge";
-import CallsTable from "@/components/dashboard/CallsTable";
-import StatusDot from "@/components/dashboard/StatusDot";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsoleSubNav from "@/components/console/ConsoleSubNav";
+import CostTag from "@/components/console/CostTag";
+import KeyBadge from "@/components/console/KeyBadge";
+import CallsTable from "@/components/console/CallsTable";
+import StatusDot from "@/components/console/StatusDot";
 import {
   getAppById,
   effectiveVisibility,
@@ -29,20 +29,20 @@ import {
   PIPELINE_APP_IDS,
   SETTINGS_API_KEYS,
   MOCK_RECENT_REQUESTS,
-} from "@/lib/dashboard/mock-data";
-import { getAppIcon } from "@/lib/dashboard/utils";
-import PlaygroundForm from "@/components/dashboard/playground/PlaygroundForm";
-import JsonInput from "@/components/dashboard/playground/JsonInput";
-import PlaygroundOutput from "@/components/dashboard/playground/PlaygroundOutput";
-import TranscodingOutput from "@/components/dashboard/playground/TranscodingOutput";
-import CodeSnippets from "@/components/dashboard/playground/CodeSnippets";
-import WebcamPlayground from "@/components/dashboard/playground/WebcamPlayground";
-import AppAnalytics from "@/components/dashboard/stats/AppAnalytics";
+} from "@/lib/console/mock-data";
+import { getAppIcon } from "@/lib/console/utils";
+import PlaygroundForm from "@/components/console/playground/PlaygroundForm";
+import JsonInput from "@/components/console/playground/JsonInput";
+import PlaygroundOutput from "@/components/console/playground/PlaygroundOutput";
+import TranscodingOutput from "@/components/console/playground/TranscodingOutput";
+import CodeSnippets from "@/components/console/playground/CodeSnippets";
+import WebcamPlayground from "@/components/console/playground/WebcamPlayground";
+import AppAnalytics from "@/components/console/stats/AppAnalytics";
 import {
   OverviewTab,
   SettingsTab,
-} from "@/components/dashboard/AppDetailView";
-import type { App, Pipeline, PipelineVisibility } from "@/lib/dashboard/types";
+} from "@/components/console/AppDetailView";
+import type { App, Pipeline, PipelineVisibility } from "@/lib/console/types";
 
 // ─── Tabs ───
 //
@@ -568,7 +568,7 @@ function JobsTab({
   runs,
 }: {
   model: App;
-  runs: import("@/lib/dashboard/types").AccountActivityRow[];
+  runs: import("@/lib/console/types").AccountActivityRow[];
 }) {
   if (runs.length === 0) {
     return (
@@ -878,7 +878,7 @@ export default function AppDetailPage() {
           </div>
 
           {/* Tabs — mobile scroll strip */}
-          <DashboardSubNav
+          <ConsoleSubNav
             hideAt="md"
             ariaLabel="App section"
             tabs={tabs}

@@ -2,11 +2,11 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import AppCard from "@/components/dashboard/AppCard";
+import AppCard from "@/components/console/AppCard";
 import {
   getOrganizationBySlug,
   appsForOrganization,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/console/mock-data";
 
 /**
  * Public organization profile — like a GitHub organization page

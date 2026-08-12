@@ -1,8 +1,8 @@
 "use client";
 
-import KeysView from "@/components/dashboard/KeysView";
-import SignInWall from "@/components/dashboard/SignInWall";
-import { useAuth } from "@/components/dashboard/AuthContext";
+import KeysView from "@/components/console/KeysView";
+import SignInWall from "@/components/console/SignInWall";
+import { useAuth } from "@/components/console/AuthContext";
 
 // Note: the previous server-component metadata moves out with the auth gate.
 // Title/description for /keys now come from the layout's defaults.

@@ -3,19 +3,19 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { BarChart3, Box, ChevronDown } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import { useEnvironment } from "@/components/dashboard/EnvironmentContext";
+import { useAuth } from "@/components/console/AuthContext";
+import { useEnvironment } from "@/components/console/EnvironmentContext";
 import EnvironmentFilter, {
   ALL_ENVIRONMENTS as ALL,
-} from "@/components/dashboard/EnvironmentFilter";
-import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
-import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
-import SignInWall from "@/components/dashboard/SignInWall";
-import UsageView from "@/components/dashboard/UsageView";
+} from "@/components/console/EnvironmentFilter";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
+import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
+import SignInWall from "@/components/console/SignInWall";
+import UsageView from "@/components/console/UsageView";
 
 export default function UsagePage() {
   return (
-    <Suspense fallback={<DashboardPageSkeleton kpiCount={4} withChart />}>
+    <Suspense fallback={<ConsolePageSkeleton kpiCount={4} withChart />}>
       <UsageContent />
     </Suspense>
   );
@@ -39,7 +39,7 @@ function UsageContent() {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
-      <DashboardPageHeader
+      <ConsolePageHeader
         title="Usage"
         icon={BarChart3}
         description="Requests, latency, errors, and spend across your API tokens."
