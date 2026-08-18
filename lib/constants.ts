@@ -65,6 +65,6 @@ export const PORTAL_NAV_ITEMS = [
 
 export const EXTERNAL_LINKS = {
   docs: "https://docs.livepeer.org",
-  discord: "https://discord.gg/livepeer",
+  discord: "https://discord.gg/55SZFEEH5y",
   github: "https://github.com/livepeer",
 } as const;
