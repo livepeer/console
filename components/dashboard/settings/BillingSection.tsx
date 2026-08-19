@@ -26,6 +26,12 @@ import {
   useBillingPlans,
 } from "@/lib/dashboard/useBillingPlans";
 import { useBillingAccount } from "@/lib/dashboard/useBillingAccount";
+import { redirectToCheckout } from "@/lib/dashboard/checkout-redirect";
+import { useWalletBillingState } from "@/lib/dashboard/useOwnerWallet";
+import {
+  includedUsageRemainingLabel,
+  includedUsageSummary,
+} from "@/lib/dashboard/wallet-settlement-display";
 import type {
   DashboardBillingPlan,
   DashboardScheduledChangeConflict,
@@ -172,6 +178,11 @@ export default function BillingSection() {
     ensureDefaultPaymentMethod,
     removePaymentMethod,
   } = useBillingAccount(externalUserId);
+  const wallet = useWalletBillingState(externalUserId);
+  const included =
+    wallet.state.status === "ready"
+      ? includedUsageSummary(wallet.state.wallet.billingState)
+      : null;
 
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const [pmBusy, setPmBusy] = useState(false);
@@ -255,7 +266,7 @@ export default function BillingSection() {
       const { checkoutUrl } = await startPaymentMethodCheckout({
         externalUserId,
       });
-      window.location.assign(checkoutUrl);
+      redirectToCheckout(checkoutUrl);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Payment method checkout failed";
@@ -283,7 +294,7 @@ export default function BillingSection() {
       ...timing,
     });
     if (result.checkoutUrl) {
-      window.location.assign(result.checkoutUrl);
+      redirectToCheckout(result.checkoutUrl);
       return;
     }
     await reloadPlans();
@@ -361,7 +372,7 @@ export default function BillingSection() {
       const result = await subscribe(input);
 
       if (result.checkoutUrl) {
-        window.location.assign(result.checkoutUrl);
+        redirectToCheckout(result.checkoutUrl);
         return;
       }
 
@@ -503,7 +514,7 @@ export default function BillingSection() {
       const { checkoutUrl } = await startPaymentMethodCheckout({
         externalUserId,
       });
-      window.location.assign(checkoutUrl);
+      redirectToCheckout(checkoutUrl);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Payment method checkout failed"
@@ -602,12 +613,14 @@ export default function BillingSection() {
   const planSub =
     subscriptionUiState.kind === "canceling"
       ? `${cancelingPlanName} ends ${cancelingEndsLabel}`
-      : subscription?.planName?.trim() ||
-        (subscriptionUiState.kind === "pending"
-          ? "Payment needs to be completed"
-          : subscriptionUiState.kind === "active"
-            ? "Current subscription"
-            : "Choose a plan to get started");
+      : included
+        ? includedUsageRemainingLabel(included)
+        : subscription?.planName?.trim() ||
+          (subscriptionUiState.kind === "pending"
+            ? "Payment needs to be completed"
+            : subscriptionUiState.kind === "active"
+              ? "Current subscription"
+              : "Choose a plan to get started");
 
   // Starter is the floor — cancel is only for paid catalog plans.
   const canCancel = canCancelBillingSubscription(
@@ -733,6 +746,15 @@ export default function BillingSection() {
                 plan.type.trim().toLowerCase() === "free";
               const includedUsage = includedUsageFeatureLabel(plan);
               const features: string[] = [];
+              if (
+                isCurrent &&
+                included &&
+                (included.planId === plan.id || !included.planId)
+              ) {
+                features.push(
+                  `$${included.remainingUsd} of $${included.totalUsd} included left`,
+                );
+              }
               if (isUsagePlan(plan)) {
                 features.push(resolvedPayPerUseBehavior(plan));
               } else {

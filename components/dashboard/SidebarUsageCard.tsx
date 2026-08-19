@@ -4,23 +4,36 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/dashboard/AuthContext";
 import { useAccountUsage } from "@/lib/dashboard/useAccountUsage";
+import { useWalletBillingState } from "@/lib/dashboard/useOwnerWallet";
 import {
   formatPeriodResetLabel,
   microsToUsd,
 } from "@/lib/dashboard/usage-capability-display";
+import { includedUsageSummary } from "@/lib/dashboard/wallet-settlement-display";
 
 /**
  * SidebarUsageCard — bottom-of-sidebar plan + usage indicator.
  *
- * Data comes from PymtHouse (OpenMeter) via `/api/pymthouse/account-usage`.
- * Prefer the plan included-discount allowance (USD). If that is unavailable,
- * show period spend in dollars — never a fake request-count free tier.
+ * Remaining included usage comes from the wallet billing state (plan
+ * discount). Prepaid grants are not labeled as included. If no allowance
+ * is on the live plan, show period spend in dollars.
  */
 export default function SidebarUsageCard() {
   const { user } = useAuth();
-  const usage = useAccountUsage(user?.id?.trim(), 30);
+  const externalUserId = user?.id?.trim();
+  const usage = useAccountUsage(externalUserId, 30);
+  const wallet = useWalletBillingState(externalUserId);
+  const included =
+    wallet.state.status === "ready"
+      ? includedUsageSummary(wallet.state.wallet.billingState)
+      : null;
 
-  if (usage.status === "loading" || usage.status === "idle") {
+  if (
+    usage.status === "loading" ||
+    usage.status === "idle" ||
+    wallet.state.status === "loading" ||
+    wallet.state.status === "idle"
+  ) {
     return (
       <div
         className="mx-1 mt-2 block animate-pulse rounded-md border border-subtle bg-sidebar-card-bg px-2.5 py-2"
@@ -46,31 +59,34 @@ export default function SidebarUsageCard() {
   }
 
   const { data } = usage;
-  const balance = data.balance;
-  const showUsdAllowance =
-    balance && BigInt(balance.lifetimeGrantedUsdMicros || "0") > BigInt(0);
+  const showUsdAllowance = Boolean(included);
 
-  const resetsAt = formatPeriodResetLabel(data.period.end);
-  const planLabel = showUsdAllowance ? "Included usage" : "Usage";
+  const resetsAt = included?.resetsAt
+    ? new Date(included.resetsAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })
+    : formatPeriodResetLabel(data.period.end);
+  const planLabel = included?.planName?.trim() || (showUsdAllowance ? "Included usage" : "Usage");
 
   let primaryUsed: number;
   let primaryLimit: number | null;
   let primaryDisplay: ReactNode;
   let footerLeft: string;
 
-  if (showUsdAllowance && balance) {
-    const granted = BigInt(balance.lifetimeGrantedUsdMicros || "1");
-    const consumed = BigInt(balance.consumedUsdMicros || "0");
+  if (showUsdAllowance && included) {
+    const granted = BigInt(included.totalUsdMicros || "1");
+    const consumed = BigInt(included.consumedUsdMicros || "0");
     primaryUsed = Number((consumed * BigInt(10000)) / granted) / 100;
     primaryLimit = 100;
     primaryDisplay = (
       <>
         <b className="font-medium text-fg">
-          ${microsToUsd(balance.consumedUsdMicros).toFixed(2)}
+          ${microsToUsd(included.consumedUsdMicros).toFixed(2)}
         </b>
         <span className="text-fg-faint">
           {" "}
-          / ${microsToUsd(balance.lifetimeGrantedUsdMicros).toFixed(2)}
+          / ${microsToUsd(included.totalUsdMicros).toFixed(2)}
         </span>
       </>
     );
@@ -112,7 +128,9 @@ export default function SidebarUsageCard() {
       >
         <div
           className={`h-full rounded-[2px] ${
-            balance && !balance.hasAccess
+            usage.status === "ready" &&
+            usage.data.balance &&
+            !usage.data.balance.hasAccess
               ? "bg-warm"
               : "bg-gradient-to-r from-green to-green-bright"
           }`}

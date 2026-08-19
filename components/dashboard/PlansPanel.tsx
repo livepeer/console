@@ -19,6 +19,12 @@ import {
   ScheduledChangeConflictError,
   useBillingPlans,
 } from "@/lib/dashboard/useBillingPlans";
+import { redirectToCheckout } from "@/lib/dashboard/checkout-redirect";
+import { useWalletBillingState } from "@/lib/dashboard/useOwnerWallet";
+import {
+  includedUsageRemainingLabel,
+  includedUsageSummary,
+} from "@/lib/dashboard/wallet-settlement-display";
 
 function isUsagePlan(
   plan: Pick<DashboardBillingPlan, "type" | "isStarterDefault">
@@ -75,6 +81,11 @@ export default function PlansPanel({
 }) {
   const { state, reload, subscribe, changePlan } =
     useBillingPlans(externalUserId);
+  const wallet = useWalletBillingState(externalUserId);
+  const included =
+    wallet.state.status === "ready"
+      ? includedUsageSummary(wallet.state.wallet.billingState)
+      : null;
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<"success" | "cancel" | null>(null);
@@ -108,7 +119,7 @@ export default function PlansPanel({
             cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
           });
           if (result.checkoutUrl) {
-            window.location.assign(result.checkoutUrl);
+            redirectToCheckout(result.checkoutUrl);
             return;
           }
           await reload();
@@ -163,7 +174,7 @@ export default function PlansPanel({
       ...timing,
     });
     if (result.checkoutUrl) {
-      window.location.assign(result.checkoutUrl);
+      redirectToCheckout(result.checkoutUrl);
       return;
     }
     await reload();
@@ -219,7 +230,7 @@ export default function PlansPanel({
             cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
           });
           if (result.checkoutUrl) {
-            window.location.assign(result.checkoutUrl);
+            redirectToCheckout(result.checkoutUrl);
             return;
           }
           await reload();
@@ -309,7 +320,9 @@ export default function PlansPanel({
       <div className="border-b border-hairline px-4 py-3.5">
         <p className="text-[17px] font-bold text-fg">Plans</p>
         <p className="mt-0.5 text-[12px] text-fg-muted">
-          Subscribe via PymtHouse → Stripe Checkout
+          {included
+            ? includedUsageRemainingLabel(included)
+            : "Subscribe via PymtHouse → Stripe Checkout"}
         </p>
         {flash === "success" ? (
           <p className="mt-2 text-[12px] text-emerald-400">
@@ -340,6 +353,12 @@ export default function PlansPanel({
                     ? ` · ${plan.capabilityCount} capabilities`
                     : ""}
                 </p>
+                {isCurrent && included && included.planId === plan.id ? (
+                  <p className="mt-1 text-[11px] text-fg-muted">
+                    ${included.remainingUsd} of ${included.totalUsd} included
+                    left
+                  </p>
+                ) : null}
                 {isUsagePlan(plan) ? (
                   <p className="mt-1 text-[11px] text-fg-faint">
                     {resolvedPayPerUseBehavior(plan)}

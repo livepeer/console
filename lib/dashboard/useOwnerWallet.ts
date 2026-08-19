@@ -42,6 +42,52 @@ export type OwnerWalletState =
     }
   | { status: "error"; message: string };
 
+export type WalletBillingState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; wallet: DashboardOwnerWallet }
+  | { status: "error"; message: string };
+
+/** Wallet GET only — remaining included usage + plan, without PM/invoice lists. */
+export function useWalletBillingState(externalUserId: string | undefined) {
+  const [state, setState] = useState<WalletBillingState>({ status: "idle" });
+  const trimmedUserId = externalUserId?.trim() || "";
+
+  const load = useCallback(async () => {
+    if (!trimmedUserId) {
+      setState({ status: "idle" });
+      return;
+    }
+
+    setState({ status: "loading" });
+    try {
+      const qs = `externalUserId=${encodeURIComponent(trimmedUserId)}`;
+      const walletResponse = await fetch(`/api/pymthouse/wallet?${qs}`);
+      const walletBody = await readResponseJson<
+        DashboardOwnerWallet & { error?: string }
+      >(walletResponse);
+      if (!walletResponse.ok) {
+        throw new Error(
+          walletUpstreamMessage(walletResponse.status, walletBody.error),
+        );
+      }
+      setState({ status: "ready", wallet: walletBody });
+    } catch (error) {
+      setState({
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "Failed to load wallet",
+      });
+    }
+  }, [trimmedUserId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { state, reload: load };
+}
+
 export function useOwnerWallet(
   enabled: boolean,
   externalUserId: string | undefined,

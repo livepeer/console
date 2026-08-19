@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { BillingState } from "@pymthouse/builder-sdk";
+import type { BillingStateWithIncluded } from "./wallet-settlement-display";
 import {
   availableRunway,
   collectionSchedule,
+  includedUsageRemainingLabel,
+  includedUsageSummary,
   overageLimitNote,
   spendPostureBadge,
 } from "./wallet-settlement-display";
@@ -16,6 +19,9 @@ function money(usdMicros: string, usd: string) {
 function makeState(overrides: {
   status?: BillingState["status"];
   includedRemaining?: { usdMicros: string; usd: string };
+  includedTotal?: { usdMicros: string; usd: string };
+  includedConsumed?: { usdMicros: string; usd: string };
+  sourcePlan?: { id: string | null; name: string | null; type: string | null } | null;
   prepaid?: { usdMicros: string; usd: string };
   spendable?: { usdMicros: string; usd: string };
   ceiling?: { usdMicros: string; usd: string };
@@ -23,7 +29,7 @@ function makeState(overrides: {
   remaining?: { usdMicros: string; usd: string } | null;
   utilizationBps?: number | null;
   leadThreshold?: { usdMicros: string; usd: string };
-}): BillingState {
+}): BillingStateWithIncluded {
   const prepaid = {
     ...money("0", "0.00"),
     ...(overrides.prepaid ?? {}),
@@ -53,11 +59,17 @@ function makeState(overrides: {
       prepaid,
       included: includedRemaining,
       includedUsage: {
-        total: money("10000000", "10.00"),
+        total: {
+          ...money("10000000", "10.00"),
+          ...(overrides.includedTotal ?? {}),
+        },
         remaining: includedRemaining,
-        consumed: money("0", "0.00"),
+        consumed: {
+          ...money("0", "0.00"),
+          ...(overrides.includedConsumed ?? {}),
+        },
         resetsAt: "2026-09-01T00:00:00.000Z",
-        sourcePlan: null,
+        sourcePlan: overrides.sourcePlan === undefined ? null : overrides.sourcePlan,
       },
       spendable,
       overage: {
@@ -134,6 +146,19 @@ describe("availableRunway", () => {
     assert.equal(runway.detail, "Included $8.00 · Credits $2.50");
   });
 
+  it("names the live plan on the included side", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "active",
+        includedRemaining: { usdMicros: "4980000", usd: "4.98" },
+        prepaid: { usdMicros: "10000000", usd: "10.00" },
+        unbilledDebt: null,
+        sourcePlan: { id: "starter", name: "Starter", type: "free" },
+      }),
+    );
+    assert.equal(runway.detail, "Starter included $4.98 · Credits $10.00");
+  });
+
   it("omits zero sides from the funded breakdown", () => {
     const runway = availableRunway(
       makeState({
@@ -197,6 +222,38 @@ describe("availableRunway", () => {
     );
     assert.equal(runway.usd, "-$2.00");
     assert.equal(runway.tone, "danger");
+  });
+});
+
+describe("includedUsageSummary", () => {
+  it("returns null when the plan has no included allowance", () => {
+    const summary = includedUsageSummary(
+      makeState({
+        includedRemaining: { usdMicros: "0", usd: "0.00" },
+        includedTotal: { usdMicros: "0", usd: "0.00" },
+      }),
+    );
+    assert.equal(summary, null);
+  });
+
+  it("keeps remaining after the prepaid balance and names the plan", () => {
+    const summary = includedUsageSummary(
+      makeState({
+        includedRemaining: { usdMicros: "4982000", usd: "4.98" },
+        includedTotal: { usdMicros: "5000000", usd: "5.00" },
+        includedConsumed: { usdMicros: "18000", usd: "0.02" },
+        sourcePlan: { id: "plan_1", name: "Starter", type: "free" },
+      }),
+    );
+    assert.ok(summary);
+    assert.equal(summary.remainingUsd, "4.98");
+    assert.equal(summary.totalUsd, "5.00");
+    assert.equal(summary.consumedUsd, "0.02");
+    assert.equal(summary.planName, "Starter");
+    assert.equal(
+      includedUsageRemainingLabel(summary),
+      "Starter · $4.98 of $5.00 included left",
+    );
   });
 });
 

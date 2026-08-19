@@ -1,6 +1,29 @@
 import type { BillingState, BillingStatus } from "@pymthouse/builder-sdk";
 import { microsToUsd } from "./usage-capability-display";
 
+type IncludedUsageFunding = {
+  total: { usdMicros: string; usd: string };
+  remaining: { usdMicros: string; usd: string };
+  consumed: { usdMicros: string; usd: string };
+  resetsAt?: string;
+  sourcePlan?: {
+    id: string | null;
+    name: string | null;
+    type: string | null;
+  } | null;
+};
+
+/** Wallet payloads include this; builder-sdk 0.6.x types omit it. */
+export type BillingStateWithIncluded = BillingState & {
+  funding: BillingState["funding"] & {
+    includedUsage?: IncludedUsageFunding;
+  };
+};
+
+function asIncludedState(state: BillingState): BillingStateWithIncluded {
+  return state as BillingStateWithIncluded;
+}
+
 /** Wallet strip amounts: always two decimals (matches prepaid `$0.00`). */
 export function formatWalletUsd(micros: string | null | undefined): string {
   if (!micros?.trim()) return "0.00";
@@ -66,9 +89,9 @@ export type AvailableRunway = {
  * negative of unbilled overage debt.
  */
 export function availableRunway(state: BillingState): AvailableRunway {
+  const funding = asIncludedState(state).funding;
   const included = parseUsdMicros(
-    state.funding.includedUsage?.remaining.usdMicros ??
-      state.funding.included.usdMicros,
+    funding.includedUsage?.remaining.usdMicros ?? funding.included.usdMicros,
   );
   const prepaid = parseUsdMicros(state.funding.prepaid.usdMicros);
   const spendable = parseUsdMicros(state.funding.spendable.usdMicros);
@@ -88,7 +111,12 @@ export function availableRunway(state: BillingState): AvailableRunway {
   } else {
     const parts: string[] = [];
     if (included > BigInt(0)) {
-      parts.push(`Included $${formatWalletUsd(included.toString())}`);
+      const planName = funding.includedUsage?.sourcePlan?.name?.trim();
+      parts.push(
+        planName
+          ? `${planName} included $${formatWalletUsd(included.toString())}`
+          : `Included $${formatWalletUsd(included.toString())}`,
+      );
     }
     if (prepaid > BigInt(0)) {
       parts.push(`Credits $${formatWalletUsd(prepaid.toString())}`);
@@ -116,6 +144,58 @@ export function overageLimitNote(state: BillingState): string | null {
     return `Overage limit $${ceiling.usd} · $${remaining.usd} left`;
   }
   return `Overage limit $${ceiling.usd}`;
+}
+
+export type IncludedUsageSummary = {
+  remainingUsdMicros: string;
+  totalUsdMicros: string;
+  consumedUsdMicros: string;
+  remainingUsd: string;
+  totalUsd: string;
+  consumedUsd: string;
+  planId: string | null;
+  planName: string | null;
+  resetsAt: string | null;
+};
+
+/**
+ * Remaining included-usage discount for the live plan period.
+ * Null when the live plan has no usage allowance (prepaid / invoice only).
+ */
+export function includedUsageSummary(
+  state: BillingState | null | undefined,
+): IncludedUsageSummary | null {
+  if (!state) return null;
+  const funding = asIncludedState(state).funding;
+  const included = funding.includedUsage;
+  const remainingUsdMicros =
+    included?.remaining.usdMicros ?? funding.included.usdMicros;
+  const totalUsdMicros = included?.total.usdMicros ?? remainingUsdMicros;
+  const consumedUsdMicros = included?.consumed.usdMicros ?? "0";
+  if (parseUsdMicros(totalUsdMicros) <= BigInt(0)) return null;
+
+  const planName = included?.sourcePlan?.name?.trim() || null;
+  const planId = included?.sourcePlan?.id?.trim() || null;
+  const resetsAt = included?.resetsAt?.trim() || null;
+
+  return {
+    remainingUsdMicros,
+    totalUsdMicros,
+    consumedUsdMicros,
+    remainingUsd: formatWalletUsd(remainingUsdMicros),
+    totalUsd: formatWalletUsd(totalUsdMicros),
+    consumedUsd: formatWalletUsd(consumedUsdMicros),
+    planId,
+    planName,
+    resetsAt,
+  };
+}
+
+export function includedUsageRemainingLabel(
+  summary: IncludedUsageSummary,
+): string {
+  const plan = summary.planName ?? "Plan";
+  return `${plan} · $${summary.remainingUsd} of $${summary.totalUsd} included left`;
 }
 
 /** When the next invoice goes out, in the customer's terms. */

@@ -15,6 +15,11 @@ import {
 import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
 import PlansPanel from "@/components/dashboard/PlansPanel";
 import WalletPanel from "@/components/dashboard/WalletPanel";
+import { useWalletBillingState } from "@/lib/dashboard/useOwnerWallet";
+import {
+  includedUsageSummary,
+  type IncludedUsageSummary,
+} from "@/lib/dashboard/wallet-settlement-display";
 
 const PERIOD_DAYS = 30;
 
@@ -41,9 +46,7 @@ function UsageLoadError({ message, onRetry }: { message: string; onRetry: () => 
 function AllowanceStrip({
   requestCount,
   requestLimit,
-  balanceUsdMicros,
-  grantedUsdMicros,
-  consumedUsdMicros,
+  included,
   hasAccess,
   forecast,
   willExceed,
@@ -54,9 +57,7 @@ function AllowanceStrip({
 }: {
   requestCount: number;
   requestLimit: number | null;
-  balanceUsdMicros: string | null;
-  grantedUsdMicros: string | null;
-  consumedUsdMicros: string | null;
+  included: IncludedUsageSummary | null;
   hasAccess: boolean;
   forecast: number;
   willExceed: boolean;
@@ -65,10 +66,13 @@ function AllowanceStrip({
   periodDelta: number;
   resetsAt: string;
 }) {
-  const showUsdAllowance = grantedUsdMicros && BigInt(grantedUsdMicros) > BigInt(0);
-  const usedUsd = consumedUsdMicros ?? "0";
-  const granted = grantedUsdMicros ?? "0";
-  const remaining = balanceUsdMicros ?? "0";
+  const showUsdAllowance = Boolean(included);
+  const usedUsd = included?.consumedUsdMicros ?? "0";
+  const granted = included?.totalUsdMicros ?? "0";
+  const remaining = included?.remainingUsdMicros ?? "0";
+  const allowanceLabel = included?.planName?.trim()
+    ? `${included.planName} included`
+    : "Included this period";
 
   const usedForBar = showUsdAllowance
     ? Number((BigInt(usedUsd) * BigInt(10000)) / BigInt(granted || "1"))
@@ -84,7 +88,7 @@ function AllowanceStrip({
     <div className="flex flex-col gap-3 rounded-md border border-hairline bg-dark-lighter shadow-card px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-          {showUsdAllowance ? "Included this period" : "Usage this period"}
+          {showUsdAllowance ? allowanceLabel : "Usage this period"}
         </p>
         {showUsdAllowance && !hasAccess && (
           <span className="rounded-[3px] border border-warm/30 bg-warm/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warm">
@@ -169,6 +173,7 @@ export default function UsageView() {
   const { user } = useAuth();
   const externalUserId = user?.id?.trim();
   const usageState = useAccountUsage(externalUserId, PERIOD_DAYS);
+  const walletState = useWalletBillingState(externalUserId);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
 
@@ -265,8 +270,16 @@ export default function UsageView() {
   const { data } = usageState;
   const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
-  const resetsAt = formatPeriodResetLabel(data.period.end);
-  const grantedMicros = data.balance?.lifetimeGrantedUsdMicros ?? null;
+  const included =
+    walletState.state.status === "ready"
+      ? includedUsageSummary(walletState.state.wallet.billingState)
+      : null;
+  const resetsAt = included?.resetsAt
+    ? new Date(included.resetsAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })
+    : formatPeriodResetLabel(data.period.end);
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
@@ -277,9 +290,7 @@ export default function UsageView() {
       <AllowanceStrip
         requestCount={forecastStats.requestCount}
         requestLimit={null}
-        balanceUsdMicros={data.balance?.balanceUsdMicros ?? null}
-        grantedUsdMicros={grantedMicros}
-        consumedUsdMicros={data.balance?.consumedUsdMicros ?? null}
+        included={included}
         hasAccess={data.balance?.hasAccess ?? true}
         forecast={forecastStats.forecast}
         willExceed={forecastStats.willExceed}
@@ -350,6 +361,7 @@ export default function UsageView() {
 
       <LimitsPanel
         balance={data.balance}
+        included={included}
         networkFeeUsdMicros={data.current.networkFeeUsdMicros}
         endUserBillableUsdMicros={data.current.endUserBillableUsdMicros}
         requestCount={data.current.requestCount}
@@ -511,6 +523,7 @@ function BreakdownTable({
 
 function LimitsPanel({
   balance,
+  included,
   networkFeeUsdMicros,
   endUserBillableUsdMicros,
   requestCount,
@@ -521,34 +534,42 @@ function LimitsPanel({
     lifetimeGrantedUsdMicros: string;
     hasAccess: boolean;
   } | null;
+  included: IncludedUsageSummary | null;
   networkFeeUsdMicros: string;
   endUserBillableUsdMicros: string;
   requestCount: number;
 }) {
-  const limits = balance
-    ? [
-        {
-          label: "Included usage",
-          used: microsToUsdDisplay(balance.consumedUsdMicros),
-          max: `$${microsToUsdDisplay(balance.lifetimeGrantedUsdMicros)}`,
-          pct:
-            BigInt(balance.lifetimeGrantedUsdMicros || "0") > BigInt(0)
-              ? Math.min(
-                  100,
-                  Number(
-                    (BigInt(balance.consumedUsdMicros || "0") * BigInt(10000)) /
-                      BigInt(balance.lifetimeGrantedUsdMicros || "1"),
-                  ) / 100,
-                )
-              : 0,
-        },
-        {
-          label: "Remaining balance",
-          used: `$${microsToUsdDisplay(balance.balanceUsdMicros)}`,
-          max: "—",
-          pct: balance.hasAccess ? 40 : 100,
-        },
-      ]
+  const includedLimit = included
+    ? {
+        label: included.planName
+          ? `${included.planName} included usage`
+          : "Included usage",
+        used: microsToUsdDisplay(included.consumedUsdMicros),
+        max: `$${included.totalUsd}`,
+        pct:
+          BigInt(included.totalUsdMicros || "0") > BigInt(0)
+            ? Math.min(
+                100,
+                Number(
+                  (BigInt(included.consumedUsdMicros || "0") * BigInt(10000)) /
+                    BigInt(included.totalUsdMicros || "1"),
+                ) / 100,
+              )
+            : 0,
+      }
+    : null;
+  const prepaidLimit = balance
+    ? {
+        label: "Prepaid credits",
+        used: `$${microsToUsdDisplay(balance.balanceUsdMicros)}`,
+        max: "—",
+        pct: balance.hasAccess ? 40 : 100,
+      }
+    : null;
+  const limits = includedLimit || prepaidLimit
+    ? [includedLimit, prepaidLimit].filter(
+        (row): row is NonNullable<typeof row> => row !== null,
+      )
     : [
         {
           label: "Signed requests",

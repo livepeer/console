@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
 import { useOwnerWallet } from "@/lib/dashboard/useOwnerWallet";
+import { redirectToCheckout } from "@/lib/dashboard/checkout-redirect";
 import {
   availableRunway,
   collectionSchedule,
   formatWalletUsd,
+  includedUsageRemainingLabel,
+  includedUsageSummary,
   overageLimitNote,
   spendPostureBadge,
   type SpendPostureTone,
@@ -57,22 +60,6 @@ const AVAILABLE_TONE_CLASS: Record<SpendPostureTone, string> = {
   warn: "text-amber-400",
   danger: "text-rose-400",
 };
-
-/** Only follow https (or localhost http, for dev) Checkout URLs. */
-function redirectToCheckout(url: string): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("Invalid checkout URL");
-  }
-  const isLocalhost =
-    parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-  if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && isLocalhost)) {
-    throw new Error("Unsafe checkout URL");
-  }
-  window.location.assign(parsed.toString());
-}
 
 export default function WalletPanel({
   externalUserId,
@@ -166,6 +153,7 @@ export default function WalletPanel({
   const billingState = wallet.billingState;
   const posture = spendPostureBadge(billingState.status);
   const runway = availableRunway(billingState);
+  const included = includedUsageSummary(billingState);
   const limitNote = overageLimitNote(billingState);
   const defaultPm =
     paymentMethods.find((pm) => pm.isDefault) ?? paymentMethods[0] ?? null;
@@ -216,6 +204,17 @@ export default function WalletPanel({
               </p>
             </div>
           </div>
+          {included ? (
+            <p className="mt-3 text-[12px] text-fg-muted">
+              {includedUsageRemainingLabel(included)}
+              {included.resetsAt
+                ? ` · resets ${new Date(included.resetsAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}`
+                : ""}
+            </p>
+          ) : null}
           <p className="mt-3 text-[12px] text-fg-muted">
             {collectionSchedule(billingState)}
           </p>
