@@ -17,12 +17,28 @@ function makeState(overrides: {
   status?: BillingState["status"];
   includedRemaining?: { usdMicros: string; usd: string };
   prepaid?: { usdMicros: string; usd: string };
+  spendable?: { usdMicros: string; usd: string };
   ceiling?: { usdMicros: string; usd: string };
   unbilledDebt?: { usdMicros: string; usd: string } | null;
   remaining?: { usdMicros: string; usd: string } | null;
   utilizationBps?: number | null;
   leadThreshold?: { usdMicros: string; usd: string };
 }): BillingState {
+  const prepaid = {
+    ...money("0", "0.00"),
+    ...(overrides.prepaid ?? {}),
+  };
+  const includedRemaining = {
+    ...money("0", "0.00"),
+    ...(overrides.includedRemaining ?? {}),
+  };
+  const spendableDefaultMicros = (
+    BigInt(prepaid.usdMicros || "0") + BigInt(includedRemaining.usdMicros || "0")
+  ).toString();
+  const spendable = {
+    ...money(spendableDefaultMicros, "0.00"),
+    ...(overrides.spendable ?? {}),
+  };
   return {
     asOf: "2026-08-08T00:00:00.000Z",
     subject: {
@@ -34,22 +50,16 @@ function makeState(overrides: {
     canSpend: true,
     reason: null,
     funding: {
-      prepaid: {
-        ...money("0", "0.00"),
-        ...(overrides.prepaid ?? {}),
-      },
-      included: money("0", "0.00"),
+      prepaid,
+      included: includedRemaining,
       includedUsage: {
         total: money("10000000", "10.00"),
-        remaining: {
-          ...money("0", "0.00"),
-          ...(overrides.includedRemaining ?? {}),
-        },
+        remaining: includedRemaining,
         consumed: money("0", "0.00"),
         resetsAt: "2026-09-01T00:00:00.000Z",
         sourcePlan: null,
       },
-      spendable: money("0", "0.00"),
+      spendable,
       overage: {
         eligible: true,
         ceiling: {
@@ -150,6 +160,20 @@ describe("availableRunway", () => {
     assert.equal(runway.usdMicros, "-1250000");
     assert.equal(runway.tone, "info");
     assert.equal(runway.detail, "Unbilled $1.25");
+  });
+
+  it("keeps spendable while funded even if gathering debt is present", () => {
+    const runway = availableRunway(
+      makeState({
+        status: "active",
+        includedRemaining: { usdMicros: "0", usd: "0.00" },
+        prepaid: { usdMicros: "5010000", usd: "5.01" },
+        unbilledDebt: { usdMicros: "19990000", usd: "19.99" },
+      }),
+    );
+    assert.equal(runway.usd, "$5.01");
+    assert.equal(runway.usdMicros, "5010000");
+    assert.equal(runway.detail, "Credits $5.01");
   });
 
   it("treats null debt as zero", () => {
