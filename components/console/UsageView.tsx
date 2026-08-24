@@ -15,6 +15,7 @@ import {
   type UsageCapabilityRow,
 } from "@/lib/console/usage-capability-display";
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
+import PlansPanel from "@/components/console/PlansPanel";
 
 type IncludedUsageSummary = {
   planName?: string;
@@ -308,6 +309,8 @@ export default function UsageView() {
       <p className="mb-6 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
         Account{user?.id ? ` · ${user.id}` : ""}
       </p>
+
+      <PlansPanel />
 
       <AllowanceStrip
         requestCount={forecastStats.requestCount}
