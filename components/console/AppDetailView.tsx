@@ -472,7 +472,7 @@ export function SettingsTab({
                   Anyone can discover and call this pipeline. It appears as a
                   card in{" "}
                   <Link
-                    href="/"
+                    href="/explore"
                     className="text-green-bright underline decoration-green-bright/40 underline-offset-2 hover:text-green-light"
                   >
                     Explore
@@ -648,7 +648,7 @@ export function AppDetailHeader({
             </span>
             {visibility === "public" && (
               <Link
-                href="/"
+                href="/explore"
                 className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
                 title="Listed in Explore"
               >
@@ -796,7 +796,7 @@ export default function AppDetailView({ appId }: { appId: string }) {
           </span>
           {visibility === "public" && (
             <Link
-              href="/"
+              href="/explore"
               className="inline-flex items-center gap-1 rounded-full border border-green-bright/30 bg-green/10 px-2 py-px text-[11px] text-green-bright transition-colors hover:bg-green/15"
               title="Listed in Explore"
             >

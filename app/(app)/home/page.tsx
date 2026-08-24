@@ -39,15 +39,13 @@ export default function HomePage() {
   const { isConnected, isLoading, user } = useAuth();
   const router = useRouter();
 
-  // Signed-out users redirect to / — the public landing.
+  // Signed-out users redirect to /login — the console's default entry point.
   // The Home view is organization-only (KPIs, recent runs, capability
-  // leaderboard), and a SignInWall on the root /home URL was the
-  // wrong default: visitors arrived at a sign-in gate before they'd had a
-  // chance to see what's on the platform. Explore is the discovery surface
-  // and the right entry point for unauthenticated visitors.
+  // leaderboard), so there's nothing to show an unauthenticated visitor here;
+  // sending them straight to sign-in beats bouncing through `/`.
   useEffect(() => {
     if (!isLoading && (!isConnected || !user)) {
-      router.replace("/");
+      router.replace("/login");
     }
   }, [isLoading, isConnected, user, router]);
 
@@ -97,7 +95,7 @@ export default function HomePage() {
   const organization = "Flipbook";
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
-  // Signed-out users are redirected to / via the useEffect
+  // Signed-out users are redirected to /login via the useEffect
   // above; render nothing in the meantime (one frame max) so they don't see
   // a flash of organization-mock data before the redirect lands.
   if (!isConnected || !user) {
