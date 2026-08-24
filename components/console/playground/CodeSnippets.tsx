@@ -30,13 +30,40 @@ function generateSnippets(
   token: string,
   runValues?: Record<string, unknown>
 ): Record<Lang, string> {
-  const baseUrl = model.apiEndpoint ?? "https://gateway.livepeer.org/v1";
+  const isRunnerLlm =
+    model.category === "Language" && Boolean(model.runnerAppId?.trim());
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000";
+
+  const baseUrl = isRunnerLlm
+    ? `${origin}/api/runner-gateway/v1`
+    : (model.apiEndpoint ?? "https://gateway.livepeer.org/v1");
+
+  const appQuery = isRunnerLlm
+    ? `?app=${encodeURIComponent(model.runnerAppId!.trim())}`
+    : "";
+
   const endpoint =
     model.category === "Language"
-      ? `${baseUrl}/chat/completions`
+      ? `${baseUrl}/chat/completions${appQuery}`
       : `${baseUrl}/${model.id}`;
 
   const isLLM = model.category === "Language";
+  const openAiKey = isRunnerLlm ? "unused" : token;
+  const curlAuth = isRunnerLlm
+    ? `  --cookie "console session (signed in)" \\\n`
+    : `  -H "Authorization: Bearer ${token}" \\\n`;
+  const jsonAuthHeaders = isRunnerLlm
+    ? `"Content-Type": "application/json",`
+    : `"Authorization": "Bearer ${token}",
+        "Content-Type": "application/json",`;
+  const fetchAuthHeaders = isRunnerLlm
+    ? `"Content-Type": "application/json",`
+    : `Authorization: "Bearer ${token}",
+    "Content-Type": "application/json",`;
+  const credentialsOpt = isRunnerLlm ? `\n  credentials: "include",` : "";
 
   // If the user has supplied playground inputs, bake them into the request body
   // so "Copy code for this run" produces production code matching what they tested.
@@ -66,8 +93,7 @@ function generateSnippets(
 
   return {
     curl: `curl -X POST "${endpoint}" \\
-  -H "Authorization: Bearer ${token}" \\
-  -H "Content-Type: application/json" \\
+${curlAuth}  -H "Content-Type: application/json" \\
   -d '${body}'`,
 
     python: useRunValues
@@ -76,8 +102,7 @@ function generateSnippets(
 response = requests.post(
     "${endpoint}",
     headers={
-        "Authorization": "Bearer ${token}",
-        "Content-Type": "application/json",
+        ${jsonAuthHeaders}
     },
     json=${body.replace(/^/gm, "    ").trimStart()},
 )
@@ -87,7 +112,7 @@ print(response.json())`
 
 client = OpenAI(
     base_url="${baseUrl}",
-    api_key="${token}",
+    api_key="${openAiKey}",
 )
 
 response = client.chat.completions.create(
@@ -96,7 +121,7 @@ response = client.chat.completions.create(
         {"role": "user", "content": "Hello, how are you?"}
     ],
     temperature=0.7,
-    max_tokens=1024,
+    max_tokens=1024,${isRunnerLlm ? `\n    extra_query={"app": "${model.runnerAppId}"},` : ""}
 )
 print(response.choices[0].message.content)`
         : `import requests
@@ -104,8 +129,7 @@ print(response.choices[0].message.content)`
 response = requests.post(
     "${endpoint}",
     headers={
-        "Authorization": "Bearer ${token}",
-        "Content-Type": "application/json",
+        ${jsonAuthHeaders}
     },
     json={
         "prompt": "A scenic mountain landscape at sunset",
@@ -116,10 +140,9 @@ print(response.json())`,
 
     node: useRunValues
       ? `const response = await fetch("${endpoint}", {
-  method: "POST",
+  method: "POST",${credentialsOpt}
   headers: {
-    Authorization: "Bearer ${token}",
-    "Content-Type": "application/json",
+    ${fetchAuthHeaders}
   },
   body: JSON.stringify(${body.replace(/^/gm, "  ").trimStart()}),
 });
@@ -130,7 +153,7 @@ console.log(result);`
 
 const client = new OpenAI({
   baseURL: "${baseUrl}",
-  apiKey: "${token}",
+  apiKey: "${openAiKey}",
 });
 
 const response = await client.chat.completions.create({
@@ -140,13 +163,12 @@ const response = await client.chat.completions.create({
   ],
   temperature: 0.7,
   max_tokens: 1024,
-});
+}${isRunnerLlm ? `, { query: { app: "${model.runnerAppId}" } }` : ""});
 console.log(response.choices[0].message.content);`
         : `const response = await fetch("${endpoint}", {
-  method: "POST",
+  method: "POST",${credentialsOpt}
   headers: {
-    Authorization: "Bearer ${token}",
-    "Content-Type": "application/json",
+    ${fetchAuthHeaders}
   },
   body: JSON.stringify({
     prompt: "A scenic mountain landscape at sunset",
@@ -157,9 +179,8 @@ const result = await response.json();
 console.log(result);`,
 
     http: `POST ${endpoint} HTTP/1.1
-Host: ${new URL(baseUrl).host}
-Authorization: Bearer ${token}
-Content-Type: application/json
+Host: ${new URL(baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`).host}
+${isRunnerLlm ? "Cookie: <console session>\n" : `Authorization: Bearer ${token}\n`}Content-Type: application/json
 
 ${body}`,
   };
