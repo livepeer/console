@@ -46,7 +46,7 @@ const GROUPS: Group[] = [
 
 const NAV_TARGETS: Record<string, string> = {
   h: "/home",
-  e: "/",
+  e: "/explore",
   u: "/usage",
   c: "/calls",
   k: "/keys",

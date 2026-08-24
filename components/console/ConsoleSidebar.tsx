@@ -542,10 +542,11 @@ function SidebarContent({
   // persistent global mode, so the sidebar is a flat task list:
   //   • Primary — your organization resources (Home, Apps, API keys, Usage,
   //     Settings — Settings sits last, under Usage).
-  //   • NETWORK — the global network (Explore, Stats), its own labeled group.
   //   • Footer — Docs.
+  // The NETWORK group (Explore, Stats) is not rendered in the signed-in rail:
+  // those routes still exist and stay linkable, they just aren't console
+  // destinations. Their entries remain in PORTAL_NAV_ITEMS, filtered out here.
   const primaryItems = PORTAL_NAV_ITEMS.filter((i) => i.zone !== "network");
-  const networkItems = PORTAL_NAV_ITEMS.filter((i) => i.zone === "network");
 
   const renderNavItem = (item: (typeof PORTAL_NAV_ITEMS)[number]) => {
     const Icon = NAV_ICONS[item.icon];
@@ -553,10 +554,8 @@ function SidebarContent({
     // Right-aligned mono meta counts. Only render expanded; collapsed shows
     // icon only.
     let meta: string | undefined;
-    if (!collapsed) {
-      if (item.href === "/explore") meta = formatRuns(APPS.length);
-      else if (item.href === "/keys")
-        meta = formatRuns(SETTINGS_API_KEYS.length);
+    if (!collapsed && item.href === "/keys") {
+      meta = formatRuns(SETTINGS_API_KEYS.length);
     }
     const itemKbd = "kbd" in item ? (item.kbd as string) : undefined;
     const itemSubmenu = "submenu" in item ? Boolean(item.submenu) : false;
@@ -707,8 +706,7 @@ function SidebarContent({
       </div>
 
       {/* Destinations. Home + your organization resources are the unlabeled
-          primary list (scope shown per-page via the header chip); the global
-          NETWORK destinations get their own labeled section below. On /settings
+          primary list (scope shown per-page via the header chip). On /settings
           the whole list is replaced by the SettingsRail. */}
       {pathname.startsWith("/settings") ? (
         <SettingsRail padX={padX} onNavigate={onNavigate} />
@@ -719,19 +717,6 @@ function SidebarContent({
               there's no environment switcher heading these. */}
           <nav aria-label="Primary" className={`pb-1 ${padX}`}>
             <ul className="space-y-px">{primaryItems.map(renderNavItem)}</ul>
-          </nav>
-
-          {/* NETWORK — the global network: browse the catalog + network health.
-              A distinct category from your own resources above. */}
-          <nav aria-label="Network" className={`pb-1 ${padX}`}>
-            {!collapsed && (
-              <div className="px-2.5 pt-2 pb-1">
-                <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-                  Network
-                </span>
-              </div>
-            )}
-            <ul className="space-y-px">{networkItems.map(renderNavItem)}</ul>
           </nav>
         </>
       )}
