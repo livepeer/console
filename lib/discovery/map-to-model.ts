@@ -1,5 +1,5 @@
-import type { App, AppCategory, AppStatus, PricingUnit } from "@/lib/dashboard/types";
-import { enrichDiscoveryModelForStreaming } from "@/lib/dashboard/streaming-playground";
+import type { App, AppCategory, AppStatus, PricingUnit } from "@/lib/console/types";
+import { enrichDiscoveryModelForStreaming } from "@/lib/console/streaming-playground";
 import type { DiscoveryCapabilityEntry, DiscoveryDatasetRow } from "./types";
 
 function inferCategory(capability: string): AppCategory {

@@ -11,15 +11,16 @@ export const metadata: Metadata = {
         ? `https://${process.env.VERCEL_URL}`
         : "https://dashboard.livepeer.org"
   ),
-  title: "Livepeer Developer Dashboard",
+  title: "Livepeer Console",
   description:
     "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
 };
 
 // FOUT prevention — runs synchronously before paint so dual-source CSS
-// variables resolve to the stored theme on first render. ThemeProvider in
-// the (app) layout takes over after hydration.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'dark';var d=s==='dark'||(s==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+// variables resolve to the stored theme on first render. With no stored
+// preference we fall back to "system", i.e. the OS `prefers-color-scheme`.
+// ThemeProvider in the (app) layout takes over after hydration.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'system';var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout({
   children,

@@ -4,17 +4,17 @@ import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Settings as SettingsIcon } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
-import SignInWall from "@/components/dashboard/SignInWall";
-import GeneralSection from "@/components/dashboard/settings/GeneralSection";
-import MembersSection from "@/components/dashboard/settings/MembersSection";
-import BillingSection from "@/components/dashboard/settings/BillingSection";
-import LimitsSection from "@/components/dashboard/settings/LimitsSection";
-import ProfileSection from "@/components/dashboard/settings/ProfileSection";
-import NotificationsSection from "@/components/dashboard/settings/NotificationsSection";
-import SecuritySection from "@/components/dashboard/settings/SecuritySection";
-import AppearanceSection from "@/components/dashboard/settings/AppearanceSection";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
+import SignInWall from "@/components/console/SignInWall";
+import GeneralSection from "@/components/console/settings/GeneralSection";
+import MembersSection from "@/components/console/settings/MembersSection";
+import BillingSection from "@/components/console/settings/BillingSection";
+import LimitsSection from "@/components/console/settings/LimitsSection";
+import ProfileSection from "@/components/console/settings/ProfileSection";
+import NotificationsSection from "@/components/console/settings/NotificationsSection";
+import SecuritySection from "@/components/console/settings/SecuritySection";
+import AppearanceSection from "@/components/console/settings/AppearanceSection";
 
 // The 7 settings sub-tabs, two groups (Organization + Account). The sidebar's
 // SettingsRail is the navigation surface — there's no horizontal TabStrip on
@@ -57,7 +57,7 @@ export default function SettingsPage() {
   return (
     <Suspense
       fallback={
-        <DashboardPageSkeleton
+        <ConsolePageSkeleton
           maxWidth="5xl"
           withTabs={false}
           kpiCount={0}

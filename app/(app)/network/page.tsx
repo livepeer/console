@@ -2,14 +2,21 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { BarChart3, Activity, Globe, Wallet, Cpu, ArrowUpRight } from "lucide-react";
-import OverviewTab from "@/components/dashboard/statistics/OverviewTab";
-import UtilizationTab from "@/components/dashboard/statistics/UtilizationTab";
-import PaymentsTab from "@/components/dashboard/statistics/PaymentsTab";
-import GpusTab from "@/components/dashboard/statistics/GpusTab";
-import TabStrip from "@/components/dashboard/TabStrip";
-import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
-import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
+import {
+  BarChart3,
+  Activity,
+  Globe,
+  Wallet,
+  Cpu,
+  ArrowUpRight,
+} from "lucide-react";
+import OverviewTab from "@/components/console/statistics/OverviewTab";
+import UtilizationTab from "@/components/console/statistics/UtilizationTab";
+import PaymentsTab from "@/components/console/statistics/PaymentsTab";
+import GpusTab from "@/components/console/statistics/GpusTab";
+import TabStrip from "@/components/console/TabStrip";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
+import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
 
 /**
  * "Updated Xs ago" pill with a breathing green dot. Network is a monitoring
@@ -42,7 +49,12 @@ function LastUpdatedPill() {
 
 type NetworkTab = "overview" | "utilization" | "payments" | "gpus";
 
-const VALID_TABS: NetworkTab[] = ["overview", "utilization", "payments", "gpus"];
+const VALID_TABS: NetworkTab[] = [
+  "overview",
+  "utilization",
+  "payments",
+  "gpus",
+];
 
 const TABS: { key: NetworkTab; label: string; icon: React.ElementType }[] = [
   { key: "overview", label: "Overview", icon: BarChart3 },
@@ -54,7 +66,7 @@ const TABS: { key: NetworkTab; label: string; icon: React.ElementType }[] = [
 export default function NetworkPage() {
   return (
     <Suspense
-      fallback={<DashboardPageSkeleton withTabs kpiCount={4} withChart />}
+      fallback={<ConsolePageSkeleton withTabs kpiCount={4} withChart />}
     >
       <NetworkContent />
     </Suspense>
@@ -82,7 +94,7 @@ function NetworkContent() {
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     },
-    [searchParams, router, pathname],
+    [searchParams, router, pathname]
   );
 
   // Network is public — orchestrators, payments, and GPU inventory are
@@ -93,7 +105,7 @@ function NetworkContent() {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
-      <DashboardPageHeader
+      <ConsolePageHeader
         title="Network"
         icon={Globe}
         description="Live state of the open GPU network — orchestrators, payments, hardware."

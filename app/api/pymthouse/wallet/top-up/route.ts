@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { startDashboardWalletTopUp } from "@/lib/dashboard/pymthouse-billing-bff";
+import { startDashboardWalletTopUp } from "@/lib/console/pymthouse-billing-bff";
 import {
   checkoutReturnOrigin,
   walletErrorResponse,

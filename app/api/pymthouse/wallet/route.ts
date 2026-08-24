@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDashboardOwnerWallet } from "@/lib/dashboard/pymthouse-billing-bff";
+import { getDashboardOwnerWallet } from "@/lib/console/pymthouse-billing-bff";
 import {
   WALLET_NO_STORE_HEADERS,
   walletErrorResponse,

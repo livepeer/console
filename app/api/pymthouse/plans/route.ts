@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PmtHouseError } from "@pymthouse/builder-sdk";
-import { listDashboardBillingPlans } from "@/lib/dashboard/pymthouse-billing-bff";
+import { listDashboardBillingPlans } from "@/lib/console/pymthouse-billing-bff";
 
 export const runtime = "nodejs";
 

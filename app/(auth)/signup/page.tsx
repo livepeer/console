@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import LoginPage from "@/components/dashboard/LoginPage";
+import { useAuth } from "@/components/console/AuthContext";
+import LoginPage from "@/components/console/LoginPage";
 
 function SignupRouteInner() {
   const { isConnected } = useAuth();

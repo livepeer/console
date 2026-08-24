@@ -9,7 +9,10 @@ interface SkeletonProps {
   className?: string;
 }
 
-const VARIANT_DEFAULTS: Record<Variant, { width: string; height: string; rounded: string }> = {
+const VARIANT_DEFAULTS: Record<
+  Variant,
+  { width: string; height: string; rounded: string }
+> = {
   text: { width: "w-full", height: "h-3.5", rounded: "rounded" },
   card: { width: "w-full", height: "h-24", rounded: "rounded-xl" },
   circle: { width: "w-8", height: "h-8", rounded: "rounded-full" },

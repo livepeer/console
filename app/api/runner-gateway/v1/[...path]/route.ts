@@ -5,7 +5,7 @@ import {
   isRunnerGatewayConfigured,
   RunnerGatewayError,
 } from "@/lib/runner-gateway";
-import { isRunnerSignerConfigured } from "@/lib/dashboard/signer-session-bff";
+import { isRunnerSignerConfigured } from "@/lib/console/signer-session-bff";
 import "@/lib/runner-gateway/tls";
 
 export const runtime = "nodejs";

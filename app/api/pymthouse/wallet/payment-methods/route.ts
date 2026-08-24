@@ -3,7 +3,7 @@ import {
   listDashboardWalletPaymentMethods,
   startDashboardWalletPaymentMethodCheckout,
   ensureDashboardWalletDefaultPaymentMethod,
-} from "@/lib/dashboard/pymthouse-billing-bff";
+} from "@/lib/console/pymthouse-billing-bff";
 import {
   WALLET_NO_STORE_HEADERS,
   checkoutReturnOrigin,

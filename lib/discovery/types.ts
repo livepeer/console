@@ -47,7 +47,7 @@ export interface DiscoveryFreshnessResponse {
 }
 
 export interface ExploreApiResponse {
-  models: import("@/lib/dashboard/types").App[];
+  models: import("@/lib/console/types").App[];
   capabilityCount: number;
   serviceType: string;
   freshness?: DiscoveryFreshnessResponse;

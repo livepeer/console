@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { House } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import FirstRunChecklist, {
   FIRST_RUN_CHANGED_EVENT,
   FIRST_RUN_DISMISSED_KEY,
-} from "@/components/dashboard/FirstRunChecklist";
-import HomeCommandBar from "@/components/dashboard/HomeCommandBar";
-import ConsumedAppsPanel from "@/components/dashboard/ConsumedAppsPanel";
-import ActivityPanel from "@/components/dashboard/ActivityPanel";
-import SectionHeader from "@/components/dashboard/SectionHeader";
+} from "@/components/console/FirstRunChecklist";
+import HomeCommandBar from "@/components/console/HomeCommandBar";
+import ConsumedAppsPanel from "@/components/console/ConsumedAppsPanel";
+import ActivityPanel from "@/components/console/ActivityPanel";
+import SectionHeader from "@/components/console/SectionHeader";
 
 // ─── Home page header — just the title chrome ───
 //
@@ -21,7 +21,7 @@ import SectionHeader from "@/components/dashboard/SectionHeader";
 // usage" is already reachable from the sidebar and the Usage panel below.
 
 function HomePageHeader() {
-  return <DashboardPageHeader title="Home" icon={House} />;
+  return <ConsolePageHeader title="Home" icon={House} />;
 }
 
 // ─── Home Page ───
@@ -39,15 +39,13 @@ export default function HomePage() {
   const { isConnected, isLoading, user } = useAuth();
   const router = useRouter();
 
-  // Signed-out users redirect to / — the public landing.
+  // Signed-out users redirect to /login — the console's default entry point.
   // The Home view is organization-only (KPIs, recent runs, capability
-  // leaderboard), and a SignInWall on the root /home URL was the
-  // wrong default: visitors arrived at a sign-in gate before they'd had a
-  // chance to see what's on the platform. Explore is the discovery surface
-  // and the right entry point for unauthenticated visitors.
+  // leaderboard), so there's nothing to show an unauthenticated visitor here;
+  // sending them straight to sign-in beats bouncing through `/`.
   useEffect(() => {
     if (!isLoading && (!isConnected || !user)) {
-      router.replace("/");
+      router.replace("/login");
     }
   }, [isLoading, isConnected, user, router]);
 
@@ -58,13 +56,13 @@ export default function HomePage() {
   // server-side run history, but in mock mode the flag alone is the source
   // of truth (MOCK_RECENT_REQUESTS is always non-empty for the organization demo).
   const [firstRunDismissed, setFirstRunDismissed] = useState<boolean | null>(
-    null,
+    null
   );
   useEffect(() => {
     if (typeof window === "undefined") return;
     const read = () =>
       setFirstRunDismissed(
-        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1",
+        window.localStorage.getItem(FIRST_RUN_DISMISSED_KEY) === "1"
       );
     read();
     // Cross-tab updates via storage; same-tab updates (e.g. Quickstart click in
@@ -97,7 +95,7 @@ export default function HomePage() {
   const organization = "Flipbook";
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
-  // Signed-out users are redirected to / via the useEffect
+  // Signed-out users are redirected to /login via the useEffect
   // above; render nothing in the meantime (one frame max) so they don't see
   // a flash of organization-mock data before the redirect lands.
   if (!isConnected || !user) {

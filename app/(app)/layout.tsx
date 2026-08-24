@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { AuthProvider } from "@/components/dashboard/AuthContext";
-import { EnvironmentProvider } from "@/components/dashboard/EnvironmentContext";
-import { ThemeProvider } from "@/components/dashboard/ThemeContext";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import KeyboardShortcuts from "@/components/dashboard/KeyboardShortcuts";
+import { AuthProvider } from "@/components/console/AuthContext";
+import { EnvironmentProvider } from "@/components/console/EnvironmentContext";
+import { ThemeProvider } from "@/components/console/ThemeContext";
+import ConsoleSidebar from "@/components/console/ConsoleSidebar";
+import KeyboardShortcuts from "@/components/console/KeyboardShortcuts";
 
-// FOUT prevention — runs synchronously in the document, before the dashboard
+// FOUT prevention — runs synchronously in the document, before the console
 // subtree paints. Reads the stored theme preference from localStorage and
 // applies `<html data-theme="...">` so dual-source CSS variables resolve to
 // the right theme on first paint. The ThemeProvider takes over after
@@ -17,26 +17,26 @@ import KeyboardShortcuts from "@/components/dashboard/KeyboardShortcuts";
 // Reads the same `localStorage["theme"]` key the marketing site uses (see
 // `app/layout.tsx`'s inline script and `components/layout/ThemeToggle.tsx`),
 // so flipping the theme on either surface propagates to the other. Default
-// is "dark" for first-time visitors — the dashboard's native presentation;
-// light is an opt-in via Settings → Appearance.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'dark';var d=s==='dark'||(s==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+// is "system" for first-time visitors — we follow the OS `prefers-color-scheme`
+// until the user pins light or dark via Settings → Appearance.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'system';var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export const metadata: Metadata = {
-  title: "Developer Dashboard — Livepeer",
+  title: "Console — Livepeer",
   description:
     "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
 };
 
-// Dashboard runs on Geist (Vercel's open-source font) instead of Favorit Pro —
-// the dashboard is a *tool*, the marketing site is the brand. We attach the Geist
+// The console runs on Geist (Vercel's open-source font) instead of Favorit Pro —
+// the console is a *tool*, the marketing site is the brand. We attach the Geist
 // CSS variables to this subtree and override `--font-sans` / `--font-mono` so
 // every Tailwind `font-sans` / `font-mono` consumer below this point picks Geist.
 //
 // Density: per the Livepeer Console design (Claude Design handoff, Apr 2026),
-// the dashboard subtree uses a 13.5px body with a slightly tighter letter-spacing
+// the console subtree uses a 13.5px body with a slightly tighter letter-spacing
 // to land in the same density bracket as Linear. Sidebar width and chrome head
 // height are exposed as custom properties so components can reference them.
-const dashboardOverrides = {
+const consoleOverrides = {
   "--font-sans": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
   "--font-mono": "var(--font-geist-mono), ui-monospace, monospace",
   "--side-w": "232px",
@@ -45,7 +45,7 @@ const dashboardOverrides = {
   letterSpacing: "-0.005em",
 } as CSSProperties;
 
-export default function DashboardLayout({
+export default function ConsoleLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -55,7 +55,7 @@ export default function DashboardLayout({
   // fills the remaining width.
   return (
     <>
-      {/* Inline theme bootstrap — must run before the dashboard subtree
+      {/* Inline theme bootstrap — must run before the console subtree
           paints. ThemeProvider below takes over post-hydration. */}
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       <ThemeProvider>
@@ -63,9 +63,9 @@ export default function DashboardLayout({
           <EnvironmentProvider>
             <div
               className={`flex min-h-screen flex-col bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden ${GeistSans.variable} ${GeistMono.variable}`}
-              style={dashboardOverrides}
+              style={consoleOverrides}
             >
-              <DashboardSidebar />
+              <ConsoleSidebar />
               <div className="flex min-w-0 flex-1 flex-col bg-dark border-l border-hairline md:overflow-y-auto">
                 {children}
               </div>

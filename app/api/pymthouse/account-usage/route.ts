@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PmtHouseError } from "@pymthouse/builder-sdk";
-import { fetchAccountUsageForExternalUser } from "@/lib/dashboard/pymthouse-bff";
+import { fetchAccountUsageForExternalUser } from "@/lib/console/pymthouse-bff";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

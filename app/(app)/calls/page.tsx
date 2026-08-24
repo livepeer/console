@@ -1,8 +1,8 @@
 "use client";
 
-import CallsView from "@/components/dashboard/CallsView";
-import SignInWall from "@/components/dashboard/SignInWall";
-import { useAuth } from "@/components/dashboard/AuthContext";
+import CallsView from "@/components/console/CallsView";
+import SignInWall from "@/components/console/SignInWall";
+import { useAuth } from "@/components/console/AuthContext";
 
 // Note: page metadata isn't valid in client components, so the previous
 // `metadata` export moves out alongside this auth gate. Title/description for

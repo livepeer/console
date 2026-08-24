@@ -3,15 +3,15 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BarChart3, Box, ChevronDown } from "lucide-react";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import DashboardPageHeader from "@/components/dashboard/DashboardPageHeader";
-import DashboardPageSkeleton from "@/components/dashboard/DashboardPageSkeleton";
-import SignInWall from "@/components/dashboard/SignInWall";
-import UsageView from "@/components/dashboard/UsageView";
+import { useAuth } from "@/components/console/AuthContext";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
+import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
+import SignInWall from "@/components/console/SignInWall";
+import UsageView from "@/components/console/UsageView";
 
 export default function UsagePage() {
   return (
-    <Suspense fallback={<DashboardPageSkeleton kpiCount={4} withChart />}>
+    <Suspense fallback={<ConsolePageSkeleton kpiCount={4} withChart />}>
       <UsageContent />
     </Suspense>
   );
@@ -24,7 +24,7 @@ function UsageContent() {
   if (isLoading) return null;
 
   // Workspace-only route — logged-out users see "Usage is workspace-only"
-  // wall in place of the dashboard. The previous behavior (a hard redirect
+  // wall in place of the console. The previous behavior (a hard redirect
   // to /login) was wrong per the v4 prototype: it dropped the
   // user out of context. The wall keeps them inside the app shell, leaves
   // the sidebar in its logged-out variant, and offers an explicit
@@ -33,7 +33,7 @@ function UsageContent() {
 
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
-      <DashboardPageHeader
+      <ConsolePageHeader
         title="Usage"
         icon={BarChart3}
         description="Signed requests, network cost, and prepaid balance usage from PymtHouse OpenMeter."

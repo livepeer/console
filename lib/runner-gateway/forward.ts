@@ -1,4 +1,4 @@
-import { getSignerContext, isRunnerSignerConfigured } from "@/lib/dashboard/signer-session-bff";
+import { getSignerContext, isRunnerSignerConfigured } from "@/lib/console/signer-session-bff";
 import {
   callRunner,
   callRunnerStream,

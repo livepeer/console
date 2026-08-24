@@ -2,11 +2,11 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import AppCard from "@/components/dashboard/AppCard";
+import AppCard from "@/components/console/AppCard";
 import {
   getOrganizationBySlug,
   appsForOrganization,
-} from "@/lib/dashboard/mock-data";
+} from "@/lib/console/mock-data";
 
 /**
  * Public organization profile — like a GitHub organization page
@@ -22,7 +22,9 @@ export default function OrganizationPage() {
     return (
       <main id="main-content" className="flex flex-1 flex-col bg-dark">
         <div className="mx-auto w-full max-w-3xl px-7 pt-20 text-center">
-          <p className="text-[15px] font-medium text-fg">Organization not found</p>
+          <p className="text-[15px] font-medium text-fg">
+            Organization not found
+          </p>
           <p className="mt-1.5 text-[13px] text-fg-muted">
             No published apps belong to &ldquo;{slug}&rdquo;.
           </p>

@@ -4,7 +4,7 @@ import {
   createDashboardApiKey,
   listDashboardApiKeys,
   revokeDashboardApiKey,
-} from "@/lib/dashboard/pymthouse-keys-bff";
+} from "@/lib/console/pymthouse-keys-bff";
 
 export const runtime = "nodejs";
 

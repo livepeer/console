@@ -3,7 +3,7 @@ import { PmtHouseError } from "@pymthouse/builder-sdk";
 import {
   getSignerSessionStatus,
   isRunnerSignerConfigured,
-} from "@/lib/dashboard/signer-session-bff";
+} from "@/lib/console/signer-session-bff";
 import { isRunnerGatewayConfigured } from "@/lib/runner-gateway";
 
 export const runtime = "nodejs";

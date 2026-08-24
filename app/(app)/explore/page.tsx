@@ -1,4 +1,4 @@
-import ExploreView from "@/components/dashboard/ExploreView";
+import ExploreView from "@/components/console/ExploreView";
 
 // /explore — the app catalog as a first-class destination (the sidebar's
 // "Explore" item points here). Reachable signed-in or out; unlike `/`, it never

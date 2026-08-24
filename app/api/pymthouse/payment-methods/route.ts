@@ -6,7 +6,7 @@ import {
   ensureDashboardUserDefaultPaymentMethod,
   setDashboardUserDefaultPaymentMethod,
   startDashboardPaymentMethodCheckout,
-} from "@/lib/dashboard/pymthouse-billing-bff";
+} from "@/lib/console/pymthouse-billing-bff";
 
 export const runtime = "nodejs";
 

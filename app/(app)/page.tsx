@@ -2,14 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/dashboard/AuthContext";
-import ExploreView from "@/components/dashboard/ExploreView";
+import { useAuth } from "@/components/console/AuthContext";
 
 // Root `/`:
-//   - signed in  → redirect to /home (the dashboard default)
-//   - signed out → the Explore catalog stays here as the public landing
-// (Logged-in users still reach Explore via the sidebar, which points to
-// /explore — that route doesn't redirect.)
+//   - signed in  → redirect to /home (the console default)
+//   - signed out → redirect to /login (the console default entry point)
+// Explore is still reachable at /explore for anyone who lands there directly;
+// it just isn't the default landing any more.
 export default function RootPage() {
   const { isConnected, isLoading, user } = useAuth();
   const router = useRouter();
@@ -17,12 +16,10 @@ export default function RootPage() {
   const signedIn = isConnected && !!user;
 
   useEffect(() => {
-    if (!isLoading && signedIn) router.replace("/home");
+    if (isLoading) return;
+    router.replace(signedIn ? "/home" : "/login");
   }, [isLoading, signedIn, router]);
 
-  // Hold a frame while auth hydrates, and while redirecting signed-in users, so
-  // they never flash the Explore catalog before landing on /home.
-  if (isLoading || signedIn) return null;
-
-  return <ExploreView />;
+  // Nothing renders here — `/` is a pure redirect in both auth states.
+  return null;
 }
