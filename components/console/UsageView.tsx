@@ -16,15 +16,12 @@ import {
 } from "@/lib/console/usage-capability-display";
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
 import PlansPanel from "@/components/console/PlansPanel";
-
-type IncludedUsageSummary = {
-  planName?: string;
-  consumedUsdMicros: string;
-  totalUsdMicros: string;
-  remainingUsdMicros: string;
-  totalUsd: string;
-  resetsAt?: string;
-};
+import WalletPanel from "@/components/console/WalletPanel";
+import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
+import {
+  includedUsageSummary,
+  type IncludedUsageSummary,
+} from "@/lib/console/wallet-settlement-display";
 
 const PERIOD_DAYS = 30;
 
@@ -196,6 +193,7 @@ function AllowanceStrip({
 export default function UsageView() {
   const { isConnected, user } = useAuth();
   const usageState = useAccountUsage(isConnected, PERIOD_DAYS);
+  const walletState = useWalletBillingState(isConnected);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
 
@@ -301,8 +299,16 @@ export default function UsageView() {
   const { data } = usageState;
   const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
-  const included: IncludedUsageSummary | null = null;
-  const resetsAt = formatPeriodResetLabel(data.period.end);
+  const included: IncludedUsageSummary | null =
+    walletState.state.status === "ready"
+      ? includedUsageSummary(walletState.state.wallet.billingState)
+      : null;
+  const resetsAt = included?.resetsAt
+    ? new Date(included.resetsAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      })
+    : formatPeriodResetLabel(data.period.end);
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
@@ -311,6 +317,14 @@ export default function UsageView() {
       </p>
 
       <PlansPanel />
+
+      <WalletPanel
+        periodBillableUsdMicros={
+          data.current.endUserBillableUsdMicros ||
+          data.current.networkFeeUsdMicros ||
+          null
+        }
+      />
 
       <AllowanceStrip
         requestCount={forecastStats.requestCount}
