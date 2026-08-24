@@ -25,6 +25,9 @@ export type {
   AccountRequestsPayload,
   AccountUsagePayload,
 } from "@/lib/console/account-usage";
+import { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
+
+export { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
 
 export function createPmtHouseClientForPublicApp(
   publicClientId: string
@@ -37,22 +40,6 @@ export function createPmtHouseClientForPublicApp(
     m2mClientSecret: config.m2mClientSecret,
     allowInsecureHttp: config.allowInsecureHttp,
   });
-}
-
-/**
- * Pymthouse signals user-not-found with two envelopes: the REST shape
- * (`{ error: <prose>, code: "not_found" }`) and the OAuth shape used by the
- * mint-token route (`{ error: "not_found" }`, no `code`).
- */
-export function isUserNotFoundError(error: unknown): boolean {
-  if (!(error instanceof PmtHouseError) || error.status !== 404) {
-    return false;
-  }
-  if (error.code === "not_found") {
-    return true;
-  }
-  const details = error.details as { error?: unknown } | null | undefined;
-  return details?.error === "not_found";
 }
 
 export async function ensureDashboardAppUser(
