@@ -1,6 +1,6 @@
 # Livepeer Console
 
-The signed-in surface for developers using the Livepeer network — browse AI apps, manage API keys, monitor usage.
+The signed-in surface for developers using the Livepeer network — manage API keys, monitor usage.
 
 ## Status
 
