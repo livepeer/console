@@ -40,16 +40,17 @@ const nextConfig: NextConfig = {
       // /models/[id] to /apps/[id] (one noun — "app" — for the object across
       // both the consumer catalog and the operator surfaces).
       {
-        source: "/models/:id",
-        destination: "/apps/:id",
+        source: "/models/:path*",
+        destination: "/apps/:path*",
         permanent: true,
       },
       // The operator console folded into the app page as ownership-gated tabs,
       // so the separate /manage route is gone. Deep-link the console via
-      // /apps/[id]?tab=overview instead.
+      // /apps/[...id]?tab=overview instead. `:path*` preserves slash-y
+      // capability ids (e.g. livepeer-example/hello-world).
       {
-        source: "/apps/:id/manage",
-        destination: "/apps/:id?tab=overview",
+        source: "/apps/:path*/manage",
+        destination: "/apps/:path*?tab=overview",
         permanent: true,
       },
       // Old livepeer.org routes → new site equivalents
