@@ -1,21 +1,20 @@
-import { formatCompact } from "./org-fleet";
+import type { AccountUsagePayload } from "@/lib/console/account-usage";
+import {
+  humanizePipelineModel,
+  microsToUsd,
+} from "@/lib/console/usage-capability-display";
+import { formatCompact, getOrgFleet } from "./org-fleet";
 
 /**
- * The CONSUME (outbound) ledger — the mirror of the "Deployed apps" ledger.
- *
- * An organization doesn't only deploy apps; it also *calls* apps across the
- * network — its own, and (mostly) apps it didn't deploy. That outbound demand
- * is what drives spend. This module answers the operator's question: "how much
- * of my usage is on apps I didn't build?"
- *
- * Mock note: in production this is aggregated from metered outbound requests.
+ * The CONSUME (outbound) ledger — apps this organization calls, with MTD spend
+ * and trailing 7-day call volume. Built from PymtHouse account-usage (OpenMeter).
  */
 
 export interface ConsumedApp {
-  /** App id when it's one of ours; otherwise a network slug for linking. */
+  /** App id when it's one of ours; otherwise pipeline|model key for linking. */
   id: string;
   name: string;
-  /** Provider/owner label, or "Your organization" for apps you deployed. */
+  /** Provider/owner label, or the org slug for apps you deployed. */
   owner: string;
   /** Did THIS organization deploy it? false = an app you didn't build. */
   owned: boolean;
@@ -23,83 +22,6 @@ export interface ConsumedApp {
   /** Month-to-date spend in dollars. */
   spendNum: number;
 }
-
-// What this organization calls. Mostly third-party network apps (you didn't
-// deploy them); a little is the org exercising its own apps.
-const CONSUMED_APPS_RAW: ConsumedApp[] = [
-  {
-    id: "daydream-video",
-    name: "Daydream Video",
-    owner: "daydream",
-    owned: false,
-    calls7d: 2_400,
-    spendNum: 1.6,
-  },
-  {
-    id: "flux-schnell",
-    name: "FLUX Schnell",
-    owner: "black-forest-labs",
-    owned: false,
-    calls7d: 1_900,
-    spendNum: 0.95,
-  },
-  {
-    id: "frameworks-transcoding",
-    name: "Frameworks Transcoding",
-    owner: "frameworks",
-    owned: false,
-    calls7d: 1_500,
-    spendNum: 0.8,
-  },
-  {
-    id: "qwen3-32b",
-    name: "Qwen3 32B",
-    owner: "qwen",
-    owned: false,
-    calls7d: 900,
-    spendNum: 0.55,
-  },
-  {
-    id: "whisper-v3",
-    name: "Whisper V3",
-    owner: "openai",
-    owned: false,
-    calls7d: 600,
-    spendNum: 0.45,
-  },
-  {
-    id: "sdxl-turbo",
-    name: "SDXL Turbo",
-    owner: "stability",
-    owned: false,
-    calls7d: 700,
-    spendNum: 0.4,
-  },
-  {
-    id: "llama-3-70b",
-    name: "Llama 3 70B",
-    owner: "meta",
-    owned: false,
-    calls7d: 400,
-    spendNum: 0.25,
-  },
-  {
-    id: "app-sentiment",
-    name: "Sentiment",
-    owner: "Your organization",
-    owned: true,
-    calls7d: 400,
-    spendNum: 0.4,
-  },
-  {
-    id: "app-image-upscale",
-    name: "Image Upscale",
-    owner: "Your organization",
-    owned: true,
-    calls7d: 100,
-    spendNum: 0.3,
-  },
-];
 
 export interface OrgConsumption {
   /** Apps you call, sorted by spend desc. The `owned` flag on each row tells
@@ -113,10 +35,85 @@ function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-export function getOrgConsumption(): OrgConsumption {
-  const apps = [...CONSUMED_APPS_RAW].sort((a, b) => b.spendNum - a.spendNum);
-  const totalSpendNum = apps.reduce((s, a) => s + a.spendNum, 0);
-  const totalCalls7d = apps.reduce((s, a) => s + a.calls7d, 0);
+/** Last 7 UTC calendar dates (YYYY-MM-DD), newest first. */
+function last7UtcDateKeys(now = new Date()): Set<string> {
+  const keys = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i)
+    );
+    keys.add(d.toISOString().slice(0, 10));
+  }
+  return keys;
+}
+
+function ownerSlugFromPipeline(pipeline: string): string {
+  const raw = pipeline.includes(":")
+    ? pipeline.split(":").slice(-1)[0]!
+    : pipeline;
+  return (
+    raw
+      .split(/[-_./|]+/)
+      .filter(Boolean)[0]
+      ?.toLowerCase() || pipeline.toLowerCase()
+  );
+}
+
+/**
+ * Map a MTD account-usage payload into the Home Usage panel shape.
+ * Spend is period totals (calendar MTD when fetched with `window=mtd`);
+ * calls · 7d are summed from `dailyByPipeline` over the last 7 UTC days.
+ */
+export function buildOrgConsumptionFromUsage(
+  payload: AccountUsagePayload,
+  organization: string
+): OrgConsumption {
+  const fleet = getOrgFleet();
+  const ownedByPipelineId = new Map(
+    fleet.apps.map((app) => [app.deployment.pipelineId, app.id] as const)
+  );
+  const last7 = last7UtcDateKeys();
+  const periodDayCount = payload.periodDayKeys.length;
+
+  const calls7dByKey = new Map<string, number>();
+  for (const row of payload.current.dailyByPipeline) {
+    if (!last7.has(row.date)) continue;
+    const key = `${row.pipeline}|${row.modelId}`;
+    calls7dByKey.set(key, (calls7dByKey.get(key) ?? 0) + row.requestCount);
+  }
+
+  const apps: ConsumedApp[] = payload.current.pipelineModels.map((row) => {
+    const key = `${row.pipeline}|${row.modelId}`;
+    const ownedAppId =
+      ownedByPipelineId.get(row.pipeline) ?? ownedByPipelineId.get(row.modelId);
+    const owned = Boolean(ownedAppId);
+    const fromDaily = calls7dByKey.get(key) ?? 0;
+    // Early in the month (or when daily buckets are missing) fall back to the
+    // period total when the whole MTD window fits inside 7 days.
+    const calls7d =
+      fromDaily > 0 || periodDayCount > 7 ? fromDaily : row.requestCount;
+
+    return {
+      id: ownedAppId ?? key,
+      name: humanizePipelineModel(row.pipeline, row.modelId),
+      owner: owned
+        ? organization.toLowerCase()
+        : ownerSlugFromPipeline(row.pipeline),
+      owned,
+      calls7d,
+      spendNum: microsToUsd(
+        row.endUserBillableUsdMicros || row.networkFeeUsdMicros
+      ),
+    };
+  });
+
+  apps.sort((a, b) => b.spendNum - a.spendNum || b.calls7d - a.calls7d);
+
+  const totalSpendNum = microsToUsd(
+    payload.current.endUserBillableUsdMicros ||
+      payload.current.networkFeeUsdMicros
+  );
+  const totalCalls7d = apps.reduce((sum, app) => sum + app.calls7d, 0);
 
   return {
     apps,
