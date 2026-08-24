@@ -1,27 +1,12 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/console/AuthContext";
+import { redirect } from "next/navigation";
+import { auth0 } from "@/lib/auth0";
 import LoginPage from "@/components/console/LoginPage";
 
-/**
- * Signup route — sibling of `/login`. Renders the same
- * `LoginPage` component but seeds it with `initialMode="signup"`. The
- * footer toggle inside the page is a `<Link>` to `/login`, so
- * URL and visible mode stay in sync without query-param trickery.
- */
-export default function SignupRoute() {
-  const { isConnected } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isConnected) {
-      router.replace("/home");
-    }
-  }, [isConnected, router]);
-
-  if (isConnected) return null;
+export default async function SignupRoute() {
+  const session = await auth0.getSession();
+  if (session) {
+    redirect("/home");
+  }
 
   return <LoginPage initialMode="signup" />;
 }

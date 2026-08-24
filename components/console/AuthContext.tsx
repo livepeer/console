@@ -2,15 +2,16 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
-  useState,
-  useEffect,
+  useMemo,
   type ReactNode,
 } from "react";
+import { useUser } from "@auth0/nextjs-auth0/client";
 
 export type AuthProvider = "github" | "google" | "email";
 
-export interface MockUser {
+export interface ConsoleUser {
   name: string;
   email: string;
   initials: string;
@@ -21,9 +22,7 @@ export interface MockUser {
 interface AuthContextValue {
   isConnected: boolean;
   isLoading: boolean;
-  user: MockUser | null;
-  connect: (user: MockUser) => void;
-  updateUser: (patch: Partial<MockUser>) => void;
+  user: ConsoleUser | null;
   disconnect: () => void;
 }
 
@@ -31,8 +30,6 @@ const AuthContext = createContext<AuthContextValue>({
   isConnected: false,
   isLoading: true,
   user: null,
-  connect: () => {},
-  updateUser: () => {},
   disconnect: () => {},
 });
 
@@ -40,60 +37,58 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function displayNameFrom(email: string, preferredName?: string): string {
+  const trimmed = preferredName?.trim();
+  if (trimmed) return trimmed;
+  return email.split("@")[0] || "User";
+}
+
+function providerFromSub(sub?: string): AuthProvider {
+  if (sub?.startsWith("github|")) return "github";
+  if (sub?.startsWith("google-oauth2|")) return "google";
+  return "email";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<MockUser | null>(null);
+  const { user: auth0User, isLoading } = useUser();
 
-  // Restore from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("console-user");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as Partial<MockUser>;
-          // Backfill provider for any pre-existing localStorage entries
-          const hydrated: MockUser = {
-            name: parsed.name ?? "Demo User",
-            email: parsed.email ?? "demo@livepeer.org",
-            initials: parsed.initials ?? "DU",
-            provider: (parsed.provider as AuthProvider) ?? "email",
-            avatarUrl: parsed.avatarUrl,
-          };
-          setUser(hydrated);
-          setIsConnected(true);
-        } catch {
-          // ignore
-        }
-      }
-      setIsLoading(false);
-    }
+  const user = useMemo<ConsoleUser | null>(() => {
+    if (!auth0User) return null;
+    const email = auth0User.email?.trim() || "";
+    const name = displayNameFrom(
+      email,
+      auth0User.name?.trim() || auth0User.nickname?.trim(),
+    );
+    return {
+      name,
+      email,
+      initials: getInitials(name) || "U",
+      provider: providerFromSub(auth0User.sub),
+      avatarUrl: auth0User.picture,
+    };
+  }, [auth0User]);
+
+  const disconnect = useCallback(() => {
+    window.location.assign("/auth/logout");
   }, []);
-
-  const connect = (u: MockUser) => {
-    setUser(u);
-    setIsConnected(true);
-    localStorage.setItem("console-user", JSON.stringify(u));
-  };
-
-  const updateUser = (patch: Partial<MockUser>) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, ...patch };
-      localStorage.setItem("console-user", JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const disconnect = () => {
-    setUser(null);
-    setIsConnected(false);
-    localStorage.removeItem("console-user");
-  };
 
   return (
     <AuthContext.Provider
-      value={{ isConnected, isLoading, user, connect, updateUser, disconnect }}
+      value={{
+        isConnected: !!auth0User,
+        isLoading,
+        user,
+        disconnect,
+      }}
     >
       {children}
     </AuthContext.Provider>

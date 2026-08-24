@@ -13,6 +13,7 @@
     "format:check": "prettier . --check"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.27.0",
     "framer-motion": "^11.15.0",
     "geist": "^1.7.0",
     "lucide-react": "^1.6.0",
