@@ -12,7 +12,7 @@ This repo was extracted from [`livepeer/website`](https://github.com/livepeer/we
 
 - Next.js 15 (App Router), React 19, TypeScript
 - Tailwind CSS v4 (`@tailwindcss/postcss`)
-- Geist Sans + Mono via `geist`
+- Inter, self-hosted from [rsms.me/inter](https://rsms.me/inter/) + Geist Mono via `geist`
 - Framer Motion 11, Lucide icons, Recharts
 - Package manager: pnpm
 
@@ -24,13 +24,18 @@ pnpm dev          # http://localhost:3000
 pnpm build        # production build (verify before pushing)
 pnpm lint         # ESLint, zero warnings
 pnpm typecheck    # tsc --noEmit
+
+# Fonts — only when bumping Inter or adding a non-ASCII UI glyph.
+# Verifies no glyph falls onto the 344 KB fallback; see CLAUDE.md.
+python3 scripts/build-inter-fonts.py --check
 ```
 
 ## Layout
 
 ```
 app/
-├── layout.tsx              # Root: html/body, Geist fonts, theme bootstrap
+├── layout.tsx              # Root: html/body, Inter preload, theme bootstrap
+├── fonts.css               # GENERATED — @font-face rules (build-inter-fonts.py)
 ├── globals.css             # Token layer + console utilities
 ├── (app)/                  # Console chrome (sidebar, providers)
 │   ├── layout.tsx
