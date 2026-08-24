@@ -3,16 +3,27 @@ import "server-only";
 import {
   PmtHouseError,
   type BillingProduct,
+  type CreateAppUserPaymentMethodCheckoutResult,
   type CreateBillingCheckoutResult,
   type UserSubscriptionResponse,
 } from "@pymthouse/builder-sdk";
 import { createPmtHouseClientForPublicApp } from "@/lib/console/pymthouse-bff";
 import type {
   DashboardBillingPlan,
+  DashboardInvoice,
+  DashboardInvoiceHostedUrl,
+  DashboardPaymentMethod,
   DashboardScheduledChangeConflict,
   DashboardSubscriptionChange,
   DashboardUserSubscription,
 } from "@/lib/console/pymthouse-billing";
+import type {
+  DashboardOwnerWallet,
+  DashboardWalletInvoice,
+  DashboardWalletPaymentMethod,
+  DashboardWalletPaymentMethodCheckoutResult,
+  DashboardWalletTopUpResult,
+} from "@/lib/console/pymthouse-wallet";
 import {
   pymthouseAppsOrigin,
   readM2mAuthHeader,
@@ -22,10 +33,22 @@ import {
 
 export type {
   DashboardBillingPlan,
+  DashboardInvoice,
+  DashboardInvoiceHostedUrl,
+  DashboardPaymentMethod,
   DashboardScheduledChangeConflict,
   DashboardSubscriptionChange,
+  DashboardSubscriptionHistoryItem,
   DashboardUserSubscription,
 } from "@/lib/console/pymthouse-billing";
+
+export type {
+  DashboardOwnerWallet,
+  DashboardWalletInvoice,
+  DashboardWalletPaymentMethod,
+  DashboardWalletPaymentMethodCheckoutResult,
+  DashboardWalletTopUpResult,
+} from "@/lib/console/pymthouse-wallet";
 
 function readOptionalString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -192,4 +215,210 @@ export async function resumeDashboardUserSubscription(
 export async function listDashboardUserSubscriptions(externalUserId: string) {
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   return client.listUserSubscriptions(externalUserId);
+}
+
+export async function listDashboardUserInvoices(
+  externalUserId: string,
+  opts?: { page?: number; pageSize?: number }
+): Promise<{
+  items: DashboardInvoice[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.listUserInvoices(externalUserId, opts);
+}
+
+export async function getDashboardUserInvoiceHostedUrl(
+  externalUserId: string,
+  invoiceId: string
+): Promise<DashboardInvoiceHostedUrl> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.getUserInvoiceHostedUrl(externalUserId, invoiceId);
+}
+
+export async function listDashboardUserPaymentMethods(
+  externalUserId: string
+): Promise<DashboardPaymentMethod[]> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  const result = await client.listUserPaymentMethods(externalUserId);
+  return result.paymentMethods ?? [];
+}
+
+export async function startDashboardPaymentMethodCheckout(input: {
+  externalUserId: string;
+  successUrl?: string;
+  cancelUrl?: string;
+}): Promise<CreateAppUserPaymentMethodCheckoutResult> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.createUserPaymentMethodCheckout({
+    externalUserId: input.externalUserId,
+    ...(input.successUrl ? { successUrl: input.successUrl } : {}),
+    ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
+  });
+}
+
+export async function setDashboardUserDefaultPaymentMethod(
+  externalUserId: string,
+  paymentMethodId: string
+) {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.setUserDefaultPaymentMethod(externalUserId, paymentMethodId);
+}
+
+/** Promote first attached PM to Stripe default when none is set (post-Checkout). */
+export async function ensureDashboardUserDefaultPaymentMethod(
+  externalUserId: string
+) {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.ensureUserDefaultPaymentMethod(externalUserId);
+}
+
+export async function removeDashboardUserPaymentMethod(
+  externalUserId: string,
+  paymentMethodId: string
+) {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  return client.unlinkUserPaymentMethod(externalUserId, paymentMethodId);
+}
+
+// ---------------------------------------------------------------------------
+// Owner wallet (Builder M2M) — pymthouse PR #399
+// /api/v1/apps/{clientId}/billing/wallet* over M2M Basic auth.
+// ---------------------------------------------------------------------------
+
+async function walletFetch<T>(
+  path: string,
+  init?: {
+    method?: string;
+    body?: Record<string, unknown>;
+    externalUserId?: string;
+    query?: Record<string, string | number | undefined>;
+  }
+): Promise<T> {
+  const publicClientId = readPublicClientId();
+  const params = new URLSearchParams();
+  const externalUserId = init?.externalUserId?.trim();
+  if (externalUserId && (init?.method ?? "GET") === "GET") {
+    params.set("externalUserId", externalUserId);
+  }
+  for (const [key, value] of Object.entries(init?.query ?? {})) {
+    if (value === undefined) continue;
+    params.set(key, String(value));
+  }
+  const query = params.toString();
+  const separator = path.includes("?") ? "&" : "?";
+  const urlPath = `${path}${query ? `${separator}${query}` : ""}`;
+
+  const method = init?.method ?? "GET";
+  const body =
+    init?.body ||
+    (externalUserId && (method === "POST" || method === "PATCH"))
+      ? {
+          ...(init?.body ?? {}),
+          ...(externalUserId && (method === "POST" || method === "PATCH")
+            ? { externalUserId }
+            : {}),
+        }
+      : undefined;
+
+  const response = await fetch(
+    `${pymthouseAppsOrigin()}/api/v1/apps/${encodeURIComponent(publicClientId)}/billing/wallet${urlPath}`,
+    {
+      method,
+      headers: {
+        Authorization: readM2mAuthHeader(),
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      cache: "no-store",
+    }
+  );
+  return readPymthouseResponse<T>(response);
+}
+
+export async function getDashboardOwnerWallet(
+  externalUserId: string
+): Promise<DashboardOwnerWallet> {
+  return walletFetch<DashboardOwnerWallet>("", {
+    externalUserId,
+  });
+}
+
+export async function startDashboardWalletTopUp(input: {
+  amountUsd: string;
+  externalUserId: string;
+  successUrl?: string;
+  cancelUrl?: string;
+}): Promise<DashboardWalletTopUpResult> {
+  return walletFetch<DashboardWalletTopUpResult>("/top-up", {
+    method: "POST",
+    externalUserId: input.externalUserId,
+    body: {
+      amountUsd: input.amountUsd,
+      ...(input.successUrl ? { successUrl: input.successUrl } : {}),
+      ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
+    },
+  });
+}
+
+export async function listDashboardWalletInvoices(opts: {
+  externalUserId: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{
+  items: DashboardWalletInvoice[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}> {
+  return walletFetch(`/invoices`, {
+    externalUserId: opts.externalUserId,
+    query: {
+      page: opts.page,
+      pageSize: opts.pageSize,
+    },
+  });
+}
+
+export async function listDashboardWalletPaymentMethods(
+  externalUserId: string
+): Promise<DashboardWalletPaymentMethod[]> {
+  const result = await walletFetch<{
+    paymentMethods?: DashboardWalletPaymentMethod[];
+  }>("/payment-methods", { externalUserId });
+  return result.paymentMethods ?? [];
+}
+
+export async function startDashboardWalletPaymentMethodCheckout(input: {
+  externalUserId: string;
+  successUrl?: string;
+  cancelUrl?: string;
+}): Promise<DashboardWalletPaymentMethodCheckoutResult> {
+  return walletFetch<DashboardWalletPaymentMethodCheckoutResult>(
+    "/payment-methods",
+    {
+      method: "POST",
+      externalUserId: input.externalUserId,
+      body: {
+        ...(input.successUrl ? { successUrl: input.successUrl } : {}),
+        ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
+      },
+    }
+  );
+}
+
+export async function ensureDashboardWalletDefaultPaymentMethod(
+  externalUserId: string
+): Promise<{ promoted: boolean; paymentMethodId: string | null }> {
+  return walletFetch<{ promoted: boolean; paymentMethodId: string | null }>(
+    "/payment-methods",
+    {
+      method: "PATCH",
+      externalUserId,
+      body: { ensureDefault: true },
+    }
+  );
 }
