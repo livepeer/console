@@ -10,6 +10,8 @@ interface PlaygroundFormProps {
   config: PlaygroundConfig;
   onRun: (values: Record<string, unknown>) => void;
   isRunning: boolean;
+  /** Short-lived signer JWT — rendered as a hidden input for live runner calls. */
+  signerJwt?: string;
 }
 
 function TypeBadge({ type }: { type: string }) {
@@ -175,6 +177,7 @@ export default function PlaygroundForm({
   config,
   onRun,
   isRunning,
+  signerJwt,
 }: PlaygroundFormProps) {
   const getDefaults = useCallback(() => {
     const defaults: Record<string, unknown> = {};
@@ -201,6 +204,9 @@ export default function PlaygroundForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col">
+      {signerJwt ? (
+        <input type="hidden" name="signer-jwt" value={signerJwt} readOnly />
+      ) : null}
       <div className="space-y-5 pb-4">
         {config.fields.map((field) => (
           <div key={field.name}>
