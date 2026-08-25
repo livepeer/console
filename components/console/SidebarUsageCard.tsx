@@ -4,30 +4,55 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/console/AuthContext";
 import { useAccountUsage } from "@/lib/console/useAccountUsage";
+import { useMeBillingSurface } from "@/lib/console/useMeBillingSurface";
 import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
 import {
   formatPeriodResetLabel,
   microsToUsd,
 } from "@/lib/console/usage-capability-display";
-import { includedUsageSummary } from "@/lib/console/wallet-settlement-display";
+import { includedUsageSummary, sharedPoolUsageMeter } from "@/lib/console/wallet-settlement-display";
 
 /**
- * Sidebar usage meter. Remaining included usage comes from the wallet
- * billing state when the live plan has an allowance; otherwise period spend.
+ * Sidebar usage meter. Merchant apps use this session's `/me/billing/state`.
+ * Owner-rollup apps use this user's spend vs the owner's remaining included.
  */
 export default function SidebarUsageCard() {
   const { isConnected } = useAuth();
   const usage = useAccountUsage(isConnected, 30);
+  const meBilling = useMeBillingSurface(isConnected);
   const wallet = useWalletBillingState(isConnected);
-  const included =
-    wallet.state.status === "ready"
-      ? includedUsageSummary(wallet.state.wallet.billingState)
+  const merchantIncluded =
+    meBilling.state.status === "ready" &&
+    meBilling.state.surface.mode === "merchant" &&
+    meBilling.state.surface.state
+      ? includedUsageSummary(meBilling.state.surface.state)
       : null;
+  const ownerRollup =
+    meBilling.state.status === "ready" &&
+    meBilling.state.surface.mode === "owner_rollup";
+  const actorUsdMicros =
+    usage.status === "ready"
+      ? usage.data.current.endUserBillableUsdMicros ||
+        usage.data.current.networkFeeUsdMicros ||
+        "0"
+      : "0";
+  const poolMeter =
+    ownerRollup && wallet.state.status === "ready"
+      ? sharedPoolUsageMeter({
+          state: wallet.state.wallet.billingState,
+          actorUsdMicros,
+        })
+      : null;
+  const included = merchantIncluded;
 
   if (
     usage.status === "loading" ||
     usage.status === "idle" ||
     (isConnected &&
+      (meBilling.state.status === "loading" ||
+        meBilling.state.status === "idle")) ||
+    (isConnected &&
+      ownerRollup &&
       (wallet.state.status === "loading" || wallet.state.status === "idle"))
   ) {
     return (
@@ -57,7 +82,8 @@ export default function SidebarUsageCard() {
   }
 
   const { data } = usage;
-  const showUsdAllowance = Boolean(included);
+  const showUsdAllowance = Boolean(included) && !poolMeter;
+  const showPoolMeter = Boolean(poolMeter);
 
   const resetsAt = included?.resetsAt
     ? new Date(included.resetsAt).toLocaleDateString(undefined, {
@@ -65,15 +91,31 @@ export default function SidebarUsageCard() {
         day: "numeric",
       })
     : formatPeriodResetLabel(data.period.end);
-  const planLabel =
-    included?.planName?.trim() || (showUsdAllowance ? "Included usage" : "Usage");
+  const planLabel = poolMeter
+    ? "Your usage"
+    : included?.planName?.trim() || (showUsdAllowance ? "Included usage" : "Usage");
 
   let primaryUsed: number;
   let primaryLimit: number | null;
   let primaryDisplay: ReactNode;
   let footerLeft: string;
 
-  if (showUsdAllowance && included) {
+  if (showPoolMeter && poolMeter) {
+    const available = BigInt(poolMeter.availableUsdMicros || "0");
+    const actor = BigInt(poolMeter.actorUsdMicros || "0");
+    primaryUsed =
+      available > BigInt(0)
+        ? Number((actor * BigInt(10000)) / available) / 100
+        : 0;
+    primaryLimit = 100;
+    primaryDisplay = (
+      <>
+        <b className="font-medium text-fg">${poolMeter.actorUsd}</b>
+        <span className="text-fg-faint"> / ${poolMeter.availableUsd}</span>
+      </>
+    );
+    footerLeft = "available";
+  } else if (showUsdAllowance && included) {
     const granted = BigInt(included.totalUsdMicros || "1");
     const consumed = BigInt(included.consumedUsdMicros || "0");
     primaryUsed = Number((consumed * BigInt(10000)) / granted) / 100;

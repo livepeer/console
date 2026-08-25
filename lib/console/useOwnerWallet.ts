@@ -37,6 +37,71 @@ type WalletBillingState =
   | { status: "ready"; wallet: DashboardOwnerWallet }
   | { status: "error"; message: string };
 
+/** Checkout actions against `/api/pymthouse/wallet*` (session `externalUserId`). */
+export function useWalletCheckoutActions() {
+  const startTopUp = useCallback(async (input: { amountUsd: string }) => {
+    const response = await fetch("/api/pymthouse/wallet/top-up", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amountUsd: input.amountUsd,
+        successUrl: `${window.location.origin}/usage?topup=succeeded`,
+        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
+      }),
+    });
+    const body = await readResponseJson<{
+      checkoutUrl?: string;
+      error?: string;
+    }>(response);
+    if (!response.ok || !body.checkoutUrl) {
+      throw new Error(body.error ?? `Top-up failed (${response.status})`);
+    }
+    return { checkoutUrl: body.checkoutUrl };
+  }, []);
+
+  const startPaymentMethodCheckout = useCallback(async () => {
+    const response = await fetch("/api/pymthouse/wallet/payment-methods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        successUrl: `${window.location.origin}/usage?topup=pm-saved`,
+        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
+      }),
+    });
+    const body = await readResponseJson<{
+      checkoutUrl?: string;
+      error?: string;
+    }>(response);
+    if (!response.ok || !body.checkoutUrl) {
+      throw new Error(
+        body.error ?? `Payment method checkout failed (${response.status})`
+      );
+    }
+    return { checkoutUrl: body.checkoutUrl };
+  }, []);
+
+  const ensureDefaultPaymentMethod = useCallback(async () => {
+    const response = await fetch("/api/pymthouse/wallet/payment-methods", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ensureDefault: true }),
+    });
+    const body = await readResponseJson<{ error?: string }>(response);
+    if (!response.ok) {
+      throw new Error(
+        body.error ??
+          `Ensure default payment method failed (${response.status})`
+      );
+    }
+  }, []);
+
+  return {
+    startTopUp,
+    startPaymentMethodCheckout,
+    ensureDefaultPaymentMethod,
+  };
+}
+
 /** Wallet GET only — remaining included usage + plan, without PM/invoice lists. */
 export function useWalletBillingState(enabled: boolean) {
   const [state, setState] = useState<WalletBillingState>({ status: "idle" });
@@ -138,68 +203,18 @@ export function useOwnerWallet(enabled: boolean) {
     void load();
   }, [load]);
 
-  const startTopUp = useCallback(async (input: { amountUsd: string }) => {
-    const response = await fetch("/api/pymthouse/wallet/top-up", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amountUsd: input.amountUsd,
-        successUrl: `${window.location.origin}/usage?topup=succeeded`,
-        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
-      }),
-    });
-    const body = await readResponseJson<{
-      checkoutUrl?: string;
-      error?: string;
-    }>(response);
-    if (!response.ok || !body.checkoutUrl) {
-      throw new Error(body.error ?? `Top-up failed (${response.status})`);
-    }
-    return { checkoutUrl: body.checkoutUrl };
-  }, []);
-
-  const startPaymentMethodCheckout = useCallback(async () => {
-    const response = await fetch("/api/pymthouse/wallet/payment-methods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        successUrl: `${window.location.origin}/usage?topup=pm-saved`,
-        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
-      }),
-    });
-    const body = await readResponseJson<{
-      checkoutUrl?: string;
-      error?: string;
-    }>(response);
-    if (!response.ok || !body.checkoutUrl) {
-      throw new Error(
-        body.error ?? `Payment method checkout failed (${response.status})`
-      );
-    }
-    return { checkoutUrl: body.checkoutUrl };
-  }, []);
+  const checkout = useWalletCheckoutActions();
 
   const ensureDefaultPaymentMethod = useCallback(async () => {
-    const response = await fetch("/api/pymthouse/wallet/payment-methods", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ensureDefault: true }),
-    });
-    const body = await readResponseJson<{ error?: string }>(response);
-    if (!response.ok) {
-      throw new Error(
-        body.error ??
-          `Ensure default payment method failed (${response.status})`
-      );
-    }
+    await checkout.ensureDefaultPaymentMethod();
     await load();
-  }, [load]);
+  }, [checkout, load]);
 
   return {
     state,
     reload: load,
-    startTopUp,
-    startPaymentMethodCheckout,
+    startTopUp: checkout.startTopUp,
+    startPaymentMethodCheckout: checkout.startPaymentMethodCheckout,
     ensureDefaultPaymentMethod,
   };
 }
