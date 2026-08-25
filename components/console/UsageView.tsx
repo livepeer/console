@@ -17,11 +17,14 @@ import {
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
 import PlansPanel from "@/components/console/PlansPanel";
 import WalletPanel from "@/components/console/WalletPanel";
-import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
 import {
   includedUsageSummary,
+  sharedPoolUsageMeter,
   type IncludedUsageSummary,
+  type SharedPoolUsageMeter,
 } from "@/lib/console/wallet-settlement-display";
+import { useMeBillingSurface } from "@/lib/console/useMeBillingSurface";
+import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
 
 const PERIOD_DAYS = 30;
 
@@ -57,6 +60,9 @@ function AllowanceStrip({
   requestCount,
   requestLimit,
   included,
+  poolMeter,
+  posture,
+  ownSpendUsdMicros,
   hasAccess,
   forecast,
   willExceed,
@@ -68,6 +74,11 @@ function AllowanceStrip({
   requestCount: number;
   requestLimit: number | null;
   included: IncludedUsageSummary | null;
+  /** Owner-rollup: this user's spend vs remaining pool (not grant total). */
+  poolMeter: SharedPoolUsageMeter | null;
+  /** Set on owner_rollup. */
+  posture: { label: string; canSpend: boolean } | null;
+  ownSpendUsdMicros: string;
   hasAccess: boolean;
   forecast: number;
   willExceed: boolean;
@@ -76,19 +87,29 @@ function AllowanceStrip({
   periodDelta: number;
   resetsAt: string;
 }) {
-  const showUsdAllowance = Boolean(included);
+  const showUsdAllowance = Boolean(included) && !poolMeter;
   const usedUsd = included?.consumedUsdMicros ?? "0";
   const granted = included?.totalUsdMicros ?? "0";
   const remaining = included?.remainingUsdMicros ?? "0";
   const allowanceLabel = included?.planName?.trim()
     ? `${included.planName} included`
     : "Included this period";
+  const actorLimit = poolMeter
+    ? Number(
+        (BigInt(poolMeter.availableUsdMicros || "0") > BigInt(0)
+          ? (BigInt(poolMeter.actorUsdMicros || "0") * BigInt(10000)) /
+            BigInt(poolMeter.availableUsdMicros || "1")
+          : BigInt(0))
+      ) / 100
+    : 0;
 
-  const usedForBar = showUsdAllowance
-    ? Number((BigInt(usedUsd) * BigInt(10000)) / BigInt(granted || "1"))
-    : requestLimit
-      ? (requestCount / requestLimit) * 100
-      : 0;
+  const usedForBar = poolMeter
+    ? actorLimit
+    : showUsdAllowance
+      ? Number((BigInt(usedUsd) * BigInt(10000)) / BigInt(granted || "1"))
+      : requestLimit
+        ? (requestCount / requestLimit) * 100
+        : 0;
   const pct = Math.min(100, usedForBar);
   const forecastPct = requestLimit
     ? Math.min(100, (forecast / requestLimit) * 100)
@@ -98,16 +119,41 @@ function AllowanceStrip({
     <div className="flex flex-col gap-3 rounded-md border border-hairline bg-dark-lighter shadow-card px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-          {showUsdAllowance ? allowanceLabel : "Usage this period"}
+          {poolMeter
+            ? "Your usage this period"
+            : showUsdAllowance
+              ? allowanceLabel
+              : "Your usage this period"}
         </p>
         {showUsdAllowance && !hasAccess && (
           <span className="rounded-[3px] border border-warm/30 bg-warm/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warm">
             Exhausted
           </span>
         )}
+        {posture && (
+          <span
+            className={`rounded-[3px] border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+              posture.canSpend
+                ? "border-green/30 bg-green/10 text-green-bright"
+                : "border-warm/30 bg-warm/10 text-warm"
+            }`}
+          >
+            {posture.label}
+          </span>
+        )}
       </div>
       <div className="flex flex-wrap items-baseline gap-3">
-        {showUsdAllowance ? (
+        {poolMeter ? (
+          <span className="font-mono text-[15px] tabular-nums leading-none text-fg-muted">
+            <b className="mr-0.5 text-[24px] font-medium tracking-[-0.01em] text-fg">
+              ${poolMeter.actorUsd}
+            </b>
+            <span className="text-fg-faint">
+              {" "}
+              / ${poolMeter.availableUsd} available
+            </span>
+          </span>
+        ) : showUsdAllowance ? (
           <span className="font-mono text-[15px] tabular-nums leading-none text-fg-muted">
             <b className="mr-0.5 text-[24px] font-medium tracking-[-0.01em] text-fg">
               ${microsToUsdDisplay(remaining)}
@@ -134,7 +180,7 @@ function AllowanceStrip({
         </span>
       </div>
 
-      {(showUsdAllowance || requestLimit) && (
+      {(showUsdAllowance || poolMeter || requestLimit) && (
         <div className="relative h-1.5 rounded-[3px] bg-dark-card">
           <div
             className={`h-full rounded-[3px] ${
@@ -169,7 +215,7 @@ function AllowanceStrip({
           <span className="font-mono">
             <b className="font-medium text-fg">{fmt(requestCount)}</b> signed
             requests this period
-            {showUsdAllowance && (
+            {showUsdAllowance ? (
               <>
                 {" "}
                 ·{" "}
@@ -177,6 +223,15 @@ function AllowanceStrip({
                   ${microsToUsdDisplay(usedUsd)}
                 </b>{" "}
                 consumed
+              </>
+            ) : (
+              <>
+                {" "}
+                ·{" "}
+                <b className="font-medium text-fg">
+                  ${microsToUsdDisplay(ownSpendUsdMicros)}
+                </b>{" "}
+                your spend
               </>
             )}
           </span>
@@ -194,6 +249,7 @@ export default function UsageView() {
   const { isConnected, user } = useAuth();
   const usageState = useAccountUsage(isConnected, PERIOD_DAYS);
   const walletState = useWalletBillingState(isConnected);
+  const meBilling = useMeBillingSurface(isConnected);
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(100);
 
@@ -299,10 +355,29 @@ export default function UsageView() {
   const { data } = usageState;
   const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
-  const included: IncludedUsageSummary | null =
-    walletState.state.status === "ready"
-      ? includedUsageSummary(walletState.state.wallet.billingState)
-      : null;
+
+  const actorUsdMicros =
+    data.current.endUserBillableUsdMicros ||
+    data.current.networkFeeUsdMicros ||
+    "0";
+  let included: IncludedUsageSummary | null = null;
+  let billedToOwner = false;
+  let poolMeter: SharedPoolUsageMeter | null = null;
+  if (meBilling.state.status === "ready") {
+    const surface = meBilling.state.surface;
+    if (surface.mode === "owner_rollup") {
+      billedToOwner = true;
+      if (walletState.state.status === "ready") {
+        poolMeter = sharedPoolUsageMeter({
+          state: walletState.state.wallet.billingState,
+          actorUsdMicros,
+        });
+      }
+    } else if (surface.state) {
+      included = includedUsageSummary(surface.state);
+    }
+  }
+
   const resetsAt = included?.resetsAt
     ? new Date(included.resetsAt).toLocaleDateString(undefined, {
         month: "short",
@@ -310,13 +385,32 @@ export default function UsageView() {
       })
     : formatPeriodResetLabel(data.period.end);
 
+  const sessionBilling =
+    meBilling.state.status === "ready"
+      ? {
+          surface: meBilling.state.surface,
+          loading: false,
+          reload: () => {
+            void meBilling.reload();
+          },
+        }
+      : {
+          surface: null,
+          loading:
+            meBilling.state.status === "idle" ||
+            meBilling.state.status === "loading",
+          reload: () => {
+            void meBilling.reload();
+          },
+        };
+
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
       <p className="mb-6 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
         Account{user?.id ? ` · ${user.id}` : ""}
       </p>
 
-      <PlansPanel />
+      <PlansPanel sessionBilling={sessionBilling} />
 
       <WalletPanel
         periodBillableUsdMicros={
@@ -324,12 +418,20 @@ export default function UsageView() {
           data.current.networkFeeUsdMicros ||
           null
         }
+        sessionBilling={sessionBilling}
       />
 
       <AllowanceStrip
         requestCount={forecastStats.requestCount}
         requestLimit={null}
         included={included}
+        poolMeter={poolMeter}
+        posture={
+          billedToOwner
+            ? { label: "Billed to owner", canSpend: true }
+            : null
+        }
+        ownSpendUsdMicros={actorUsdMicros}
         hasAccess={data.balance?.hasAccess ?? true}
         forecast={forecastStats.forecast}
         willExceed={forecastStats.willExceed}
@@ -391,7 +493,7 @@ export default function UsageView() {
       />
 
       <LimitsPanel
-        balance={data.balance}
+        balance={billedToOwner ? null : data.balance}
         included={included}
         networkFeeUsdMicros={data.current.networkFeeUsdMicros}
         endUserBillableUsdMicros={data.current.endUserBillableUsdMicros}

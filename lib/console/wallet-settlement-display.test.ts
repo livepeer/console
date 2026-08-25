@@ -9,6 +9,7 @@ import {
   includedUsageRemainingLabel,
   includedUsageSummary,
   overageLimitNote,
+  sharedPoolUsageMeter,
   spendPostureBadge,
 } from "./wallet-settlement-display";
 
@@ -29,6 +30,7 @@ function makeState(overrides: {
   remaining?: { usdMicros: string; usd: string } | null;
   utilizationBps?: number | null;
   leadThreshold?: { usdMicros: string; usd: string };
+  subjectType?: BillingState["subject"]["type"];
 }): BillingStateWithIncluded {
   const prepaid = {
     ...money("0", "0.00"),
@@ -48,7 +50,7 @@ function makeState(overrides: {
   return {
     asOf: "2026-08-08T00:00:00.000Z",
     subject: {
-      type: "owner",
+      type: overrides.subjectType ?? "owner",
       externalUserId: null,
       billingMode: "owner_rollup",
     },
@@ -243,6 +245,7 @@ describe("includedUsageSummary", () => {
         includedTotal: { usdMicros: "5000000", usd: "5.00" },
         includedConsumed: { usdMicros: "18000", usd: "0.02" },
         sourcePlan: { id: "plan_1", name: "Starter", type: "free" },
+        subjectType: "end_user",
       }),
     );
     assert.ok(summary);
@@ -254,6 +257,49 @@ describe("includedUsageSummary", () => {
       includedUsageRemainingLabel(summary),
       "Starter · $4.98 of $5.00 included left",
     );
+  });
+
+  it("flags an owner_rollup pool as shared so actor counts are not its source", () => {
+    const owner = includedUsageSummary(
+      makeState({
+        includedRemaining: { usdMicros: "2430000", usd: "2.43" },
+        includedTotal: { usdMicros: "5000000", usd: "5.00" },
+        includedConsumed: { usdMicros: "2570000", usd: "2.57" },
+        subjectType: "owner",
+      }),
+    );
+    assert.equal(owner?.sharedWithApp, true);
+    assert.equal(
+      includedUsageRemainingLabel(owner!),
+      "Plan · $2.43 available",
+    );
+
+    const endUser = includedUsageSummary(
+      makeState({
+        includedRemaining: { usdMicros: "2430000", usd: "2.43" },
+        includedTotal: { usdMicros: "5000000", usd: "5.00" },
+        subjectType: "end_user",
+      }),
+    );
+    assert.equal(endUser?.sharedWithApp, false);
+  });
+
+  it("meters this user's spend against remaining pool, not the $5 grant", () => {
+    const meter = sharedPoolUsageMeter({
+      state: makeState({
+        includedRemaining: { usdMicros: "2430000", usd: "2.43" },
+        includedTotal: { usdMicros: "5000000", usd: "5.00" },
+        includedConsumed: { usdMicros: "2570000", usd: "2.57" },
+        prepaid: { usdMicros: "140000", usd: "0.14" },
+        spendable: { usdMicros: "2570000", usd: "2.57" },
+        subjectType: "owner",
+      }),
+      actorUsdMicros: "3000",
+    });
+    assert.equal(meter.actorUsd, "0.003");
+    assert.equal(meter.availableUsd, "2.57");
+    assert.equal(meter.label, "$0.003 of $2.57 available");
+    assert.ok(!meter.label.includes("5.00"));
   });
 });
 

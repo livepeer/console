@@ -33,6 +33,6 @@ MCP_OAUTH_BILLING_APP_ID=app_98575870d7ae33589a3f0660
 
 Until `SSO_MINT_*` lands, equivalent names may be `NAAP_MCP_ORIGIN` / `NAAP_MCP_MINT_URL` / `MCP_INTERNAL_MINT_*`.
 
-After mint, Agent may call PymtHouse `GET /api/v1/apps/{app}/me/billing/*` with the composite Bearer. On **owner_rollup** (RS-2 default) money routes return **403** `merchant_billing_required`. That is expected — usage is billed to the app owner, not a per-user prepaid wallet. Merchant-mode apps return 200 retail data.
+After mint, Agent may call PymtHouse `GET /api/v1/apps/{app}/me/billing/*` with the composite Bearer. The minted JWT carries `billing_mode`. On **owner_rollup** (RS-2 default) skip money `/me/billing/*` — those routes return **403** `merchant_billing_required` because usage is billed to the app owner. Do not fall back to the M2M owner wallet (that discloses the shared pool). Merchant-mode JWTs may call the money routes.
 
 Do not retry those 403s via M2M `GET …/users/{id}/allowances` (that is the owner wallet).

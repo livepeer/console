@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-type MeBillingResponse =
-  | { mode: "owner_rollup"; code: string }
-  | { mode: "merchant" };
+import type { MeBillingSurface } from "@/lib/console/pymthouse-me-billing-bff";
 
 export default function EndUserMeBillingNote() {
   const [note, setNote] = useState<string | null>(null);
@@ -16,7 +13,7 @@ export default function EndUserMeBillingNote() {
         cache: "no-store",
       });
       if (!response.ok || cancelled) return;
-      const body = (await response.json()) as MeBillingResponse;
+      const body = (await response.json()) as MeBillingSurface;
       if (cancelled) return;
       if (body.mode === "owner_rollup") {
         setNote(

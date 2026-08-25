@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/console/AuthContext";
-import { useOwnerWallet } from "@/lib/console/useOwnerWallet";
+import {
+  useOwnerWallet,
+  useWalletCheckoutActions,
+} from "@/lib/console/useOwnerWallet";
+import type { MeBillingSurface } from "@/lib/console/pymthouse-me-billing-bff";
 import { redirectToCheckout } from "@/lib/console/checkout-redirect";
 import {
   availableRunway,
@@ -12,6 +16,7 @@ import {
   includedUsageRemainingLabel,
   includedUsageSummary,
   overageLimitNote,
+  sharedPoolUsageMeter,
   spendPostureBadge,
   type SpendPostureTone,
 } from "@/lib/console/wallet-settlement-display";
@@ -64,18 +69,40 @@ const AVAILABLE_TONE_CLASS: Record<SpendPostureTone, string> = {
 
 export default function WalletPanel({
   periodBillableUsdMicros = null,
+  sessionBilling,
 }: {
   /** Period end-user billable USD micros from the Usage page (metered usage, not credits). */
   periodBillableUsdMicros?: string | null;
+  sessionBilling?: {
+    surface: MeBillingSurface | null;
+    loading: boolean;
+    reload: () => void;
+  };
 }) {
   const { isConnected } = useAuth();
+  const merchant =
+    sessionBilling?.surface?.mode === "merchant"
+      ? sessionBilling.surface
+      : null;
+  const waitingSession =
+    sessionBilling != null &&
+    (sessionBilling.loading || sessionBilling.surface === null);
   const {
     state,
-    reload,
-    startTopUp,
-    startPaymentMethodCheckout,
-    ensureDefaultPaymentMethod,
-  } = useOwnerWallet(isConnected);
+    reload: reloadOwner,
+    startTopUp: ownerStartTopUp,
+    startPaymentMethodCheckout: ownerStartPm,
+    ensureDefaultPaymentMethod: ownerEnsureDefault,
+  } = useOwnerWallet(isConnected && !merchant && !waitingSession);
+  const checkout = useWalletCheckoutActions();
+  const reload = merchant ? () => sessionBilling?.reload() : reloadOwner;
+  const startTopUp = merchant ? checkout.startTopUp : ownerStartTopUp;
+  const startPaymentMethodCheckout = merchant
+    ? checkout.startPaymentMethodCheckout
+    : ownerStartPm;
+  const ensureDefaultPaymentMethod = merchant
+    ? checkout.ensureDefaultPaymentMethod
+    : ownerEnsureDefault;
   const [showTopUp, setShowTopUp] = useState(false);
   const [amountUsd, setAmountUsd] = useState<string>("25.00");
   const [busy, setBusy] = useState<"topup" | "pm" | null>(null);
@@ -127,7 +154,10 @@ export default function WalletPanel({
     }
   }
 
-  if (state.status === "loading" || state.status === "idle") {
+  if (
+    waitingSession ||
+    (!merchant && (state.status === "loading" || state.status === "idle"))
+  ) {
     return (
       <div className="mt-4 animate-pulse rounded-md border border-hairline bg-dark-lighter px-4 py-6">
         <div className="h-4 w-40 rounded bg-white/5" />
@@ -136,7 +166,7 @@ export default function WalletPanel({
     );
   }
 
-  if (state.status === "error") {
+  if (!merchant && state.status === "error") {
     return (
       <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-4">
         <p className="text-sm text-fg-muted">Could not load wallet.</p>
@@ -153,12 +183,47 @@ export default function WalletPanel({
     );
   }
 
-  const { wallet, paymentMethods, invoices } = state;
+  if (merchant && !merchant.wallet) {
+    return (
+      <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-4">
+        <p className="text-sm text-fg-muted">Could not load session wallet.</p>
+        <Button
+          className="mt-3"
+          variant="secondary"
+          size="sm"
+          onClick={() => sessionBilling?.reload()}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const { wallet, paymentMethods, invoices } = merchant
+    ? {
+        wallet: merchant.wallet,
+        paymentMethods: merchant.paymentMethods,
+        invoices: merchant.invoices,
+      }
+    : state.status === "ready"
+      ? state
+      : { wallet: null, paymentMethods: [], invoices: [] };
+
+  if (!wallet) {
+    return null;
+  }
   const usageUsd = formatWalletUsd(periodBillableUsdMicros);
   const billingState = wallet.billingState;
   const posture = spendPostureBadge(billingState.status);
   const runway = availableRunway(billingState);
   const included = includedUsageSummary(billingState);
+  const poolMeter =
+    included?.sharedWithApp && periodBillableUsdMicros
+      ? sharedPoolUsageMeter({
+          state: billingState,
+          actorUsdMicros: periodBillableUsdMicros,
+        })
+      : null;
   const limitNote = overageLimitNote(billingState);
   const defaultPm =
     paymentMethods.find((pm) => pm.isDefault) ?? paymentMethods[0] ?? null;
@@ -209,7 +274,20 @@ export default function WalletPanel({
               </p>
             </div>
           </div>
-          {included ? (
+          {poolMeter ? (
+            <p className="mt-3 text-[12px] text-fg-muted">
+              {poolMeter.label}
+              {included?.resetsAt
+                ? ` · resets ${new Date(included.resetsAt).toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "short",
+                      day: "numeric",
+                    }
+                  )}`
+                : ""}
+            </p>
+          ) : included ? (
             <p className="mt-3 text-[12px] text-fg-muted">
               {includedUsageRemainingLabel(included)}
               {included.resetsAt
