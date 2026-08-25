@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/components/console/AuthContext";
+import EndUserMeBillingNote from "./EndUserMeBillingNote";
 import Dialog from "@/components/design-system/Dialog";
 import TimingChoicePanel from "@/components/console/TimingChoicePanel";
 import {
@@ -624,6 +625,7 @@ export default function BillingSection() {
 
   return (
     <div>
+      <EndUserMeBillingNote />
       {flash === "success" ? (
         <p className="mb-4 text-[13px] text-emerald-400">
           Checkout completed — billing details refreshed.
