@@ -30,6 +30,13 @@ export function formatWalletUsd(micros: string | null | undefined): string {
   return microsToUsd(micros).toFixed(2);
 }
 
+function formatMeterActorUsd(micros: string): string {
+  const usd = microsToUsd(micros);
+  if (usd >= 0.01) return usd.toFixed(2);
+  const trimmed = usd.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+  return trimmed || "0";
+}
+
 function parseUsdMicros(raw: string | null | undefined): bigint {
   const trimmed = raw?.trim();
   if (!trimmed || !/^-?\d+$/.test(trimmed)) return BigInt(0);
@@ -156,6 +163,12 @@ export type IncludedUsageSummary = {
   planId: string | null;
   planName: string | null;
   resetsAt: string | null;
+  /**
+   * True when the allowance is the app owner's rollup pool, which every end
+   * user of the app draws from. Actor-scoped counts (request history, jobs by
+   * capability) must not be presented as the source of `consumedUsdMicros`.
+   */
+  sharedWithApp: boolean;
 };
 
 /**
@@ -188,6 +201,7 @@ export function includedUsageSummary(
     planId,
     planName,
     resetsAt,
+    sharedWithApp: state.subject.type === "owner",
   };
 }
 
@@ -195,7 +209,44 @@ export function includedUsageRemainingLabel(
   summary: IncludedUsageSummary,
 ): string {
   const plan = summary.planName ?? "Plan";
+  if (summary.sharedWithApp) {
+    return `${plan} · $${summary.remainingUsd} available`;
+  }
   return `${plan} · $${summary.remainingUsd} of $${summary.totalUsd} included left`;
+}
+
+export type SharedPoolUsageMeter = {
+  actorUsdMicros: string;
+  actorUsd: string;
+  availableUsdMicros: string;
+  availableUsd: string;
+  /** `$0.003 of $2.57 available` — actor spend vs remaining pool, not grant total. */
+  label: string;
+};
+
+/**
+ * Owner-rollup meter: this user's period spend against remaining spendable
+ * on the shared owner pool. Never uses grant total (the `$5.00`) or pool
+ * consumed (other users' usage).
+ */
+export function sharedPoolUsageMeter(input: {
+  state: BillingState;
+  actorUsdMicros: string;
+}): SharedPoolUsageMeter {
+  const runway = availableRunway(input.state);
+  const availableMicros =
+    parseUsdMicros(runway.usdMicros) > BigInt(0)
+      ? parseUsdMicros(runway.usdMicros)
+      : BigInt(0);
+  const actorUsd = formatMeterActorUsd(input.actorUsdMicros || "0");
+  const availableUsd = formatWalletUsd(availableMicros.toString());
+  return {
+    actorUsdMicros: input.actorUsdMicros || "0",
+    actorUsd,
+    availableUsdMicros: availableMicros.toString(),
+    availableUsd,
+    label: `$${actorUsd} of $${availableUsd} available`,
+  };
 }
 
 /** When the next invoice goes out, in the customer's terms. */

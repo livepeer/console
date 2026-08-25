@@ -10,6 +10,7 @@ import {
   formatIncludedUsdMicros,
   formatPendingCancelDate,
   isNothingToResumeError,
+  matchCatalogPlanId,
   paidCatalogPlanIds,
   resolveApplicablePendingCancel,
   resolveTimingPayload,
@@ -372,5 +373,31 @@ test("formatBillingPlanPrice prefers Starter included usage over $0 fee", () => 
   assert.equal(
     starterIncludedUsageLabel({ includedUsdMicros: null }),
     "Free included usage",
+  );
+});
+
+test("matchCatalogPlanId prefers planId then sourcePlan then name", () => {
+  const catalog = [
+    { id: "starter", name: "Starter" },
+    { id: "ppu", name: "Pay per use" },
+  ];
+  assert.equal(
+    matchCatalogPlanId(catalog, { planId: "ppu", planName: "Pay per use" }),
+    "ppu"
+  );
+  assert.equal(
+    matchCatalogPlanId(catalog, { planId: null, planName: null }, {
+      id: "ppu",
+      name: "Pay per use",
+    }),
+    "ppu"
+  );
+  assert.equal(
+    matchCatalogPlanId(catalog, { planId: null, planName: "Pay per use" }),
+    "ppu"
+  );
+  assert.equal(
+    matchCatalogPlanId(catalog, { planId: "missing", planName: null }),
+    null
   );
 });

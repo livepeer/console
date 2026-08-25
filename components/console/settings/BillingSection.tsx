@@ -740,7 +740,8 @@ export default function BillingSection() {
               if (
                 isCurrent &&
                 included &&
-                (included.planId === plan.id || !included.planId)
+                !included.sharedWithApp &&
+                included.planId === plan.id
               ) {
                 features.push(
                   `$${included.remainingUsd} of $${included.totalUsd} included left`

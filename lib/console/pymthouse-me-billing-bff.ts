@@ -1,44 +1,82 @@
 import "server-only";
 
-import { mintEndUserAccessToken } from "@/lib/console/pymthouse-bff";
 import {
-  pymthouseAppsOrigin,
-  readPublicClientId,
-} from "@/lib/console/pymthouse-http";
+  isMerchantBillingRequiredError,
+  readAccessTokenBillingMode,
+  type AppUserInvoice,
+  type BillingState,
+  type EndUserMeWallet,
+  type UserSubscriptionResponse,
+} from "@pymthouse/builder-sdk";
+
+import { mapDashboardUserSubscription } from "@/lib/console/pymthouse-billing-bff";
+import type { DashboardUserSubscription } from "@/lib/console/pymthouse-billing";
+import {
+  createPmtHouseClientForPublicApp,
+  mintEndUserAccessToken,
+} from "@/lib/console/pymthouse-bff";
+import { readPublicClientId } from "@/lib/console/pymthouse-http";
+import type {
+  DashboardOwnerWallet,
+  DashboardWalletInvoice,
+  DashboardWalletPaymentMethod,
+} from "@/lib/console/pymthouse-wallet";
+
+export type MerchantMeBillingBundle = {
+  mode: "merchant";
+  state: BillingState | null;
+  wallet: DashboardOwnerWallet | null;
+  subscription: DashboardUserSubscription | null;
+  paymentMethods: DashboardWalletPaymentMethod[];
+  invoices: DashboardWalletInvoice[];
+};
 
 export type MeBillingSurface =
   | {
       mode: "owner_rollup";
       code: "merchant_billing_required";
     }
-  | {
-      mode: "merchant";
-      allowances: Record<string, unknown> | null;
-      state: Record<string, unknown> | null;
-      subscription: Record<string, unknown> | null;
-      wallet: Record<string, unknown> | null;
-      invoices: Record<string, unknown> | null;
-      paymentMethods: Record<string, unknown> | null;
-    };
+  | MerchantMeBillingBundle;
 
-async function getMeBilling(
-  accessToken: string,
-  suffix: string
-): Promise<{ status: number; body: Record<string, unknown> | null }> {
-  const url = `${pymthouseAppsOrigin()}/api/v1/apps/${encodeURIComponent(readPublicClientId())}/me/billing/${suffix}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-  const body = (await response.json().catch(() => null)) as Record<
-    string,
-    unknown
-  > | null;
-  return { status: response.status, body };
+type UserSubscriptionWithLivePlan = UserSubscriptionResponse & {
+  livePlan?: { id?: string | null; name?: string | null } | null;
+};
+
+function asOwnerWallet(wallet: EndUserMeWallet): DashboardOwnerWallet {
+  return {
+    clientId: wallet.clientId,
+    balance: wallet.balance,
+    paymentMethod: wallet.paymentMethod,
+    billingState: wallet.billingState,
+    payPerUsePlans: wallet.payPerUsePlans,
+  };
+}
+
+function mapInvoice(invoice: AppUserInvoice): DashboardWalletInvoice {
+  return {
+    id: invoice.id,
+    number: invoice.number,
+    status: invoice.status,
+    currency: invoice.currency,
+    totalAmount: invoice.totalAmount,
+    issuedAt: invoice.issuedAt,
+    periodStart: invoice.periodStart,
+    periodEnd: invoice.periodEnd,
+    invoiceType: invoice.invoiceType,
+  };
+}
+
+async function readMerchantPiece<T>(
+  load: () => Promise<T>
+): Promise<T | "rollup" | null> {
+  try {
+    return await load();
+  } catch (error) {
+    if (isMerchantBillingRequiredError(error)) {
+      return "rollup";
+    }
+    return null;
+  }
 }
 
 export async function readSessionMeBilling(input: {
@@ -49,31 +87,44 @@ export async function readSessionMeBilling(input: {
     input.externalUserId,
     input.email
   );
-  const allowances = await getMeBilling(accessToken, "allowances");
+  const mintedMode = readAccessTokenBillingMode(accessToken);
+  if (mintedMode === "owner_rollup") {
+    return { mode: "owner_rollup", code: "merchant_billing_required" };
+  }
+
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+
+  const [stateResult, walletResult, subscriptionResult, pmResult, invoiceResult] =
+    await Promise.all([
+      readMerchantPiece(() => client.getMeBillingState(accessToken)),
+      readMerchantPiece(() => client.getMeBillingWallet(accessToken)),
+      readMerchantPiece(() => client.getMeBillingSubscription(accessToken)),
+      readMerchantPiece(() => client.getMeBillingPaymentMethods(accessToken)),
+      readMerchantPiece(() =>
+        client.getMeBillingInvoices(accessToken, { pageSize: 20 })
+      ),
+    ]);
+
   if (
-    allowances.status === 403 &&
-    (allowances.body?.code === "merchant_billing_required" ||
-      allowances.body?.code === "merchant_wallet_required")
+    stateResult === "rollup" ||
+    walletResult === "rollup" ||
+    subscriptionResult === "rollup" ||
+    pmResult === "rollup" ||
+    invoiceResult === "rollup"
   ) {
     return { mode: "owner_rollup", code: "merchant_billing_required" };
   }
 
-  const [billingState, subscription, wallet, invoices, paymentMethods] =
-    await Promise.all([
-      getMeBilling(accessToken, "state"),
-      getMeBilling(accessToken, "subscription"),
-      getMeBilling(accessToken, "wallet"),
-      getMeBilling(accessToken, "invoices"),
-      getMeBilling(accessToken, "payment-methods"),
-    ]);
-
   return {
     mode: "merchant",
-    allowances: allowances.status === 200 ? allowances.body : null,
-    state: billingState.status === 200 ? billingState.body : null,
-    subscription: subscription.status === 200 ? subscription.body : null,
-    wallet: wallet.status === 200 ? wallet.body : null,
-    invoices: invoices.status === 200 ? invoices.body : null,
-    paymentMethods: paymentMethods.status === 200 ? paymentMethods.body : null,
+    state: stateResult,
+    wallet: walletResult ? asOwnerWallet(walletResult) : null,
+    subscription: subscriptionResult
+      ? mapDashboardUserSubscription(
+          subscriptionResult as UserSubscriptionWithLivePlan
+        )
+      : null,
+    paymentMethods: pmResult?.paymentMethods ?? [],
+    invoices: (invoiceResult?.items ?? []).map(mapInvoice),
   };
 }
