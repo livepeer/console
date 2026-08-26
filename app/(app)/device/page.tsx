@@ -1,12 +1,8 @@
 import { redirect } from "next/navigation";
-import { Smartphone } from "lucide-react";
 
 import { auth0 } from "@/lib/auth0";
-import ConsolePageHeader from "@/components/console/ConsolePageHeader";
-import {
-  parseDeviceInitiateParams,
-} from "@/lib/console/device-approval";
-import DeviceApproveForm from "./DeviceApproveForm";
+import { parseDeviceInitiateParams } from "@/lib/console/device-approval";
+import DeviceApproveForm, { DevicePageChrome } from "./DeviceApproveForm";
 
 export const dynamic = "force-dynamic";
 
@@ -37,26 +33,20 @@ export default async function DevicePage({
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid device request";
     return (
-      <>
-        <ConsolePageHeader title="Device sign-in" icon={Smartphone} />
-        <div className="mx-auto w-full max-w-5xl px-6 py-8">
-          <p className="text-sm text-red-400">{message}</p>
-        </div>
-      </>
+      <DevicePageChrome>
+        <p className="text-sm text-red-400">{message}</p>
+      </DevicePageChrome>
     );
   }
 
   return (
-    <>
-      <ConsolePageHeader title="Device sign-in" icon={Smartphone} />
-      <div className="mx-auto w-full max-w-5xl px-6 py-8">
-        <DeviceApproveForm
-          iss={parsed.issuer}
-          targetLinkUri={parsed.targetLinkUri}
-          userCode={parsed.userCode}
-          clientId={parsed.clientId}
-        />
-      </div>
-    </>
+    <DevicePageChrome>
+      <DeviceApproveForm
+        iss={parsed.issuer}
+        targetLinkUri={parsed.targetLinkUri}
+        userCode={parsed.userCode}
+        clientId={parsed.clientId}
+      />
+    </DevicePageChrome>
   );
 }
