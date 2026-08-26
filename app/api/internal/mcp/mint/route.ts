@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { PmtHouseError } from "@pymthouse/builder-sdk";
 import {
   authorizeMcpMint,
-  billingAppMismatch,
   mintMcpCompositeKey,
   mintRouteConfigured,
 } from "@/lib/console/mcp-internal-mint";
@@ -30,11 +29,6 @@ export async function POST(request: NextRequest) {
   });
   if (!auth.ok) {
     return json(auth.status, { error: auth.error });
-  }
-
-  const mismatch = billingAppMismatch();
-  if (mismatch) {
-    return json(503, mismatch);
   }
 
   let body: {
