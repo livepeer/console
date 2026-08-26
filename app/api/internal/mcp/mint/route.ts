@@ -7,6 +7,7 @@ import {
   mintMcpCompositeKey,
   mintRouteConfigured,
 } from "@/lib/console/mcp-internal-mint";
+import { resolveMcpMintSubject } from "@/lib/console/mcp-oauth-login-bridge";
 
 export const runtime = "nodejs";
 
@@ -36,26 +37,30 @@ export async function POST(request: NextRequest) {
     return json(503, mismatch);
   }
 
-  let body: { externalUserId?: unknown; email?: unknown; label?: unknown };
+  let body: {
+    code?: unknown;
+    externalUserId?: unknown;
+    email?: unknown;
+    label?: unknown;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
     return json(400, { error: "invalid_request", error_description: "invalid_json" });
   }
 
-  const externalUserId =
-    typeof body.externalUserId === "string" ? body.externalUserId.trim() : "";
-  if (!externalUserId || externalUserId.length > 256) {
-    return json(400, {
-      error: "invalid_request",
-      error_description: "externalUserId is required",
+  const subject = resolveMcpMintSubject(body);
+  if (!subject.ok) {
+    return json(subject.status, {
+      error: subject.error,
+      error_description: subject.error_description,
     });
   }
 
   try {
     const minted = await mintMcpCompositeKey({
-      externalUserId,
-      email: typeof body.email === "string" ? body.email.trim() : undefined,
+      externalUserId: subject.externalUserId,
+      email: subject.email,
       label: typeof body.label === "string" ? body.label : undefined,
     });
     return json(200, { apiKey: minted.apiKey });
