@@ -1,7 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Smartphone } from "lucide-react";
 import Button from "@/components/design-system/Button";
+import ConsolePageHeader from "@/components/console/ConsolePageHeader";
+
+export function DevicePageChrome({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <ConsolePageHeader title="Device sign-in" icon={Smartphone} />
+      <div className="mx-auto w-full max-w-5xl px-6 py-8">{children}</div>
+    </>
+  );
+}
 
 export default function DeviceApproveForm({
   iss,
