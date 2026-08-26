@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth0 } from "@/lib/auth0";
 import LoginPage from "@/components/console/LoginPage";
+import { isDeviceReturnTo } from "@/lib/console/device-initiate";
 import {
   decodeMcpOauthPendingCookie,
   MCP_OAUTH_COMPLETE_PATH,
@@ -18,6 +19,7 @@ export default async function LoginRoute({
     mcp_bridge?: string;
     state?: string;
     redirect_uri?: string;
+    returnTo?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -43,15 +45,29 @@ export default async function LoginRoute({
   );
   const mcpBridge = params.mcp_bridge === "1" && pending !== null;
 
+  const deviceReturnTo =
+    typeof params.returnTo === "string" && isDeviceReturnTo(params.returnTo)
+      ? params.returnTo
+      : null;
+
   const session = await auth0.getSession();
   if (session) {
     if (mcpBridge) {
       redirect(MCP_OAUTH_COMPLETE_PATH);
     }
+    if (deviceReturnTo) {
+      redirect(deviceReturnTo);
+    }
     redirect("/home");
   }
 
   return (
-    <LoginPage returnTo={mcpBridge ? MCP_OAUTH_COMPLETE_PATH : "/home"} />
+    <LoginPage
+      returnTo={
+        mcpBridge
+          ? MCP_OAUTH_COMPLETE_PATH
+          : deviceReturnTo ?? "/home"
+      }
+    />
   );
 }
