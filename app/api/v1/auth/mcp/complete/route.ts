@@ -6,6 +6,7 @@ import { externalUserIdFromSub } from "@/lib/console/external-user-id";
 import {
   buildMcpOauthCallbackUrl,
   decodeMcpOauthPendingCookie,
+  issueMcpIdentityCode,
   MCP_OAUTH_PENDING_COOKIE,
 } from "@/lib/console/mcp-oauth-login-bridge";
 
@@ -36,11 +37,17 @@ export async function GET(request: NextRequest) {
 
   const externalUserId = await externalUserIdFromSub(sub);
   const email = session.user.email?.trim();
+  const code = issueMcpIdentityCode({
+    externalUserId,
+    email: email || undefined,
+    state: pending.state,
+  });
   const target = buildMcpOauthCallbackUrl({
     redirectUri: pending.redirectUri,
     state: pending.state,
     externalUserId,
     email: email || undefined,
+    code,
   });
   return NextResponse.redirect(target);
 }
