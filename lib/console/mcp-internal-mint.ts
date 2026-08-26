@@ -51,6 +51,17 @@ export function billingAppMismatch(): { error: string; error_description: string
   if (publicClientId === RS2_TEST_BILLING_APP_ID) {
     return null;
   }
+  const base = process.env.APP_BASE_URL?.trim() ?? "";
+  let local = false;
+  try {
+    const host = new URL(base).hostname;
+    local = host === "localhost" || host === "127.0.0.1";
+  } catch {
+    local = false;
+  }
+  if (local) {
+    return null;
+  }
   return {
     error: "billing_app_mismatch",
     error_description: `Non-prod mint requires PYMTHOUSE_PUBLIC_CLIENT_ID=${RS2_TEST_BILLING_APP_ID}`,

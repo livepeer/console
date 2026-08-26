@@ -48,11 +48,18 @@ test("authorizeMcpMint fail-closed matrix", () => {
 
 test("billingAppMismatch pins RS-2 in non-prod", () => {
   const prev = process.env.VERCEL_ENV;
+  const prevBase = process.env.APP_BASE_URL;
   process.env.VERCEL_ENV = "preview";
+  delete process.env.APP_BASE_URL;
   process.env.PYMTHOUSE_PUBLIC_CLIENT_ID = "app_deadbeefdeadbeefdeadbeef";
   assert.equal(billingAppMismatch()?.error, "billing_app_mismatch");
   process.env.PYMTHOUSE_PUBLIC_CLIENT_ID = RS2_TEST_BILLING_APP_ID;
   assert.equal(billingAppMismatch(), null);
+  process.env.PYMTHOUSE_PUBLIC_CLIENT_ID = "app_deadbeefdeadbeefdeadbeef";
+  process.env.APP_BASE_URL = "http://localhost:3000";
+  assert.equal(billingAppMismatch(), null);
   if (prev === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = prev;
+  if (prevBase === undefined) delete process.env.APP_BASE_URL;
+  else process.env.APP_BASE_URL = prevBase;
 });
