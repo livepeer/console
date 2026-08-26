@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit --incremental false",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "mcp:oidc-client": "node scripts/mcp-oidc-client.mjs"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.27.0",
@@ -36,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "^15.1.0",
     "eslint-config-prettier": "^10.1.8",
+    "openid-client": "^6.8.7",
     "postcss": "^8.5.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.0.0",
