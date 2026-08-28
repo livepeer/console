@@ -22,7 +22,6 @@ import KeyBadge from "@/components/console/KeyBadge";
 import CallsTable from "@/components/console/CallsTable";
 import StatusDot from "@/components/console/StatusDot";
 import {
-  getAppById,
   effectiveVisibility,
   setPipelineVisibility,
   organizationSlug,
@@ -30,6 +29,8 @@ import {
   SETTINGS_API_KEYS,
   MOCK_RECENT_REQUESTS,
 } from "@/lib/console/mock-data";
+import { useDiscoveryModel } from "@/lib/console/useDiscoveryModel";
+import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
 import { getAppIcon } from "@/lib/console/utils";
 import PlaygroundForm from "@/components/console/playground/PlaygroundForm";
 import JsonInput from "@/components/console/playground/JsonInput";
@@ -37,6 +38,15 @@ import PlaygroundOutput from "@/components/console/playground/PlaygroundOutput";
 import TranscodingOutput from "@/components/console/playground/TranscodingOutput";
 import CodeSnippets from "@/components/console/playground/CodeSnippets";
 import WebcamPlayground from "@/components/console/playground/WebcamPlayground";
+import {
+  RunnerGatewayProvider,
+  useRunnerGatewayContext,
+} from "@/components/console/playground/RunnerGatewayContext";
+import {
+  buildLiveRunnerPayload,
+  extractRunnerResultText,
+  runnerGatewayPostUrl,
+} from "@/lib/console/runner-gateway-client";
 import AppAnalytics from "@/components/console/stats/AppAnalytics";
 import { OverviewTab, SettingsTab } from "@/components/console/AppDetailView";
 import type { App, Pipeline, PipelineVisibility } from "@/lib/console/types";
@@ -103,6 +113,19 @@ function modelMatchesRow(catalogId: string, runModel: string): boolean {
 // ─── Playground Tab ───
 
 function PlaygroundTab({ model }: { model: App }) {
+  return (
+    <RunnerGatewayProvider model={model}>
+      <PlaygroundTabInner model={model} />
+    </RunnerGatewayProvider>
+  );
+}
+
+function PlaygroundTabInner({ model }: { model: App }) {
+  const {
+    canRunLive,
+    state: runnerGatewayState,
+    signerJwt,
+  } = useRunnerGatewayContext();
   const [inputMode, setInputMode] = useState<
     "form" | "json" | "python" | "node" | "http"
   >("form");
@@ -113,12 +136,14 @@ function PlaygroundTab({ model }: { model: App }) {
     string,
     unknown
   > | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
-  const handleRun = useCallback(
+  const runMock = useCallback(
     (values: Record<string, unknown>) => {
       setLastRunValues(values);
       setIsRunning(true);
       setResult(null);
+      setRunError(null);
       const time = 0.3 + Math.random() * 1.5;
       setTimeout(() => {
         setIsRunning(false);
@@ -156,6 +181,87 @@ function PlaygroundTab({ model }: { model: App }) {
       }, time * 1000);
     },
     [model]
+  );
+
+  const runLive = useCallback(
+    async (values: Record<string, unknown>) => {
+      if (runnerGatewayState.status !== "ready") {
+        runMock(values);
+        return;
+      }
+
+      setLastRunValues(values);
+      setIsRunning(true);
+      setResult(null);
+      setRunError(null);
+      const started = performance.now();
+
+      try {
+        const runnerPath =
+          model.playgroundConfig?.runnerPath?.trim() || "chat/completions";
+        const payload = buildLiveRunnerPayload(model, values);
+        const url = runnerGatewayPostUrl(
+          runnerGatewayState.gatewayBaseUrl,
+          runnerGatewayState.runnerAppId,
+          runnerPath
+        );
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const contentType = response.headers.get("content-type") ?? "";
+        if (!response.ok) {
+          let message = `Gateway error (${response.status})`;
+          try {
+            const errBody = (await response.json()) as { error?: string };
+            if (errBody.error) message = errBody.error;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+
+        if (contentType.includes("text/event-stream") && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let streamed = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            streamed += decoder.decode(value, { stream: true });
+            setResult(streamed);
+          }
+        } else {
+          const data = await response.json();
+          setResult(extractRunnerResultText(data));
+        }
+
+        setInferenceTime(
+          parseFloat(((performance.now() - started) / 1000).toFixed(1))
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Run failed";
+        setRunError(message);
+        setResult(null);
+      } finally {
+        setIsRunning(false);
+      }
+    },
+    [model, runMock, runnerGatewayState]
+  );
+
+  const handleRun = useCallback(
+    (values: Record<string, unknown>) => {
+      if (canRunLive) {
+        void runLive(values);
+        return;
+      }
+      runMock(values);
+    },
+    [canRunLive, runLive, runMock]
   );
 
   // Ctrl+Enter shortcut
@@ -233,6 +339,7 @@ function PlaygroundTab({ model }: { model: App }) {
             config={model.playgroundConfig}
             onRun={handleRun}
             isRunning={isRunning}
+            signerJwt={signerJwt}
           />
         )}
         {inputMode === "json" && (
@@ -246,8 +353,20 @@ function PlaygroundTab({ model }: { model: App }) {
           inputMode === "node" ||
           inputMode === "http") && (
           <div className="flex flex-col">
+            {signerJwt ? (
+              <input
+                type="hidden"
+                name="signer-jwt"
+                value={signerJwt}
+                readOnly
+              />
+            ) : null}
             <div className="pb-4">
-              <CodeSnippets model={model} fixedLang={inputMode} />
+              <CodeSnippets
+                model={model}
+                fixedLang={inputMode}
+                runValues={lastRunValues ?? undefined}
+              />
             </div>
             <div className="flex items-center gap-2 border-t border-hairline pt-4">
               <button
@@ -283,7 +402,22 @@ function PlaygroundTab({ model }: { model: App }) {
 
       {/* Right: Output */}
       <div>
-        <h3 className="mb-4 text-sm font-medium text-fg-faint">Output</h3>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-medium text-fg-faint">Output</h3>
+          {model.runnerAppId && runnerGatewayState.status === "ready" && (
+            <span className="rounded-full border border-green/30 bg-green/10 px-2 py-0.5 text-[10px] font-medium text-green-bright">
+              Live runner
+            </span>
+          )}
+          {model.runnerAppId && runnerGatewayState.status === "loading" && (
+            <span className="text-[10px] text-fg-label">Preparing signer…</span>
+          )}
+        </div>
+        {runError && (
+          <p className="mb-3 rounded-lg border border-red/30 bg-red/10 px-3 py-2 text-xs text-red-400">
+            {runError}
+          </p>
+        )}
         {model.playgroundConfig.playgroundVariant === "transcoding" ? (
           <TranscodingOutput
             result={result}
@@ -605,14 +739,22 @@ function JobsTab({
 
 // ─── Main Page ───
 
-export default function AppDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const { isConnected } = useAuth();
+function capabilityIdFromParams(id: string | string[] | undefined): string {
+  if (Array.isArray(id)) {
+    return id.map((segment) => decodeURIComponent(segment)).join("/");
+  }
+  return id ? decodeURIComponent(id) : "";
+}
 
-  // The unified app — its catalog face and (always, since unification) its
-  // deployment manifest under `app.deployment`. One id-based lookup resolves
-  // both the org's own apps and the third-party catalog models.
-  const app = getAppById(id);
+export default function AppDetailPage() {
+  const params = useParams<{ id: string | string[] }>();
+  const id = capabilityIdFromParams(params.id);
+  const { isConnected } = useAuth();
+  const discovery = useDiscoveryModel(id || undefined);
+
+  // The app detail is powered by live Discovery Service data — capability ids
+  // may contain slashes (catch-all `[...id]`).
+  const app = discovery.status === "ready" ? discovery.model : undefined;
   // Owner/operator chrome (Settings/manage tab, publish controls) lives in the
   // stacked apps PR. In the consumer base the app detail is view-only for
   // everyone, so owner mode is gated off here; the stacked PR's revert removes
@@ -671,11 +813,17 @@ export default function AppDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isOwner]);
 
+  if (discovery.status === "loading") {
+    return <ConsolePageSkeleton withTabs kpiCount={0} withChart={false} />;
+  }
+
   if (!app) {
     return (
       <main id="main-content" className="flex flex-1 flex-col bg-dark">
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <p className="text-sm text-fg-label">App not found</p>
+          <p className="text-sm text-fg-label">
+            {discovery.status === "error" ? discovery.message : "App not found"}
+          </p>
           <Link
             href="/explore"
             className="mt-3 text-xs text-green-bright hover:underline focus:outline-none rounded"

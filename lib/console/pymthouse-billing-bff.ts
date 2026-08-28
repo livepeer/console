@@ -165,17 +165,21 @@ export async function changeDashboardBillingSubscription(input: {
   return readPymthouseResponse<DashboardSubscriptionChange>(response);
 }
 
-export async function getDashboardUserSubscription(
-  externalUserId: string
-): Promise<DashboardUserSubscription> {
-  const client = createPmtHouseClientForPublicApp(readPublicClientId());
-  const result: UserSubscriptionResponse =
-    await client.getUserSubscription(externalUserId);
+type UserSubscriptionWithLivePlan = UserSubscriptionResponse & {
+  livePlan?: { id?: string | null; name?: string | null } | null;
+};
+
+export function mapDashboardUserSubscription(
+  result: UserSubscriptionWithLivePlan
+): DashboardUserSubscription {
   const sub = result.subscription;
   const pending = result.pendingCancel ?? null;
+  const livePlanId = result.livePlan?.id?.trim() || null;
+  const livePlanName = result.livePlan?.name?.trim() || null;
   return {
-    planId: sub?.planId?.trim() || pending?.planId?.trim() || null,
-    planName: sub?.planName?.trim() || pending?.planName?.trim() || null,
+    planId: sub?.planId?.trim() || livePlanId || pending?.planId?.trim() || null,
+    planName:
+      sub?.planName?.trim() || livePlanName || pending?.planName?.trim() || null,
     status: sub?.status?.trim() || (pending ? "canceled" : null),
     subscriptionId: sub?.id?.trim() || pending?.subscriptionId?.trim() || null,
     currentPeriodEnd:
@@ -191,6 +195,16 @@ export async function getDashboardUserSubscription(
         }
       : null,
   };
+}
+
+export async function getDashboardUserSubscription(
+  externalUserId: string
+): Promise<DashboardUserSubscription> {
+  const client = createPmtHouseClientForPublicApp(readPublicClientId());
+  const result = (await client.getUserSubscription(
+    externalUserId
+  )) as UserSubscriptionWithLivePlan;
+  return mapDashboardUserSubscription(result);
 }
 
 export async function cancelDashboardUserSubscription(

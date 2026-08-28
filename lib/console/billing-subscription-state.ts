@@ -108,6 +108,35 @@ export function deriveBillingSubscriptionUiState(
   return { kind: "none", planId: null };
 }
 
+/**
+ * Catalog row for the live subscription. Prefers `planId`, then included
+ * `sourcePlan.id`, then name — OpenMeter keys sometimes fail to resolve to
+ * Neon `plans.id`, which left every row as "Enable pay-per-use".
+ */
+export function matchCatalogPlanId(
+  plans: ReadonlyArray<{ id: string; name?: string | null }>,
+  subscription: { planId: string | null; planName?: string | null } | null,
+  sourcePlan?: { id: string | null; name: string | null } | null
+): string | null {
+  const ids = [subscription?.planId, sourcePlan?.id]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  for (const id of ids) {
+    if (plans.some((plan) => plan.id === id)) return id;
+  }
+
+  const names = [subscription?.planName, sourcePlan?.name]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+  for (const name of names) {
+    const hit = plans.find(
+      (plan) => (plan.name?.trim() || plan.id).toLowerCase() === name
+    );
+    if (hit) return hit.id;
+  }
+  return null;
+}
+
 export function deriveBillingPlanAction(
   subscription: BillingSubscriptionUiState,
   planId: string
