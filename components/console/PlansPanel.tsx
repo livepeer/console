@@ -94,7 +94,8 @@ export default function PlansPanel({
   const { isConnected } = useAuth();
   const { state, reload, subscribe, changePlan } = useBillingPlans(isConnected);
   const merchant =
-    sessionBilling?.surface?.mode === "merchant"
+    sessionBilling?.surface?.mode === "merchant" &&
+    sessionBilling.surface.wallet
       ? sessionBilling.surface
       : null;
   const wallet = useWalletBillingState(
@@ -342,9 +343,7 @@ export default function PlansPanel({
     <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="border-b border-hairline px-4 py-3.5">
         <p className="text-[17px] font-bold text-fg">Plans</p>
-        <p className="mt-0.5 text-[12px] text-fg-muted">
-          {planSub}
-        </p>
+        <p className="mt-0.5 text-[12px] text-fg-muted">{planSub}</p>
         {flash === "success" ? (
           <p className="mt-2 text-[12px] text-emerald-400">
             Payment method saved
@@ -377,7 +376,10 @@ export default function PlansPanel({
                     ? ` · ${plan.capabilityCount} capabilities`
                     : ""}
                 </p>
-                {isCurrent && included && !included.sharedWithApp && included.planId === plan.id ? (
+                {isCurrent &&
+                included &&
+                !included.sharedWithApp &&
+                included.planId === plan.id ? (
                   <p className="mt-1 text-[11px] text-fg-muted">
                     ${included.remainingUsd} of ${included.totalUsd} included
                     left
