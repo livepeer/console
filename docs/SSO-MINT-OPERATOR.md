@@ -10,14 +10,15 @@ MCP_INTERNAL_MINT_ALLOWLIST=https://agent.livepeer.org
 # MCP_OAUTH_REDIRECT_ALLOWLIST=https://agent.livepeer.org/api/mcp/oauth/callback
 # MCP_OAUTH_BRIDGE_SECRET=         # falls back to mint secret or AUTH0_SECRET
 PYMTHOUSE_ISSUER_URL=https://pymthouse.com/api/v1/oidc
-PYMTHOUSE_PUBLIC_CLIENT_ID=app_98575870d7ae33589a3f0660   # required in non-prod
+# Public sibling of the M2M (Builder path id until Console infers it from M2M)
+PYMTHOUSE_PUBLIC_CLIENT_ID=app_…
 PYMTHOUSE_M2M_CLIENT_ID=m2m_…
 PYMTHOUSE_M2M_CLIENT_SECRET=pmth_cs_…
 ```
 
-Mint is `POST /api/internal/mcp/mint`. Missing secret or empty allowlist → **404**. Wrong Bearer → **401**. Bad `Origin` / `X-Mcp-Caller-Origin` → **403**. Wrong billing app in non-prod → **503** `billing_app_mismatch`.
+Mint is `POST /api/internal/mcp/mint` with `{ "code": "mcp_id_…" }` from the login callback. Missing secret or empty allowlist → **404**. Wrong Bearer → **401**. Bad `Origin` / `X-Mcp-Caller-Origin` → **403**. Missing/invalid code → **400** / **401**. The billed app is the public sibling of the configured M2M — mint does not pin a hard-coded test app id. Free-form `externalUserId` is not a mint subject.
 
-Login: `GET /login?mcp_oauth=1&state=…&redirect_uri=https://agent.livepeer.org/api/mcp/oauth/callback` → Auth0 → callback with `state` + `external_user_id` (`eu_<sha256>` of Auth0 `sub`, same as Console keys).
+Login: `GET /login?mcp_oauth=1&state=…&redirect_uri=https://agent.livepeer.org/api/mcp/oauth/callback` → Auth0 → callback with `state` + `external_user_id` (`eu_<sha256>` of Auth0 `sub`, same as Console keys) + `code`. Optional redeem: `POST /api/v1/auth/mcp/identity` `{ "code" }`.
 
 ## Storyboard / Agent
 
@@ -28,7 +29,6 @@ SSO_MINT_ORIGIN=https://<console-host>
 SSO_MINT_URL=https://<console-host>/api/internal/mcp/mint
 SSO_MINT_SECRET=<same as MCP_INTERNAL_MINT_SECRET>
 SSO_MINT_CALLER_ORIGIN=https://agent.livepeer.org
-MCP_OAUTH_BILLING_APP_ID=app_98575870d7ae33589a3f0660
 ```
 
 Until `SSO_MINT_*` lands, equivalent names may be `NAAP_MCP_ORIGIN` / `NAAP_MCP_MINT_URL` / `MCP_INTERNAL_MINT_*`.

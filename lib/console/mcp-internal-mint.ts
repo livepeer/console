@@ -1,7 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export const RS2_TEST_BILLING_APP_ID = "app_98575870d7ae33589a3f0660";
-
 function parseMintAllowlist(raw: string | undefined): string[] {
   return (raw ?? "")
     .split(",")
@@ -41,20 +39,6 @@ export function authorizeMcpMint(input: {
     return { ok: false, status: 403, error: "forbidden" };
   }
   return { ok: true };
-}
-
-export function billingAppMismatch(): { error: string; error_description: string } | null {
-  if (process.env.VERCEL_ENV === "production") {
-    return null;
-  }
-  const publicClientId = process.env.PYMTHOUSE_PUBLIC_CLIENT_ID?.trim() ?? "";
-  if (publicClientId === RS2_TEST_BILLING_APP_ID) {
-    return null;
-  }
-  return {
-    error: "billing_app_mismatch",
-    error_description: `Non-prod mint requires PYMTHOUSE_PUBLIC_CLIENT_ID=${RS2_TEST_BILLING_APP_ID}`,
-  };
 }
 
 export async function mintMcpCompositeKey(input: {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { LivepeerWordmark } from "@/components/design-system/LivepeerLogo";
+import { isMcpAuth0ReturnTo, mcpAuth0LoginHref } from "@/lib/console/mcp-auth0-login";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -48,12 +49,15 @@ export default function LoginPage({
 }: LoginPageProps = {}) {
   const mode = initialMode;
   const encodedReturnTo = encodeURIComponent(returnTo);
-  const loginHref =
-    mode === "signup"
+  const mcpBridge = isMcpAuth0ReturnTo(returnTo);
+  const loginHref = mcpBridge
+    ? mcpAuth0LoginHref()
+    : mode === "signup"
       ? `/auth/login?screen_hint=signup&returnTo=${encodedReturnTo}`
       : `/auth/login?returnTo=${encodedReturnTo}`;
-  const googleHref =
-    mode === "signup"
+  const googleHref = mcpBridge
+    ? mcpAuth0LoginHref({ connection: "google-oauth2" })
+    : mode === "signup"
       ? `/auth/login?screen_hint=signup&connection=google-oauth2&returnTo=${encodedReturnTo}`
       : `/auth/login?connection=google-oauth2&returnTo=${encodedReturnTo}`;
 

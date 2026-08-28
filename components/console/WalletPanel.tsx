@@ -37,7 +37,11 @@ function clearTopUpQueryParam(): void {
   const url = new URL(window.location.href);
   if (!url.searchParams.has("topup")) return;
   url.searchParams.delete("topup");
-  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(
+    {},
+    "",
+    `${url.pathname}${url.search}${url.hash}`
+  );
 }
 
 function formatInvoiceDate(iso: string | undefined): string {
@@ -81,7 +85,8 @@ export default function WalletPanel({
 }) {
   const { isConnected } = useAuth();
   const merchant =
-    sessionBilling?.surface?.mode === "merchant"
+    sessionBilling?.surface?.mode === "merchant" &&
+    sessionBilling.surface.wallet
       ? sessionBilling.surface
       : null;
   const waitingSession =
@@ -183,22 +188,6 @@ export default function WalletPanel({
     );
   }
 
-  if (merchant && !merchant.wallet) {
-    return (
-      <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-4">
-        <p className="text-sm text-fg-muted">Could not load session wallet.</p>
-        <Button
-          className="mt-3"
-          variant="secondary"
-          size="sm"
-          onClick={() => sessionBilling?.reload()}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
   const { wallet, paymentMethods, invoices } = merchant
     ? {
         wallet: merchant.wallet,
@@ -259,7 +248,9 @@ export default function WalletPanel({
                 {runway.usd}
               </p>
               {runway.detail ? (
-                <p className="mt-1 text-[11px] text-fg-muted">{runway.detail}</p>
+                <p className="mt-1 text-[11px] text-fg-muted">
+                  {runway.detail}
+                </p>
               ) : null}
               {limitNote ? (
                 <p className="mt-1 text-[11px] text-fg-muted">{limitNote}</p>
