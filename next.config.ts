@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
 
+/** Preview hosts change per deploy; Auth0 needs the request origin, not localhost. */
+function previewAppBaseUrl(): string | undefined {
+  if (process.env.VERCEL_ENV !== "preview") return undefined;
+  const host = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
+  return host ? `https://${host}` : undefined;
+}
+
+const previewBaseUrl = previewAppBaseUrl();
+
 const nextConfig: NextConfig = {
+  ...(previewBaseUrl
+    ? {
+        env: {
+          APP_BASE_URL: previewBaseUrl,
+        },
+      }
+    : {}),
   // Bundler-agnostic polling interval for file watching — works with both
   // Turbopack (default in Next 15) and Webpack. Needed because the native
   // file watcher doesn't pick up changes reliably in git worktrees.

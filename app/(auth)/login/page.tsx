@@ -1,21 +1,12 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/console/AuthContext";
+import { redirect } from "next/navigation";
+import { auth0 } from "@/lib/auth0";
 import LoginPage from "@/components/console/LoginPage";
 
-export default function LoginRoute() {
-  const { isConnected } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isConnected) {
-      router.replace("/home");
-    }
-  }, [isConnected, router]);
-
-  if (isConnected) return null;
+export default async function LoginRoute() {
+  const session = await auth0.getSession();
+  if (session) {
+    redirect("/home");
+  }
 
   return <LoginPage />;
 }
