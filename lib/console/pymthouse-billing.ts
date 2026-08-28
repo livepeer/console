@@ -34,6 +34,44 @@ export type DashboardScheduledChangeConflict = {
   scheduledActiveFrom: string | null;
 };
 
+export type DashboardInvoice = {
+  id: string;
+  number?: string;
+  status: string;
+  currency: string;
+  totalAmount: string;
+  issuedAt?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  invoiceType?: string;
+};
+
+export type DashboardPaymentMethod = {
+  id: string;
+  type: string;
+  brand: string | null;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+  isDefault: boolean;
+};
+
+export type DashboardSubscriptionHistoryItem = {
+  id: string;
+  status: string;
+  current: boolean;
+  planId: string | null;
+  planKey: string | null;
+  planName: string | null;
+  activeFrom: string | null;
+  activeTo: string | null;
+};
+
+export type DashboardInvoiceHostedUrl = {
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+};
+
 export type DashboardUserSubscription = {
   planId: string | null;
   planName: string | null;
