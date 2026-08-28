@@ -30,6 +30,18 @@ import {
   readPublicClientId,
   readPymthouseResponse,
 } from "@/lib/console/pymthouse-http";
+import {
+  changeOwnerWalletPlan,
+  cancelOwnerWalletPlan,
+  getOwnerSubscriptionStatus,
+  isOwnerWalletMutationError,
+  listOwnerPaidTiers,
+  mapOwnerCatalogPlans,
+  mapOwnerUserSubscription,
+  resolveSessionBillingRail,
+  resumeOwnerWalletPlan,
+} from "@/lib/console/pymthouse-owner-billing-bff";
+import { isOwnerWalletPlanKey } from "@/lib/console/owner-billing-rail";
 
 export type {
   DashboardBillingPlan,
@@ -86,7 +98,7 @@ function mapProduct(product: BillingProduct): DashboardBillingPlan {
   };
 }
 
-export async function listDashboardBillingPlans(): Promise<
+async function listRetailDashboardBillingPlans(): Promise<
   DashboardBillingPlan[]
 > {
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
@@ -97,19 +109,44 @@ export async function listDashboardBillingPlans(): Promise<
     .sort((a, b) => Number(b.isStarterDefault) - Number(a.isStarterDefault));
 }
 
+export async function listDashboardBillingPlans(
+  externalUserId?: string
+): Promise<DashboardBillingPlan[]> {
+  if (externalUserId) {
+    const rail = await resolveSessionBillingRail(externalUserId);
+    if (rail === "owner") {
+      return mapOwnerCatalogPlans(await listOwnerPaidTiers());
+    }
+  }
+  return listRetailDashboardBillingPlans();
+}
+
 export async function startDashboardBillingCheckout(input: {
   planId: string;
   externalUserId: string;
   successUrl?: string;
   cancelUrl?: string;
-}): Promise<CreateBillingCheckoutResult> {
+}): Promise<CreateBillingCheckoutResult | DashboardSubscriptionChange> {
+  const useOwner =
+    isOwnerWalletPlanKey(input.planId) ||
+    (await resolveSessionBillingRail(input.externalUserId)) === "owner";
+  if (useOwner) {
+    return changeOwnerWalletPlan({ planId: input.planId });
+  }
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
-  return client.createBillingCheckout({
-    planId: input.planId,
-    externalUserId: input.externalUserId,
-    ...(input.successUrl ? { successUrl: input.successUrl } : {}),
-    ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
-  });
+  try {
+    return await client.createBillingCheckout({
+      planId: input.planId,
+      externalUserId: input.externalUserId,
+      ...(input.successUrl ? { successUrl: input.successUrl } : {}),
+      ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
+    });
+  } catch (error) {
+    if (isOwnerWalletMutationError(error)) {
+      return changeOwnerWalletPlan({ planId: input.planId });
+    }
+    throw error;
+  }
 }
 
 export async function changeDashboardBillingSubscription(input: {
@@ -121,48 +158,62 @@ export async function changeDashboardBillingSubscription(input: {
   effectiveAt?: string;
   confirmReplaceScheduled?: boolean;
 }): Promise<DashboardSubscriptionChange> {
-  const publicClientId = readPublicClientId();
-  const response = await fetch(
-    `${pymthouseAppsOrigin()}/api/v1/apps/${encodeURIComponent(publicClientId)}/users/${encodeURIComponent(input.externalUserId)}/subscription/change`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: readM2mAuthHeader(),
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        planId: input.planId,
-        ...(input.successUrl ? { successUrl: input.successUrl } : {}),
-        ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
-        ...(input.timing ? { timing: input.timing } : {}),
-        ...(input.effectiveAt ? { effectiveAt: input.effectiveAt } : {}),
-        ...(input.confirmReplaceScheduled
-          ? { confirmReplaceScheduled: true }
-          : {}),
-      }),
-      cache: "no-store",
-    }
-  );
-  if (response.status === 409) {
-    const text = await response.text();
-    let body: DashboardScheduledChangeConflict | null = null;
-    try {
-      body = text
-        ? (JSON.parse(text) as DashboardScheduledChangeConflict)
-        : null;
-    } catch {
-      body = null;
-    }
-    if (body?.code === "scheduled_change_exists") {
-      throw new PmtHouseError(body.error || "Scheduled plan change exists", {
-        status: 409,
-        code: "scheduled_change_exists",
-        details: body,
-      });
-    }
+  const useOwner =
+    isOwnerWalletPlanKey(input.planId) ||
+    (await resolveSessionBillingRail(input.externalUserId)) === "owner";
+  if (useOwner) {
+    return changeOwnerWalletPlan({ planId: input.planId });
   }
-  return readPymthouseResponse<DashboardSubscriptionChange>(response);
+
+  const publicClientId = readPublicClientId();
+  try {
+    const response = await fetch(
+      `${pymthouseAppsOrigin()}/api/v1/apps/${encodeURIComponent(publicClientId)}/users/${encodeURIComponent(input.externalUserId)}/subscription/change`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: readM2mAuthHeader(),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          planId: input.planId,
+          ...(input.successUrl ? { successUrl: input.successUrl } : {}),
+          ...(input.cancelUrl ? { cancelUrl: input.cancelUrl } : {}),
+          ...(input.timing ? { timing: input.timing } : {}),
+          ...(input.effectiveAt ? { effectiveAt: input.effectiveAt } : {}),
+          ...(input.confirmReplaceScheduled
+            ? { confirmReplaceScheduled: true }
+            : {}),
+        }),
+        cache: "no-store",
+      }
+    );
+    if (response.status === 409) {
+      const text = await response.text();
+      let body: DashboardScheduledChangeConflict | null = null;
+      try {
+        body = text
+          ? (JSON.parse(text) as DashboardScheduledChangeConflict)
+          : null;
+      } catch {
+        body = null;
+      }
+      if (body?.code === "scheduled_change_exists") {
+        throw new PmtHouseError(body.error || "Scheduled plan change exists", {
+          status: 409,
+          code: "scheduled_change_exists",
+          details: body,
+        });
+      }
+    }
+    return await readPymthouseResponse<DashboardSubscriptionChange>(response);
+  } catch (error) {
+    if (isOwnerWalletMutationError(error)) {
+      return changeOwnerWalletPlan({ planId: input.planId });
+    }
+    throw error;
+  }
 }
 
 type UserSubscriptionWithLivePlan = UserSubscriptionResponse & {
@@ -177,9 +228,13 @@ export function mapDashboardUserSubscription(
   const livePlanId = result.livePlan?.id?.trim() || null;
   const livePlanName = result.livePlan?.name?.trim() || null;
   return {
-    planId: sub?.planId?.trim() || livePlanId || pending?.planId?.trim() || null,
+    planId:
+      sub?.planId?.trim() || livePlanId || pending?.planId?.trim() || null,
     planName:
-      sub?.planName?.trim() || livePlanName || pending?.planName?.trim() || null,
+      sub?.planName?.trim() ||
+      livePlanName ||
+      pending?.planName?.trim() ||
+      null,
     status: sub?.status?.trim() || (pending ? "canceled" : null),
     subscriptionId: sub?.id?.trim() || pending?.subscriptionId?.trim() || null,
     currentPeriodEnd:
@@ -200,6 +255,9 @@ export function mapDashboardUserSubscription(
 export async function getDashboardUserSubscription(
   externalUserId: string
 ): Promise<DashboardUserSubscription> {
+  if ((await resolveSessionBillingRail(externalUserId)) === "owner") {
+    return mapOwnerUserSubscription(await getOwnerSubscriptionStatus());
+  }
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   const result = (await client.getUserSubscription(
     externalUserId
@@ -211,6 +269,10 @@ export async function cancelDashboardUserSubscription(
   externalUserId: string,
   opts?: { timing?: string; effectiveAt?: string }
 ): Promise<void> {
+  if ((await resolveSessionBillingRail(externalUserId)) === "owner") {
+    await cancelOwnerWalletPlan();
+    return;
+  }
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   await client.cancelUserSubscription(externalUserId, {
     confirm: true,
@@ -222,6 +284,10 @@ export async function cancelDashboardUserSubscription(
 export async function resumeDashboardUserSubscription(
   externalUserId: string
 ): Promise<void> {
+  if ((await resolveSessionBillingRail(externalUserId)) === "owner") {
+    await resumeOwnerWalletPlan();
+    return;
+  }
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   await client.resumeUserSubscription(externalUserId, { confirm: true });
 }
@@ -327,8 +393,7 @@ async function walletFetch<T>(
 
   const method = init?.method ?? "GET";
   const body =
-    init?.body ||
-    (externalUserId && (method === "POST" || method === "PATCH"))
+    init?.body || (externalUserId && (method === "POST" || method === "PATCH"))
       ? {
           ...(init?.body ?? {}),
           ...(externalUserId && (method === "POST" || method === "PATCH")

@@ -106,7 +106,10 @@ export function useBillingPlans(enabled: boolean) {
         subscriptionId?: string;
         error?: string;
       }>(response);
-      if (!response.ok || !body.checkoutUrl) {
+      if (!response.ok) {
+        throw new Error(body.error ?? `Subscribe failed (${response.status})`);
+      }
+      if (!body.checkoutUrl && !body.subscriptionId) {
         throw new Error(body.error ?? `Subscribe failed (${response.status})`);
       }
       return {
