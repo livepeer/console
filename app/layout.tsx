@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
@@ -28,12 +27,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
-    >
+    <html lang="en" suppressHydrationWarning className={GeistMono.variable}>
       <head>
+        {/* Inter, self-hosted from the author's distribution — see the
+            generated @font-face rules in app/fonts.css (scripts/build-inter-fonts.py).
+            Preloaded because it's on the critical render path for every page;
+            `crossorigin` is required even same-origin, as fonts are always
+            fetched in CORS mode. Only the latin subset is preloaded — the
+            full-coverage fallback is demand-loaded. */}
+        <link
+          rel="preload"
+          href="/fonts/InterVariable-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">

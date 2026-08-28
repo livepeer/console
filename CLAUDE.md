@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-**Stack:** Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, Framer Motion 11, Geist Sans/Mono, Lucide, Recharts. Package manager: **pnpm**. No test framework.
+**Stack:** Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, Framer Motion 11, Inter (rsms.me) + Geist Mono, Lucide, Recharts. Package manager: **pnpm**. No test framework.
 
 ## Commands
 
@@ -14,7 +14,7 @@
 
 ```
 app/
-├── layout.tsx              # Root layout — html/body, Geist fonts, theme bootstrap (FOUT-safe)
+├── layout.tsx              # Root layout — html/body, Inter + Geist Mono, theme bootstrap (FOUT-safe)
 ├── globals.css             # Tailwind v4 @theme block + console token layer
 ├── (app)/                  # Console chrome (sidebar, providers, keyboard shortcuts)
 │   ├── layout.tsx
@@ -93,6 +93,32 @@ Suspense boundaries on every console route use `<ConsolePageSkeleton>` as the fa
 
 - Lucide React. Default stroke width is 1.5. Override only when the glyph reads too thin at the size you're using (e.g. `Activity` at sizes ≥ 16px reads better at `strokeWidth={1.75}`).
 - Sizes: `h-3.5 w-3.5` (14px) for inline label icons, `h-4 w-4` (16px) for buttons / nav, `h-5 w-5` (20px) for cards, `h-10 w-10` (40px) for empty-state hero glyphs.
+
+### Typefaces
+
+`font-sans` is **Inter**, self-hosted from the designer's own distribution
+(<https://rsms.me/inter/>, OFL). Files live in `public/fonts/`; the `@font-face`
+rules live in `app/fonts.css`, which is **generated** — don't hand-edit it.
+
+Two roman faces are served: a ~107 KB latin+symbols subset (preloaded in
+`app/layout.tsx`, the only one most sessions fetch) and the full 344 KB file,
+demand-loaded only for non-Latin text such as a user display name. Each face's
+`unicode-range` is derived from the actual cmap of the woff2 it points at.
+
+**If you add a non-ASCII glyph to any UI string, run the generator:**
+
+```bash
+python3 scripts/build-inter-fonts.py --check
+```
+
+It reports any glyph that would fall onto the 344 KB fallback; add those to
+`SYMBOLS` in the script and re-run it without `--check` to rebuild. This is not
+cosmetic — a single uncovered glyph bills every visitor 344 KB. A stray `✕` did
+exactly that. (Glyphs Inter lacks entirely, like `✕` and `▾`, are reported
+separately and cost nothing; they render in a system fallback.)
+
+Don't reintroduce a `--font-sans` override in a subtree layout — it would
+shadow the variable font.
 
 ### Monospace
 
