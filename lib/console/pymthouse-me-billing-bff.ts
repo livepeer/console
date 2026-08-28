@@ -16,6 +16,7 @@ import {
   mintEndUserAccessToken,
 } from "@/lib/console/pymthouse-bff";
 import { readPublicClientId } from "@/lib/console/pymthouse-http";
+import { resolveSessionBillingRail } from "@/lib/console/pymthouse-owner-billing-bff";
 import type {
   DashboardOwnerWallet,
   DashboardWalletInvoice,
@@ -83,6 +84,14 @@ export async function readSessionMeBilling(input: {
   externalUserId: string;
   email?: string;
 }): Promise<MeBillingSurface> {
+  const rail = await resolveSessionBillingRail(
+    input.externalUserId,
+    input.email
+  );
+  if (rail === "owner") {
+    return { mode: "owner_rollup", code: "merchant_billing_required" };
+  }
+
   const accessToken = await mintEndUserAccessToken(
     input.externalUserId,
     input.email
@@ -94,16 +103,21 @@ export async function readSessionMeBilling(input: {
 
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
 
-  const [stateResult, walletResult, subscriptionResult, pmResult, invoiceResult] =
-    await Promise.all([
-      readMerchantPiece(() => client.getMeBillingState(accessToken)),
-      readMerchantPiece(() => client.getMeBillingWallet(accessToken)),
-      readMerchantPiece(() => client.getMeBillingSubscription(accessToken)),
-      readMerchantPiece(() => client.getMeBillingPaymentMethods(accessToken)),
-      readMerchantPiece(() =>
-        client.getMeBillingInvoices(accessToken, { pageSize: 20 })
-      ),
-    ]);
+  const [
+    stateResult,
+    walletResult,
+    subscriptionResult,
+    pmResult,
+    invoiceResult,
+  ] = await Promise.all([
+    readMerchantPiece(() => client.getMeBillingState(accessToken)),
+    readMerchantPiece(() => client.getMeBillingWallet(accessToken)),
+    readMerchantPiece(() => client.getMeBillingSubscription(accessToken)),
+    readMerchantPiece(() => client.getMeBillingPaymentMethods(accessToken)),
+    readMerchantPiece(() =>
+      client.getMeBillingInvoices(accessToken, { pageSize: 20 })
+    ),
+  ]);
 
   if (
     stateResult === "rollup" ||
