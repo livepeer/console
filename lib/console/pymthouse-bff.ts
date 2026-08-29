@@ -56,16 +56,26 @@ export async function ensureDashboardAppUser(
 export async function mintEndUserAccessToken(
   externalUserId: string,
   email?: string
-): Promise<string> {
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  scope: string;
+}> {
   const client = createPmtHouseClientForPublicApp(readPublicClientId());
   try {
-    const minted = await client.mintUserAccessToken({ externalUserId });
-    return minted.access_token;
+    return await client.mintUserAccessToken({
+      externalUserId,
+      scope: "sign:job",
+    });
   } catch (error) {
     if (isUserNotFoundError(error)) {
       await ensureDashboardAppUser(externalUserId, email);
-      const minted = await client.mintUserAccessToken({ externalUserId });
-      return minted.access_token;
+      return client.mintUserAccessToken({
+        externalUserId,
+        scope: "sign:job",
+      });
     }
     throw error;
   }
@@ -243,10 +253,11 @@ export async function fetchAccountRequestsForExternalUser(input: {
   limit?: number;
 }): Promise<AccountRequestsPayload> {
   const publicClientId = readPublicClientId();
-  const accessToken = await mintEndUserAccessToken(
+  const minted = await mintEndUserAccessToken(
     input.externalUserId,
     input.email
   );
+  const accessToken = minted.access_token;
 
   const url = new URL(`${issuerOriginFromConfig()}/api/v1/user/usage/requests`);
   if (input.cursor) url.searchParams.set("cursor", input.cursor);
