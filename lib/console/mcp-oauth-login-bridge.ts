@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export const MCP_OAUTH_PENDING_COOKIE = "mcp_oauth_pending";
 const PENDING_TTL_MS = 10 * 60 * 1000;
@@ -295,8 +295,8 @@ export const MCP_OAUTH_COMPLETE_PATH = "/api/v1/auth/mcp/complete";
 export const RS2_TEST_BILLING_APP_ID = "app_98575870d7ae33589a3f0660";
 
 function timingSafeEqualString(left: string, right: string): boolean {
-  const a = createHmac("sha256", "mcp-mint-compare").update(left).digest();
-  const b = createHmac("sha256", "mcp-mint-compare").update(right).digest();
+  const a = createHash("sha256").update(left).digest();
+  const b = createHash("sha256").update(right).digest();
   return timingSafeEqual(a, b);
 }
 
