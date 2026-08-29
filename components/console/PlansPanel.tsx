@@ -10,11 +10,14 @@ import type {
 } from "@/lib/console/pymthouse-billing";
 import {
   defaultCancelTimingChoice,
+  deriveBillingPlanAction,
+  deriveBillingSubscriptionUiState,
   formatBillingPlanPrice,
   resolveTimingPayload,
   toDateInputValue,
   type SubscriptionTimingChoice,
 } from "@/lib/console/billing-subscription-state";
+import type { MeBillingSurface } from "@/lib/console/pymthouse-me-billing-bff";
 import {
   ScheduledChangeConflictError,
   useBillingPlans,
@@ -79,12 +82,27 @@ function clearCheckoutQueryParam(): void {
   );
 }
 
-export default function PlansPanel() {
+export default function PlansPanel({
+  sessionBilling,
+}: {
+  sessionBilling?: {
+    surface: MeBillingSurface | null;
+    loading: boolean;
+    reload: () => void;
+  };
+} = {}) {
   const { isConnected } = useAuth();
   const { state, reload, subscribe, changePlan } = useBillingPlans(isConnected);
-  const wallet = useWalletBillingState(isConnected);
-  const included =
-    wallet.state.status === "ready"
+  const merchant =
+    sessionBilling?.surface?.mode === "merchant"
+      ? sessionBilling.surface
+      : null;
+  const wallet = useWalletBillingState(
+    isConnected && !merchant && !sessionBilling?.loading
+  );
+  const included = merchant
+    ? includedUsageSummary(merchant.state)
+    : wallet.state.status === "ready"
       ? includedUsageSummary(wallet.state.wallet.billingState)
       : null;
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
@@ -123,6 +141,7 @@ export default function PlansPanel() {
             return;
           }
           await reload();
+          sessionBilling?.reload();
           setError("Plan updated.");
         } catch (err) {
           setError(
@@ -175,6 +194,7 @@ export default function PlansPanel() {
       return;
     }
     await reload();
+    sessionBilling?.reload();
     const plans = state.status === "ready" ? state.plans : [];
     const targetPlan = plans.find((p) => p.id === planId);
     setError(
@@ -194,18 +214,15 @@ export default function PlansPanel() {
     try {
       const plans = state.status === "ready" ? state.plans : [];
       const targetPlan = plans.find((p) => p.id === planId);
-      const activePlanId =
-        state.status === "ready" ? state.subscription?.planId : null;
-      const activeStatus =
-        state.status === "ready"
-          ? (state.subscription?.status?.toLowerCase() ?? "")
-          : "";
-      const hasActiveSubscription =
-        Boolean(activePlanId) &&
-        (activeStatus === "active" ||
-          activeStatus === "pending" ||
-          activeStatus === "trialing" ||
-          activeStatus === "scheduled");
+      const liveSub = state.status === "ready" ? state.subscription : null;
+      const subscriptionUi = deriveBillingSubscriptionUiState(liveSub);
+      const action = deriveBillingPlanAction(subscriptionUi, planId);
+      const hasActiveSubscription = subscriptionUi.kind !== "none";
+
+      if (action === "current") {
+        setBusyPlanId(null);
+        return;
+      }
 
       if (hasActiveSubscription && targetPlan?.isStarterDefault === true) {
         setBusyPlanId(null);
@@ -229,6 +246,7 @@ export default function PlansPanel() {
             return;
           }
           await reload();
+          sessionBilling?.reload();
           setError(
             targetPlan && isUsagePlan(targetPlan)
               ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
@@ -306,23 +324,26 @@ export default function PlansPanel() {
     return null;
   }
 
-  const activePlanId = state.subscription?.planId ?? null;
-  const activeStatus = state.subscription?.status?.toLowerCase() ?? "";
-  const hasActiveSubscription =
-    Boolean(activePlanId) &&
-    (activeStatus === "active" ||
-      activeStatus === "pending" ||
-      activeStatus === "trialing" ||
-      activeStatus === "scheduled");
+  const subscriptionUiState = deriveBillingSubscriptionUiState(
+    state.subscription
+  );
+  const hasActiveSubscription = subscriptionUiState.kind !== "none";
+  const planSub =
+    included && !included.sharedWithApp
+      ? includedUsageRemainingLabel(included)
+      : state.subscription?.planName?.trim() ||
+        (subscriptionUiState.kind === "pending"
+          ? "Payment needs to be completed"
+          : subscriptionUiState.kind === "active"
+            ? "Current subscription"
+            : "Subscribe via PymtHouse → Stripe Checkout");
 
   return (
     <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="border-b border-hairline px-4 py-3.5">
         <p className="text-[17px] font-bold text-fg">Plans</p>
         <p className="mt-0.5 text-[12px] text-fg-muted">
-          {included
-            ? includedUsageRemainingLabel(included)
-            : "Subscribe via PymtHouse → Stripe Checkout"}
+          {planSub}
         </p>
         {flash === "success" ? (
           <p className="mt-2 text-[12px] text-emerald-400">
@@ -339,7 +360,8 @@ export default function PlansPanel() {
       </div>
       <ul className="divide-y divide-hairline">
         {state.plans.map((plan) => {
-          const isCurrent = hasActiveSubscription && plan.id === activePlanId;
+          const action = deriveBillingPlanAction(subscriptionUiState, plan.id);
+          const isCurrent = action === "current";
           return (
             <li
               key={plan.id}
@@ -355,7 +377,7 @@ export default function PlansPanel() {
                     ? ` · ${plan.capabilityCount} capabilities`
                     : ""}
                 </p>
-                {isCurrent && included && included.planId === plan.id ? (
+                {isCurrent && included && !included.sharedWithApp && included.planId === plan.id ? (
                   <p className="mt-1 text-[11px] text-fg-muted">
                     ${included.remainingUsd} of ${included.totalUsd} included
                     left

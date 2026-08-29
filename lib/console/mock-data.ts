@@ -1056,6 +1056,7 @@ Typical end-to-end: 20-40ms per frame on dedicated orchestrators.`,
     name: "Qwen3 32B",
     provider: "Qwen",
     category: "Language",
+    runnerAppId: "vllm/qwen2.5-0.5b-instruct",
     coverImage: "/images/console/explore/qwen3-32b.webp",
     description:
       "High-performance 32B parameter language model with strong reasoning and multilingual capabilities.",

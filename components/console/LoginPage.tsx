@@ -38,20 +38,24 @@ interface LoginPageProps {
    *  toggle navigates between the two routes so the URL always matches the
    *  visible mode. */
   initialMode?: "signin" | "signup";
+  /** Auth0 returnTo. MCP login uses the complete route, not /home. */
+  returnTo?: string;
 }
 
 export default function LoginPage({
   initialMode = "signin",
+  returnTo = "/home",
 }: LoginPageProps = {}) {
   const mode = initialMode;
+  const encodedReturnTo = encodeURIComponent(returnTo);
   const loginHref =
     mode === "signup"
-      ? "/auth/login?screen_hint=signup&returnTo=/home"
-      : "/auth/login?returnTo=/home";
+      ? `/auth/login?screen_hint=signup&returnTo=${encodedReturnTo}`
+      : `/auth/login?returnTo=${encodedReturnTo}`;
   const googleHref =
     mode === "signup"
-      ? "/auth/login?screen_hint=signup&connection=google-oauth2&returnTo=/home"
-      : "/auth/login?connection=google-oauth2&returnTo=/home";
+      ? `/auth/login?screen_hint=signup&connection=google-oauth2&returnTo=${encodedReturnTo}`
+      : `/auth/login?connection=google-oauth2&returnTo=${encodedReturnTo}`;
 
   const oauthButtonClass =
     "inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-full border border-hairline bg-transparent px-4 text-[13px] font-medium text-fg-strong transition-colors hover:border-subtle hover:bg-hover hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-strong";
