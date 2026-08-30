@@ -409,7 +409,6 @@ const SETTINGS_RAIL_GROUPS: {
       { id: "organization", label: "General", icon: Box },
       { id: "members", label: "Members", icon: UsersIcon, meta: "4" },
       { id: "billing", label: "Billing", icon: CreditCard },
-      { id: "usage-limits", label: "Limits", icon: BarChart3 },
     ],
   },
   {

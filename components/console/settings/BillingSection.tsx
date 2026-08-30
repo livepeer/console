@@ -9,6 +9,7 @@ import {
   Download,
   Plus,
   Trash2,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/components/console/AuthContext";
 import Dialog from "@/components/design-system/Dialog";
@@ -27,10 +28,15 @@ import {
 } from "@/lib/console/useBillingPlans";
 import { useBillingAccount } from "@/lib/console/useBillingAccount";
 import { redirectToCheckout } from "@/lib/console/checkout-redirect";
-import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
+import {
+  startWalletTopUp,
+  useWalletBillingState,
+} from "@/lib/console/useOwnerWallet";
 import {
   includedUsageRemainingLabel,
   includedUsageSummary,
+  formatWalletUsd,
+  overageLimitNote,
 } from "@/lib/console/wallet-settlement-display";
 import type {
   DashboardBillingPlan,
@@ -119,6 +125,14 @@ function readCheckoutFlash(): "success" | "cancel" | null {
   return null;
 }
 
+/** Outcome of a returning wallet top-up Checkout. */
+function readTopUpFlash(): "succeeded" | "canceled" | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("topup");
+  if (value === "succeeded" || value === "canceled") return value;
+  return null;
+}
+
 /** Plan id to finish switching after setup-mode Checkout returns. */
 function readResumePlanChange(): string | null {
   if (typeof window === "undefined") return null;
@@ -132,7 +146,7 @@ function clearCheckoutQueryParam(): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   let changed = false;
-  for (const key of ["checkout", "changePlan"] as const) {
+  for (const key of ["checkout", "changePlan", "topup"] as const) {
     if (url.searchParams.has(key)) {
       url.searchParams.delete(key);
       changed = true;
@@ -197,6 +211,18 @@ export default function BillingSection() {
   const [error, setError] = useState<string | null>(null);
   const [billingNotice, setBillingNotice] = useState<string | null>(null);
   const [flash, setFlash] = useState<"success" | "cancel" | null>(null);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("25.00");
+  const [topUpBusy, setTopUpBusy] = useState(false);
+
+  const creditsUsd =
+    wallet.state.status === "ready"
+      ? Number(wallet.state.wallet.balance?.usdMicros ?? "0") / 1_000_000
+      : 0;
+  const overageNote =
+    wallet.state.status === "ready"
+      ? overageLimitNote(wallet.state.wallet.billingState)
+      : null;
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelChoice, setCancelChoice] = useState<SubscriptionTimingChoice>(
@@ -210,6 +236,40 @@ export default function BillingSection() {
   const [changeChoice, setChangeChoice] =
     useState<SubscriptionTimingChoice>("immediate");
   const [changeCustomDate, setChangeCustomDate] = useState("");
+
+  async function onAddFunds() {
+    if (!isConnected) return;
+    setError(null);
+    setTopUpBusy(true);
+    try {
+      const { checkoutUrl } = await startWalletTopUp({
+        amountUsd: topUpAmount.trim(),
+        returnPath: "/settings?tab=billing",
+      });
+      redirectToCheckout(checkoutUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Top-up failed");
+      setTopUpBusy(false);
+    }
+  }
+
+  // Checkout returns here after a top-up; confirm it and refresh the balance.
+  useEffect(() => {
+    const topUp = readTopUpFlash();
+    if (!topUp) return;
+    clearCheckoutQueryParam();
+    setTopUpOpen(false);
+    if (topUp === "succeeded") {
+      setBillingNotice(
+        "Funds added. The balance updates once Stripe settles the payment."
+      );
+      void wallet.reload();
+    } else {
+      setBillingNotice("Top-up canceled.");
+    }
+    // Runs once on return from Checkout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const next = readCheckoutFlash();
@@ -644,7 +704,7 @@ export default function BillingSection() {
       ) : null}
 
       {showCancelingBanner ? (
-        <div className="mb-4 rounded-xl border border-hairline bg-white/[0.02] px-4 py-4">
+        <div className="mb-4 rounded-md border border-hairline bg-dark-lighter px-4 py-4">
           <p className="text-[13.5px] font-medium text-fg">
             Ends at end of current period
           </p>
@@ -719,7 +779,18 @@ export default function BillingSection() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3">
+          <div
+            className={`grid grid-cols-1 ${
+              // Column count follows the plan count. A fixed 3 left a dead
+              // column whenever fewer plans were published, which reads as
+              // two cards of unequal width rather than an empty slot.
+              plans.length === 1
+                ? "md:grid-cols-1"
+                : plans.length === 2
+                  ? "md:grid-cols-2"
+                  : "md:grid-cols-3"
+            }`}
+          >
             {plans.map((plan, index) => {
               const action = deriveBillingPlanAction(
                 subscriptionUiState,
@@ -789,6 +860,95 @@ export default function BillingSection() {
       </SettingsCard>
 
       <SettingsHeader
+        title="Credits"
+        sub="Prepaid balance, drawn down after included usage runs out"
+        action={
+          <IconButton
+            primary
+            onClick={() => setTopUpOpen((open) => !open)}
+            disabled={!isConnected || topUpBusy}
+          >
+            {!topUpOpen && <Plus className="h-3 w-3" aria-hidden="true" />}
+            {topUpOpen ? "Cancel" : "Add funds"}
+          </IconButton>
+        }
+      />
+      <SettingsCard>
+        {wallet.state.status === "loading" || wallet.state.status === "idle" ? (
+          <div className="px-5 py-6">
+            <div className="h-8 w-32 animate-pulse rounded bg-dark-card motion-reduce:animate-none" />
+          </div>
+        ) : wallet.state.status === "error" ? (
+          <p className="px-5 py-6 text-[12.5px] text-fg-faint">
+            {wallet.state.message}
+          </p>
+        ) : creditsUsd <= 0 ? (
+          // Matches the Payment method empty state next to it. A $0.00 set at
+          // 28px is a loud way to say nothing.
+          <div className="px-5 py-9 text-center">
+            <Wallet
+              className="mx-auto h-[22px] w-[22px] text-fg-disabled"
+              strokeWidth={1.5}
+              aria-hidden="true"
+            />
+            <p className="mt-2 text-[13.5px] font-medium text-fg">No credits</p>
+            <p className="mx-auto mt-1 max-w-md text-[12.5px] text-fg-faint">
+              {included
+                ? `Once the ${included.planName ?? "plan"} allowance runs out, usage draws on credits before it is invoiced as overage.`
+                : "Credits are drawn on before usage is invoiced as overage."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 px-5 py-4">
+            <div>
+              <p className="font-mono text-[28px] font-medium leading-none tracking-[-0.02em] tabular-nums text-fg">
+                ${formatWalletUsd(wallet.state.wallet.balance?.usdMicros)}
+              </p>
+              <p className="mt-2 text-[12.5px] text-fg-faint">
+                {included
+                  ? `Drawn on after the ${included.planName ?? "plan"} allowance`
+                  : "Drawn on before metered overage"}
+              </p>
+            </div>
+            {overageNote && (
+              <p className="text-[12.5px] text-fg-faint">{overageNote}</p>
+            )}
+          </div>
+        )}
+
+        {topUpOpen && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-hairline px-5 py-3.5">
+            <span className="font-mono text-[13px] text-fg-faint">$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={topUpAmount}
+              onChange={(e) => setTopUpAmount(e.target.value)}
+              aria-label="Top-up amount in USD"
+              className="h-7 w-24 rounded-[4px] border border-hairline bg-dark-card px-2 font-mono text-[13px] tabular-nums text-fg outline-none focus-visible:ring-1 focus-visible:ring-green-bright/30"
+            />
+            {["10.00", "25.00", "100.00"].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setTopUpAmount(preset)}
+                className="btn-outline rounded-[4px] px-2 py-0.5 font-mono text-[11px] tabular-nums transition-colors"
+              >
+                ${preset}
+              </button>
+            ))}
+            <IconButton
+              primary
+              onClick={() => void onAddFunds()}
+              disabled={topUpBusy}
+            >
+              {topUpBusy ? "Starting…" : "Continue"}
+            </IconButton>
+          </div>
+        )}
+      </SettingsCard>
+
+      <SettingsHeader
         title="Payment method"
         sub="Card on file for subscription charges and pay-per-use auto-debit"
         action={
@@ -840,7 +1000,7 @@ export default function BillingSection() {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-hairline">
+          <ul className="divide-y divide-[var(--color-border-hairline)]">
             {paymentMethods.map((pm) => {
               const isBusy = paymentMethodActionId === pm.id;
               return (

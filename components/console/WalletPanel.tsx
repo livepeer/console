@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/console/AuthContext";
 import { useOwnerWallet } from "@/lib/console/useOwnerWallet";
 import { redirectToCheckout } from "@/lib/console/checkout-redirect";
 import {
   availableRunway,
-  collectionSchedule,
   formatWalletUsd,
-  includedUsageRemainingLabel,
   includedUsageSummary,
   overageLimitNote,
   spendPostureBadge,
@@ -49,17 +48,17 @@ function formatInvoiceDate(iso: string | undefined): string {
 const QUICK_AMOUNTS = ["10.00", "25.00", "100.00"] as const;
 
 const POSTURE_TONE_CLASS: Record<SpendPostureTone, string> = {
-  ok: "border-emerald-400/30 text-emerald-400",
+  ok: "border-green-bright/30 text-green-bright",
   info: "border-hairline text-fg-muted",
-  warn: "border-amber-400/30 text-amber-400",
-  danger: "border-rose-400/30 text-rose-400",
+  warn: "border-warm/30 text-warm",
+  danger: "border-red-400/30 text-red-400",
 };
 
 const AVAILABLE_TONE_CLASS: Record<SpendPostureTone, string> = {
   ok: "text-fg",
   info: "text-fg",
-  warn: "text-amber-400",
-  danger: "text-rose-400",
+  warn: "text-warm",
+  danger: "text-red-400",
 };
 
 export default function WalletPanel({
@@ -160,6 +159,19 @@ export default function WalletPanel({
   const runway = availableRunway(billingState);
   const included = includedUsageSummary(billingState);
   const limitNote = overageLimitNote(billingState);
+  // The long-form schedule sentence reads as a paragraph next to two numbers;
+  // the threshold is the only part that changes, so only it earns the space.
+  const lead = billingState.collection.leadThreshold;
+  const invoiceNote =
+    lead.usdMicros === "0"
+      ? `Invoiced ${billingState.collection.collectionInterval.toLowerCase()}`
+      : `Invoiced at $${lead.usd}`;
+  const resetsLabel = included?.resetsAt
+    ? new Date(included.resetsAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : null;
   const defaultPm =
     paymentMethods.find((pm) => pm.isDefault) ?? paymentMethods[0] ?? null;
   const hasPaymentMethod =
@@ -179,10 +191,6 @@ export default function WalletPanel({
               {billingState.explain.headline}
             </p>
           </div>
-          <p className="mt-1 max-w-prose text-[12px] text-fg-muted">
-            {billingState.explain.detail}
-          </p>
-
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
@@ -194,10 +202,9 @@ export default function WalletPanel({
                 {runway.usd}
               </p>
               {runway.detail ? (
-                <p className="mt-1 text-[11px] text-fg-muted">{runway.detail}</p>
-              ) : null}
-              {limitNote ? (
-                <p className="mt-1 text-[11px] text-fg-muted">{limitNote}</p>
+                <p className="mt-1 font-mono text-[11px] text-fg-faint">
+                  {runway.detail}
+                </p>
               ) : null}
             </div>
             <div>
@@ -207,30 +214,27 @@ export default function WalletPanel({
               <p className="mt-1 font-mono text-[28px] font-medium tabular-nums tracking-[-0.01em] text-fg">
                 ${usageUsd}
               </p>
+              {resetsLabel ? (
+                <p className="mt-1 font-mono text-[11px] text-fg-faint">
+                  resets {resetsLabel}
+                </p>
+              ) : null}
             </div>
           </div>
-          {included ? (
-            <p className="mt-3 text-[12px] text-fg-muted">
-              {includedUsageRemainingLabel(included)}
-              {included.resetsAt
-                ? ` · resets ${new Date(included.resetsAt).toLocaleDateString(
-                    "en-US",
-                    {
-                      month: "short",
-                      day: "numeric",
-                    }
-                  )}`
-                : ""}
-            </p>
-          ) : null}
-          <p className="mt-3 text-[12px] text-fg-muted">
-            {collectionSchedule(billingState)}
+          <p className="mt-3 font-mono text-[11px] text-fg-faint">
+            {[limitNote, invoiceNote].filter(Boolean).join(" · ")}
           </p>
-          {wallet.payPerUsePlans.map((plan) => (
-            <p key={plan.planId} className="mt-1 text-[11px] text-fg-faint">
-              {plan.planName}: {plan.resolvedBehavior}
-            </p>
-          ))}
+          {billingState.explain.docsUrl ? (
+            <a
+              href={billingState.explain.docsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-[12px] text-fg-faint underline decoration-transparent underline-offset-[3px] transition-colors hover:text-fg-strong hover:decoration-current"
+            >
+              How billing works
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
         <div className="flex flex-col items-end gap-2">
           {showTopUp ? (
@@ -288,12 +292,12 @@ export default function WalletPanel({
       </div>
 
       {flash === "succeeded" ? (
-        <p className="border-b border-hairline px-4 py-2 text-[12px] text-emerald-400">
+        <p className="border-b border-hairline px-4 py-2 text-[12px] text-green-bright">
           Funds added. Your balance updates once Stripe settles the payment.
         </p>
       ) : null}
       {flash === "pm-saved" ? (
-        <p className="border-b border-hairline px-4 py-2 text-[12px] text-emerald-400">
+        <p className="border-b border-hairline px-4 py-2 text-[12px] text-green-bright">
           Payment method saved.
         </p>
       ) : null}
@@ -337,7 +341,7 @@ export default function WalletPanel({
             No invoices or top-ups yet.
           </p>
         ) : (
-          <ul className="mt-1.5 divide-y divide-hairline">
+          <ul className="mt-1.5 divide-y divide-[var(--color-border-hairline)]">
             {invoices.slice(0, 8).map((invoice) => (
               <li
                 key={invoice.id}
@@ -364,7 +368,7 @@ export default function WalletPanel({
       </div>
 
       {error ? (
-        <p className="border-t border-hairline px-4 py-2 text-xs text-rose-400">
+        <p className="border-t border-hairline px-4 py-2 text-xs text-red-400">
           {error}
         </p>
       ) : null}

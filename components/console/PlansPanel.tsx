@@ -318,14 +318,14 @@ export default function PlansPanel() {
   return (
     <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="border-b border-hairline px-4 py-3.5">
-        <p className="text-[17px] font-bold text-fg">Plans</p>
+        <p className="text-base font-semibold text-fg">Plans</p>
         <p className="mt-0.5 text-[12px] text-fg-muted">
           {included
             ? includedUsageRemainingLabel(included)
             : "Subscribe via PymtHouse → Stripe Checkout"}
         </p>
         {flash === "success" ? (
-          <p className="mt-2 text-[12px] text-emerald-400">
+          <p className="mt-2 text-[12px] text-green-bright">
             Payment method saved
             {hasActiveSubscription && state.subscription?.planName
               ? ` · on ${state.subscription.planName}`
@@ -337,7 +337,7 @@ export default function PlansPanel() {
           <p className="mt-2 text-[12px] text-fg-muted">Checkout canceled.</p>
         ) : null}
       </div>
-      <ul className="divide-y divide-hairline">
+      <ul className="divide-y divide-[var(--color-border-hairline)]">
         {state.plans.map((plan) => {
           const isCurrent = hasActiveSubscription && plan.id === activePlanId;
           return (
@@ -355,12 +355,6 @@ export default function PlansPanel() {
                     ? ` · ${plan.capabilityCount} capabilities`
                     : ""}
                 </p>
-                {isCurrent && included && included.planId === plan.id ? (
-                  <p className="mt-1 text-[11px] text-fg-muted">
-                    ${included.remainingUsd} of ${included.totalUsd} included
-                    left
-                  </p>
-                ) : null}
                 {isUsagePlan(plan) ? (
                   <p className="mt-1 text-[11px] text-fg-faint">
                     {resolvedPayPerUseBehavior(plan)}
@@ -373,7 +367,7 @@ export default function PlansPanel() {
                 </span>
               ) : (
                 <Button
-                  variant="primary"
+                  variant="secondary"
                   size="sm"
                   disabled={!isConnected || busyPlanId === plan.id}
                   onClick={() => void onSubscribe(plan.id)}
@@ -394,7 +388,7 @@ export default function PlansPanel() {
         })}
       </ul>
       {error ? (
-        <p className="border-t border-hairline px-4 py-2 text-xs text-rose-400">
+        <p className="border-t border-hairline px-4 py-2 text-xs text-red-400">
           {error}
         </p>
       ) : null}
