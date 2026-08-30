@@ -2,28 +2,41 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import StackedAreaChart, {
-  MiniSpark,
-} from "@/components/console/StackedAreaChart";
+import SectionHeader from "@/components/console/SectionHeader";
+import { MiniSpark } from "@/components/console/StackedAreaChart";
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/console/AuthContext";
 import { useAccountUsage } from "@/lib/console/useAccountUsage";
 import {
   buildUsageCapabilityRows,
   formatPeriodResetLabel,
-  microsToUsdDisplay,
+  microsToUsd,
   type UsageCapabilityRow,
 } from "@/lib/console/usage-capability-display";
-import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
-import PlansPanel from "@/components/console/PlansPanel";
-import WalletPanel from "@/components/console/WalletPanel";
 import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
 import {
   includedUsageSummary,
   type IncludedUsageSummary,
 } from "@/lib/console/wallet-settlement-display";
 
-const PERIOD_DAYS = 30;
+/**
+ * Usage answers three questions, in this order: what did this period cost,
+ * will it run out before it resets, and what drove it. Everything on the page
+ * serves one of those.
+ *
+ * Plans, payment methods and invoices deliberately live at
+ * /settings?tab=billing — which carries a fuller version of all three — so
+ * this page links there rather than restating it.
+ */
+
+type PeriodId = "7d" | "30d" | "90d";
+
+const PERIODS: Array<{ id: PeriodId; label: string; noun: string; days: number }> =
+  [
+    { id: "7d", label: "7d", noun: "7 days", days: 7 },
+    { id: "30d", label: "30d", noun: "30 days", days: 30 },
+    { id: "90d", label: "90d", noun: "90 days", days: 90 },
+  ];
 
 function fmt(n: number): string {
   return Math.round(n).toLocaleString("en-US");
@@ -31,6 +44,34 @@ function fmt(n: number): string {
 
 function fmtSpend(n: number): string {
   return `$${n.toFixed(2)}`;
+}
+
+function fmtUsd(n: number): string {
+  return n >= 1000
+    ? `$${Math.round(n).toLocaleString("en-US")}`
+    : `$${n.toFixed(2)}`;
+}
+
+function fmtUnit(n: number): string {
+  if (n <= 0) return "—";
+  return n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`;
+}
+
+/** Cost-descending, so the ranking matches the column the eye lands on. */
+function orderByCost(rows: UsageCapabilityRow[]): UsageCapabilityRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      microsToUsd(b.networkFeeUsdMicros) - microsToUsd(a.networkFeeUsdMicros)
+  );
+}
+
+function SkeletonBar({ className }: { className: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded bg-dark-card motion-reduce:animate-none ${className}`}
+      aria-hidden="true"
+    />
+  );
 }
 
 function UsageLoadError({
@@ -41,362 +82,459 @@ function UsageLoadError({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center">
-      <p className="text-sm text-fg-muted">
-        Could not load usage from PymtHouse.
-      </p>
+    <div className="flex flex-col items-center rounded-md border border-hairline bg-dark-lighter px-5 py-16 text-center">
+      <p className="text-sm text-fg-muted">Usage didn&apos;t load.</p>
       <p className="mt-2 max-w-md font-mono text-xs text-fg-faint">{message}</p>
-      <Button className="mt-6" variant="secondary" size="sm" onClick={onRetry}>
-        Retry
+      <Button className="mt-6" variant="secondary" size="xs" onClick={onRetry}>
+        Try again
       </Button>
     </div>
   );
 }
 
-function AllowanceStrip({
-  requestCount,
-  requestLimit,
-  included,
-  hasAccess,
-  forecast,
-  willExceed,
-  daysToLimit,
-  priorRequestCount,
-  periodDelta,
+function PeriodTabs({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: PeriodId;
+  onChange: (id: PeriodId) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Reporting period"
+      className="inline-flex items-center gap-px rounded-[5px] border border-hairline bg-dark p-px"
+    >
+      {PERIODS.map((p) => {
+        const active = p.id === value;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            aria-pressed={active}
+            disabled={disabled}
+            onClick={() => onChange(p.id)}
+            className={`rounded-[4px] px-2 py-1 font-mono text-[11px] transition-colors duration-[var(--motion-duration-fast)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-bright/30 disabled:opacity-50 ${
+              active
+                ? "bg-dark-card text-fg"
+                : "text-fg-faint hover:bg-hover hover:text-fg-strong"
+            }`}
+          >
+            {p.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * What the period cost, and whether it runs out. Consumed, projected and the
+ * ceiling share one track: the answer is the shape of the bar, not a
+ * reconciliation of four cards.
+ */
+/**
+ * The period as an instrument rather than a widget: one rule carrying spend,
+ * projection and the included ceiling, with the two figures anchored to the
+ * ends they describe. Sans for language, mono for quantity — nothing here is
+ * mono unless it is a number.
+ */
+type Runway = {
+  /** Included allowance for the cycle. */
+  includedTotal: number;
+  /** Included already consumed. */
+  consumed: number;
+  /** Prepaid credit balance. */
+  credits: number;
+  /** Metered overage still available, or null when overage is not eligible. */
+  overage: number | null;
+};
+
+/**
+ * The period as an instrument. The rule spans the whole runway — included,
+ * then credits, then metered overage — because that is the sequence spending
+ * actually follows. A rule that stopped at the included allowance made
+ * crossing it look terminal when it only means you start paying.
+ */
+function PeriodMeter({
+  loading,
+  spendUsd,
+  jobs,
+  priorJobs,
+  periodNoun,
+  runway,
+  projectedUsd,
   resetsAt,
 }: {
-  requestCount: number;
-  requestLimit: number | null;
-  included: IncludedUsageSummary | null;
-  hasAccess: boolean;
-  forecast: number;
-  willExceed: boolean;
-  daysToLimit: number;
-  priorRequestCount: number;
-  periodDelta: number;
+  loading: boolean;
+  spendUsd: number;
+  jobs: number;
+  priorJobs: number;
+  periodNoun: string;
+  runway: Runway | null;
+  projectedUsd: number | null;
   resetsAt: string;
 }) {
-  const showUsdAllowance = Boolean(included);
-  const usedUsd = included?.consumedUsdMicros ?? "0";
-  const granted = included?.totalUsdMicros ?? "0";
-  const remaining = included?.remainingUsdMicros ?? "0";
-  const allowanceLabel = included?.planName?.trim()
-    ? `${included.planName} included`
-    : "Included this period";
+  const perJob = jobs > 0 ? spendUsd / jobs : 0;
+  const delta = priorJobs > 0 ? ((jobs - priorJobs) / priorJobs) * 100 : null;
 
-  const usedForBar = showUsdAllowance
-    ? Number((BigInt(usedUsd) * BigInt(10000)) / BigInt(granted || "1"))
-    : requestLimit
-      ? (requestCount / requestLimit) * 100
+  const includedLeft = runway
+    ? Math.max(0, runway.includedTotal - runway.consumed)
+    : 0;
+  // Everything still spendable before the account is blocked.
+  const remaining = runway
+    ? includedLeft + runway.credits + (runway.overage ?? 0)
+    : 0;
+  const ceiling = runway ? runway.consumed + remaining : 0;
+  const overCeiling =
+    runway && projectedUsd && projectedUsd > ceiling
+      ? projectedUsd - ceiling
       : 0;
-  const pct = Math.min(100, usedForBar);
-  const forecastPct = requestLimit
-    ? Math.min(100, (forecast / requestLimit) * 100)
-    : pct;
+  const willBlock = overCeiling > 0;
+  const intoOverage =
+    runway && projectedUsd && projectedUsd > runway.includedTotal
+      ? Math.min(projectedUsd, ceiling) - runway.includedTotal
+      : 0;
+
+  const scaleMax = Math.max(ceiling, willBlock ? projectedUsd! : 0);
+  const pct = (v: number) =>
+    scaleMax > 0 ? Math.min(100, (v / scaleMax) * 100) : 0;
+  const consumedPct = pct(runway?.consumed ?? 0);
+  const projectedPct = projectedUsd ? pct(projectedUsd) : consumedPct;
+  const includedPct = runway ? pct(runway.includedTotal) : 100;
+
+  if (loading) {
+    return (
+      <section
+        className="rounded-md border border-hairline bg-dark-lighter px-6 py-5 shadow-card"
+        aria-busy="true"
+      >
+        <div className="flex items-start justify-between gap-6">
+          <div className="w-40">
+            <SkeletonBar className="h-3 w-16" />
+            <SkeletonBar className="mt-2.5 h-8 w-36" />
+          </div>
+          <div className="flex w-40 flex-col items-end">
+            <SkeletonBar className="h-3 w-20" />
+            <SkeletonBar className="mt-2.5 h-8 w-36" />
+            <SkeletonBar className="mt-2.5 h-3 w-28" />
+          </div>
+        </div>
+        <SkeletonBar className="mt-5 h-[3px] w-full" />
+        <SkeletonBar className="mt-4 h-3 w-72" />
+        <SkeletonBar className="mt-2 h-3 w-60" />
+      </section>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-hairline bg-dark-lighter shadow-card px-5 py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.06em] text-fg-faint">
-          {showUsdAllowance ? allowanceLabel : "Usage this period"}
-        </p>
-        {showUsdAllowance && !hasAccess && (
-          <span className="rounded-[3px] border border-warm/30 bg-warm/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warm">
-            Exhausted
-          </span>
+    <section className="rounded-md border border-hairline bg-dark-lighter px-6 py-5 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+            Spend
+          </p>
+          <p className="mt-1.5 font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums text-fg">
+            {fmtUsd(spendUsd)}
+          </p>
+        </div>
+        {runway && (
+          <div className="text-right">
+            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+              Remaining
+            </p>
+            <p
+              className={`mt-1.5 font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums ${
+                remaining <= 0 ? "text-warm" : "text-fg"
+              }`}
+            >
+              {fmtUsd(remaining)}
+            </p>
+            {/* Names the right edge of the rule. Without it the limit is only
+                derivable by adding spend and remaining. */}
+            <p className="mt-1.5 text-[12px] text-fg-faint">
+              of{" "}
+              <span className="font-mono tabular-nums">{fmtUsd(ceiling)}</span>{" "}
+              spend limit
+            </p>
+          </div>
         )}
-      </div>
-      <div className="flex flex-wrap items-baseline gap-3">
-        {showUsdAllowance ? (
-          <span className="font-mono text-[15px] tabular-nums leading-none text-fg-muted">
-            <b className="mr-0.5 text-[24px] font-medium tracking-[-0.01em] text-fg">
-              ${microsToUsdDisplay(remaining)}
-            </b>
-            <span className="text-fg-faint">
-              {" "}
-              / ${microsToUsdDisplay(granted)} remaining
-            </span>
-          </span>
-        ) : requestLimit ? (
-          <span className="font-mono text-[15px] tabular-nums leading-none text-fg-muted">
-            <b className="mr-0.5 text-[24px] font-medium tracking-[-0.01em] text-fg">
-              {fmt(requestCount)}
-            </b>
-            <span className="text-fg-faint"> / {fmt(requestLimit)} jobs</span>
-          </span>
-        ) : (
-          <span className="font-mono text-[24px] font-medium tabular-nums text-fg">
-            {fmt(requestCount)}
-          </span>
-        )}
-        <span className="ml-auto font-mono text-[11.5px] text-fg-faint">
-          resets {resetsAt}
-        </span>
       </div>
 
-      {(showUsdAllowance || requestLimit) && (
-        <div className="relative h-1.5 rounded-[3px] bg-dark-card">
-          <div
-            className={`h-full rounded-[3px] ${
-              hasAccess
-                ? "bg-gradient-to-r from-green to-green-bright"
-                : "bg-warm"
-            }`}
-            style={{ width: `${pct}%` }}
-          />
-          {requestLimit && (
+      {runway && (
+        <div
+          className="relative mt-5 h-[3px] bg-dark-card"
+          role="img"
+          aria-label={`${fmtUsd(runway.consumed)} spent of ${fmtUsd(ceiling)} available — ${fmtUsd(includedLeft)} included, then ${fmtUsd(runway.credits)} credits, then ${fmtUsd(runway.overage ?? 0)} metered overage`}
+        >
+          {projectedPct > consumedPct && (
             <div
-              className="absolute -top-0.5 -bottom-0.5 w-px"
+              className="absolute inset-y-0"
               style={{
-                left: `${forecastPct}%`,
-                background: "rgba(251,191,36,0.55)",
-                transform: "translateX(-0.5px)",
+                left: `${consumedPct}%`,
+                width: `${Math.max(0, projectedPct - consumedPct)}%`,
+                background: willBlock
+                  ? "color-mix(in srgb, var(--color-warm) 35%, transparent)"
+                  : "color-mix(in srgb, var(--color-green-bright) 25%, transparent)",
               }}
-              aria-hidden="true"
             />
           )}
+          <div
+            className="absolute inset-y-0 left-0 bg-green-bright transition-[width] duration-[var(--motion-duration-slow)] ease-[var(--motion-easing-out)] motion-reduce:transition-none"
+            style={{ width: `${consumedPct}%` }}
+          />
+          {/* Where included usage ends and metered overage begins. */}
+          <div
+            className="absolute -top-1 -bottom-1 w-px bg-border-strong"
+            style={{ left: `${includedPct}%` }}
+            aria-hidden="true"
+          />
         </div>
       )}
 
-      <div className="flex flex-wrap items-baseline justify-between gap-4 text-[12px] text-fg-muted">
-        {requestLimit && willExceed ? (
-          <span className="font-mono">
-            Forecast <b className="font-medium text-fg">{fmt(forecast)}</b> jobs
-            by {resetsAt} · over limit in{" "}
-            <b className="font-medium text-warm">~{daysToLimit}d</b>
-          </span>
-        ) : (
-          <span className="font-mono">
-            <b className="font-medium text-fg">{fmt(requestCount)}</b> signed
-            requests this period
-            {showUsdAllowance && (
+      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5 text-[12px] text-fg-faint">
+        <p>
+          <span className="font-mono tabular-nums text-fg-strong">
+            {fmt(jobs)}
+          </span>{" "}
+          jobs
+          {perJob > 0 && (
+            <>
+              {" · "}
+              <span className="font-mono tabular-nums text-fg-strong">
+                {fmtUnit(perJob)}
+              </span>{" "}
+              per job
+            </>
+          )}
+          {delta !== null && (
+            <>
+              {" · "}
+              <span
+                className={`font-mono tabular-nums ${delta >= 0 ? "text-fg-strong" : "text-fg-disabled"}`}
+              >
+                {delta > 0 ? "+" : ""}
+                {delta.toFixed(0)}%
+              </span>{" "}
+              vs prior {periodNoun}
+            </>
+          )}
+        </p>
+        {runway && (
+          <p className={willBlock ? "text-warm" : undefined}>
+            {projectedUsd === null ? (
+              <>Resets {resetsAt}</>
+            ) : willBlock ? (
               <>
-                {" "}
-                ·{" "}
-                <b className="font-medium text-fg">
-                  ${microsToUsdDisplay(usedUsd)}
-                </b>{" "}
-                consumed
+                Projected{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtUsd(projectedUsd)}
+                </span>{" "}
+                by {resetsAt} — over your limit by{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtUsd(overCeiling)}
+                </span>
+              </>
+            ) : intoOverage > 0 ? (
+              <>
+                Projected{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtUsd(projectedUsd)}
+                </span>{" "}
+                by {resetsAt} ·{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtUsd(intoOverage)}
+                </span>{" "}
+                billed as overage
+              </>
+            ) : (
+              <>
+                Projected{" "}
+                <span className="font-mono tabular-nums">
+                  {fmtUsd(projectedUsd)}
+                </span>{" "}
+                by {resetsAt} · within included
               </>
             )}
-          </span>
+          </p>
         )}
-        <span className="font-mono text-[11.5px] text-fg-faint">
-          Last period {fmt(priorRequestCount)} · {periodDelta >= 0 ? "+" : ""}
-          {periodDelta.toFixed(0)}%
-        </span>
       </div>
-    </div>
+    </section>
   );
 }
 
 export default function UsageView() {
   const { isConnected, user } = useAuth();
-  const usageState = useAccountUsage(isConnected, PERIOD_DAYS);
+  const [period, setPeriod] = useState<PeriodId>("30d");
+  const active = PERIODS.find((p) => p.id === period) ?? PERIODS[1]!;
+
+  const usageState = useAccountUsage(isConnected, { periodDays: active.days });
   const walletState = useWalletBillingState(isConnected);
-  const [priceMin, setPriceMin] = useState(0);
-  const [priceMax, setPriceMax] = useState(100);
+  const data = usageState.status === "ready" ? usageState.data : null;
 
   const capabilityRows = useMemo(() => {
-    if (usageState.status !== "ready") return [];
-    return buildUsageCapabilityRows({
-      current: usageState.data.current.pipelineModels,
-      prior: usageState.data.prior.pipelineModels,
-      period: usageState.data.period,
-      dailyByPipeline: usageState.data.current.dailyByPipeline,
-    });
-  }, [usageState]);
+    if (!data) return [];
+    return orderByCost(buildUsageCapabilityRows({
+      current: data.current.pipelineModels,
+      prior: data.prior.pipelineModels,
+      period: data.period,
+      dailyByPipeline: data.current.dailyByPipeline,
+    }));
+  }, [data]);
 
-  const dataMaxSpend = useMemo(
-    () => Math.max(...capabilityRows.map((c) => c.spendUsd), 0.01),
-    [capabilityRows]
-  );
-
-  const filteredRows = useMemo(() => {
-    return capabilityRows.filter((c) => {
-      const matchesPrice =
-        c.spendUsd >= (priceMin / 100) * dataMaxSpend &&
-        c.spendUsd <= (priceMax / 100) * dataMaxSpend;
-      return matchesPrice;
-    });
-  }, [capabilityRows, priceMin, priceMax, dataMaxSpend]);
-
-  const periodDayCount = useMemo(() => {
-    if (usageState.status !== "ready") return PERIOD_DAYS;
-    const first = capabilityRows[0]?.data.length;
-    return first && first > 0 ? first : PERIOD_DAYS;
-  }, [usageState, capabilityRows]);
-
-  const forecastStats = useMemo(() => {
-    if (usageState.status !== "ready") {
-      return {
-        forecast: 0,
-        willExceed: false,
-        daysToLimit: 0,
-        priorRequestCount: 0,
-        periodDelta: 0,
-        requestCount: 0,
-      };
-    }
-    const { current, prior } = usageState.data;
-    const dayCount = capabilityRows[0]?.data.length ?? PERIOD_DAYS;
-    const totalsByDay = Array.from({ length: dayCount }, (_, dayIndex) =>
-      capabilityRows.reduce((sum, row) => sum + (row.data[dayIndex] ?? 0), 0)
-    );
-    const last7Avg =
-      totalsByDay.slice(-7).reduce((a, b) => a + b, 0) /
-      Math.max(1, Math.min(7, totalsByDay.length));
-    const daysLeft = 6;
-    const forecast = Math.round(current.requestCount + last7Avg * daysLeft);
-    const grantedJobs = usageState.data.balance?.lifetimeGrantedUsdMicros
-      ? null
-      : 10_000;
-    const limit = grantedJobs ?? 10_000;
-    const willExceed = forecast > limit;
-    const left = limit - current.requestCount;
-    const daysToLimit =
-      left > 0 && last7Avg > 0 ? Math.max(0, Math.floor(left / last7Avg)) : 0;
-    const priorRequestCount = prior.requestCount;
-    const periodDelta =
-      priorRequestCount > 0
-        ? ((current.requestCount - priorRequestCount) / priorRequestCount) * 100
-        : 0;
-
-    return {
-      forecast,
-      willExceed,
-      daysToLimit,
-      priorRequestCount,
-      periodDelta,
-      requestCount: current.requestCount,
-    };
-  }, [usageState, capabilityRows]);
-
-  if (usageState.status === "loading" || usageState.status === "idle") {
-    return (
-      <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
-        <ConsolePageSkeleton
-          maxWidth="6xl"
-          withTabs={false}
-          kpiCount={0}
-          withChart
-        />
-      </div>
-    );
-  }
-
-  if (usageState.status === "error") {
-    return (
-      <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
-        <UsageLoadError
-          message={usageState.message}
-          onRetry={usageState.reload}
-        />
-      </div>
-    );
-  }
-
-  const { data } = usageState;
-  const grandReq = filteredRows.reduce((a, c) => a + c.requestCount, 0);
-  const grandSpend = filteredRows.reduce((a, c) => a + c.spendUsd, 0);
   const included: IncludedUsageSummary | null =
     walletState.state.status === "ready"
       ? includedUsageSummary(walletState.state.wallet.billingState)
       : null;
+
+  const runway: Runway | null = useMemo(() => {
+    if (walletState.state.status !== "ready" || !included) return null;
+    const funding = walletState.state.wallet.billingState.funding;
+    const overage = funding.overage;
+    return {
+      includedTotal: microsToUsd(included.totalUsdMicros),
+      consumed: microsToUsd(included.consumedUsdMicros),
+      credits: microsToUsd(
+        walletState.state.wallet.balance?.usdMicros ?? "0"
+      ),
+      overage:
+        overage.eligible && overage.remaining
+          ? microsToUsd(overage.remaining.usdMicros)
+          : null,
+    };
+  }, [walletState.state, included]);
+
   const resetsAt = included?.resetsAt
     ? new Date(included.resetsAt).toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
       })
-    : formatPeriodResetLabel(data.period.end);
+    : data
+      ? formatPeriodResetLabel(data.period.end)
+      : "—";
+
+  /**
+   * The allowance is measured in network cost, so the burn rate comes from the
+   * same meter — a projection built on billable retail would read high against
+   * a balance it never touches.
+   */
+  const projectedUsd = useMemo(() => {
+    if (!data || !included?.resetsAt) return null;
+    const byDay = new Map<string, number>();
+    for (const row of data.current.dailyByPipeline) {
+      byDay.set(
+        row.date,
+        (byDay.get(row.date) ?? 0) + microsToUsd(row.networkFeeUsdMicros)
+      );
+    }
+    const daily = data.periodDayKeys.map((k) => byDay.get(k) ?? 0);
+    if (daily.length === 0) return null;
+    const window = daily.slice(-7);
+    const rate = window.reduce((a, b) => a + b, 0) / Math.max(1, window.length);
+    const daysLeft = Math.max(
+      0,
+      Math.ceil((Date.parse(included.resetsAt) - Date.now()) / 86_400_000)
+    );
+    if (daysLeft === 0 || rate <= 0) return null;
+    return microsToUsd(included.consumedUsdMicros) + rate * daysLeft;
+  }, [data, included]);
+
+  const rangeLabel = useMemo(() => {
+    if (!data) return `Last ${active.noun}`;
+    const fmtDay = (iso: string) =>
+      new Date(iso).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+    return `${fmtDay(data.period.start)} – ${fmtDay(data.period.end)}`;
+  }, [data, active.noun]);
+
+  const loading = usageState.status === "loading" || usageState.status === "idle";
+  const grandReq = capabilityRows.reduce((a, c) => a + c.requestCount, 0);
+  const grandSpend = capabilityRows.reduce(
+    (a, c) => a + microsToUsd(c.networkFeeUsdMicros),
+    0
+  );
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
-      <p className="mb-6 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-        Account{user?.id ? ` · ${user.id}` : ""}
-      </p>
-
-      <PlansPanel />
-
-      <WalletPanel
-        periodBillableUsdMicros={
-          data.current.endUserBillableUsdMicros ||
-          data.current.networkFeeUsdMicros ||
-          null
+      <SectionHeader
+        variant="default"
+        className="mb-3 flex items-end justify-between gap-3"
+        title="This period"
+        description={rangeLabel}
+        action={
+          <PeriodTabs value={period} onChange={setPeriod} disabled={loading} />
         }
       />
-
-      <AllowanceStrip
-        requestCount={forecastStats.requestCount}
-        requestLimit={null}
-        included={included}
-        hasAccess={data.balance?.hasAccess ?? true}
-        forecast={forecastStats.forecast}
-        willExceed={forecastStats.willExceed}
-        daysToLimit={forecastStats.daysToLimit}
-        priorRequestCount={forecastStats.priorRequestCount}
-        periodDelta={forecastStats.periodDelta}
+      <PeriodMeter
+        loading={loading}
+        spendUsd={data ? microsToUsd(data.current.networkFeeUsdMicros) : 0}
+        jobs={data?.current.requestCount ?? 0}
+        priorJobs={data?.prior.requestCount ?? 0}
+        periodNoun={active.noun}
+        runway={runway}
+        projectedUsd={projectedUsd}
         resetsAt={resetsAt}
       />
 
-      <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
-          <div>
-            <p className="text-[17px] font-bold text-fg">Jobs by capability</p>
-            <p className="mt-0.5 text-[12px] text-fg-muted">
-              {periodDayCount} days · {fmt(data.current.requestCount)} jobs ·
-              OpenMeter
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3.5 justify-end text-[11.5px] text-fg-muted">
-            {filteredRows.map((c) => (
-              <span key={c.id} className="inline-flex items-center gap-1.5">
-                <span
-                  className="h-2 w-2 rounded-[2px]"
-                  style={{ background: c.color }}
-                  aria-hidden="true"
-                />
-                {c.name}
-              </span>
+      {usageState.status === "error" ? (
+        <div className="mt-4">
+          <UsageLoadError message={usageState.message} onRetry={usageState.reload} />
+        </div>
+      ) : loading ? (
+        <>
+          <SectionHeader
+            variant="default"
+            className="mt-7 mb-3 flex items-end justify-between gap-3"
+            title="Spend by capability"
+            description="Loading…"
+          />
+          <div
+            className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card"
+            aria-busy="true"
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-4 border-b border-hairline px-5 py-3.5 last:border-b-0"
+              >
+                <SkeletonBar className="h-3.5 w-40" />
+                <SkeletonBar className="h-3.5 w-20" />
+              </div>
             ))}
           </div>
+        </>
+      ) : capabilityRows.length === 0 ? (
+        <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-14 text-center">
+          <p className="text-sm text-fg-muted">No jobs in this period.</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-fg-faint">
+            Signed requests appear here within a minute of your first call.
+          </p>
         </div>
-        <div className="px-3 pt-2 pb-2">
-          {filteredRows.length > 0 ? (
-            <StackedAreaChart
-              series={filteredRows.map((c) => ({ name: c.name, data: c.data }))}
-              colors={filteredRows.map((c) => c.color)}
-              dayKeys={data.periodDayKeys}
-            />
-          ) : (
-            <p className="py-12 text-center text-sm text-fg-faint">
-              No usage in this period.
-            </p>
-          )}
-        </div>
-      </div>
+      ) : (
+        <>
+          <SectionHeader
+            variant="default"
+            className="mt-7 mb-3 flex items-end justify-between gap-3"
+            title="Spend by capability"
+            description={`${capabilityRows.length} capabilities · ranked by cost`}
+          />
+          <BreakdownSection
+            rows={capabilityRows}
+            grandReq={grandReq}
+                grandSpend={grandSpend}
+          />
+        </>
+      )}
 
-      <BreakdownSection
-        rows={filteredRows}
-        grandReq={grandReq}
-        grandSpend={grandSpend}
-        priceMin={priceMin}
-        priceMax={priceMax}
-        dataMaxSpend={dataMaxSpend}
-        onPriceChange={(min, max) => {
-          setPriceMin(min);
-          setPriceMax(max);
-        }}
-        allRows={capabilityRows}
-      />
-
-      <LimitsPanel
-        balance={data.balance}
-        included={included}
-        networkFeeUsdMicros={data.current.networkFeeUsdMicros}
-        endUserBillableUsdMicros={data.current.endUserBillableUsdMicros}
-        requestCount={data.current.requestCount}
-      />
+      {user?.id && (
+        <p className="mt-8 break-all font-mono text-[10.5px] text-fg-disabled">
+          Account {user.id}
+        </p>
+      )}
     </div>
   );
 }
@@ -405,46 +543,18 @@ function BreakdownSection({
   rows,
   grandReq,
   grandSpend,
-  priceMin,
-  priceMax,
-  dataMaxSpend,
-  onPriceChange,
-  allRows,
 }: {
   rows: UsageCapabilityRow[];
   grandReq: number;
   grandSpend: number;
-  priceMin: number;
-  priceMax: number;
-  dataMaxSpend: number;
-  onPriceChange: (min: number, max: number) => void;
-  allRows: UsageCapabilityRow[];
 }) {
   return (
     <>
-      <div className="mt-7 mb-2.5 flex items-center gap-2">
-        <span className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
-          Breakdown
-        </span>
-        <span className="rounded-full border border-hairline bg-dark-card px-1.5 py-px font-mono text-[10.5px] text-fg-faint">
-          {rows.length}
-        </span>
-      </div>
-      <BreakdownTable rows={rows} grandReq={grandReq} grandSpend={grandSpend} />
-      {allRows.length > 0 && (
-        <p className="mt-2 text-[10px] text-fg-disabled">
-          Spend filter: ${((priceMin / 100) * dataMaxSpend).toFixed(3)} – $
-          {((priceMax / 100) * dataMaxSpend).toFixed(3)} (
-          <button
-            type="button"
-            className="underline hover:text-fg-muted"
-            onClick={() => onPriceChange(0, 100)}
-          >
-            reset
-          </button>
-          )
-        </p>
-      )}
+      <BreakdownTable
+        rows={rows}
+        grandReq={grandReq}
+        grandSpend={grandSpend}
+      />
     </>
   );
 }
@@ -459,26 +569,20 @@ function BreakdownTable({
   grandSpend: number;
 }) {
   const cols =
-    "grid grid-cols-[1.7fr_1.5fr_0.7fr_0.7fr_1fr_0.9fr] items-center gap-2 px-4";
-
-  const deltaColor = (d: number) => {
-    if (d > 25) return "#fbbf24";
-    if (d > 0) return "var(--color-fg-strong)";
-    if (d < -10) return "#94a3b8";
-    return "var(--color-fg-muted)";
-  };
+    "grid grid-cols-[minmax(0,1.7fr)_0.8fr_0.9fr_0.75fr_0.9fr_0.8fr] items-center gap-3 px-5"
 
   return (
-    <div className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
+    <div className="overflow-x-auto overflow-y-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
+      <div className="min-w-[620px]">
       <div
-        className={`${cols} border-b border-hairline bg-dark py-2.5 font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-disabled`}
+        className={`${cols} border-b border-hairline bg-dark py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint`}
       >
         <div>Capability</div>
-        <div className="justify-self-end">Jobs · trend</div>
-        <div className="justify-self-end">Δ vs prior</div>
-        <div className="justify-self-end">Share</div>
-        <div className="justify-self-end">Network cost</div>
-        <div className="justify-self-end">Billable</div>
+        <div className="justify-self-end whitespace-nowrap">Jobs</div>
+        <div className="justify-self-end whitespace-nowrap">Trend</div>
+        <div className="justify-self-end whitespace-nowrap">Change</div>
+        <div className="justify-self-end whitespace-nowrap">Cost</div>
+        <div className="justify-self-end whitespace-nowrap">Per job</div>
       </div>
 
       {rows.length === 0 ? (
@@ -487,61 +591,46 @@ function BreakdownTable({
         </p>
       ) : (
         rows.map((c) => {
-          const share = grandReq > 0 ? (c.requestCount / grandReq) * 100 : 0;
-          const unitCost = c.requestCount > 0 ? c.spendUsd / c.requestCount : 0;
+          const cost = microsToUsd(c.networkFeeUsdMicros);
+          const unitCost = c.requestCount > 0 ? cost / c.requestCount : 0;
           return (
             <div
               key={c.id}
               className={`${cols} border-b border-hairline py-2.5 text-[13px] text-fg-strong transition-colors last:border-b-0 hover:bg-zebra`}
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <span
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: c.color }}
                   aria-hidden="true"
                 />
                 <Link
-                  href={`/jobs?capability=${encodeURIComponent(c.id)}`}
-                  className="truncate font-mono text-xs text-fg underline decoration-transparent underline-offset-[3px] transition-colors hover:text-green-bright hover:decoration-current"
+                  href={`/calls?capability=${encodeURIComponent(c.id)}`}
+                  className="truncate text-[13px] text-fg transition-colors hover:text-green-bright"
                   title={c.id}
                 >
                   {c.name}
                 </Link>
               </div>
-              <div className="flex items-center justify-end gap-2.5">
-                <span className="font-mono tabular-nums text-fg-strong">
-                  {fmt(c.requestCount)}
-                </span>
-                <span className="opacity-85">
-                  <MiniSpark
-                    data={c.data}
-                    color={c.color}
-                    height={18}
-                    width={70}
-                  />
-                </span>
+              <div className="justify-self-end font-mono text-[13px] tabular-nums text-fg-strong">
+                {fmt(c.requestCount)}
+              </div>
+              <div className="justify-self-end opacity-80">
+                <MiniSpark data={c.data} color={c.color} height={16} width={64} />
               </div>
               <div
-                className="justify-self-end font-mono tabular-nums"
-                style={{ color: deltaColor(c.delta) }}
+                className={`justify-self-end font-mono text-[12.5px] tabular-nums ${
+                  c.delta >= 0 ? "text-fg-strong" : "text-fg-disabled"
+                }`}
               >
                 {c.delta > 0 ? "+" : ""}
                 {c.delta.toFixed(0)}%
               </div>
-              <div className="justify-self-end font-mono tabular-nums text-fg-faint">
-                {share.toFixed(1)}%
+              <div className="justify-self-end font-mono text-[13px] tabular-nums text-fg">
+                {fmtSpend(cost)}
               </div>
-              <div className="justify-self-end font-mono tabular-nums text-fg-faint">
-                ${microsToUsdDisplay(c.networkFeeUsdMicros)}
-              </div>
-              <div className="justify-self-end font-mono tabular-nums text-fg">
-                {fmtSpend(c.spendUsd)}
-                {unitCost > 0 && (
-                  <span className="text-fg-disabled">
-                    {" "}
-                    · ${unitCost.toFixed(4)}/req
-                  </span>
-                )}
+              <div className="justify-self-end font-mono text-[12.5px] tabular-nums text-fg-faint">
+                {unitCost > 0 ? `$${unitCost.toFixed(4)}` : "—"}
               </div>
             </div>
           );
@@ -553,141 +642,17 @@ function BreakdownTable({
       >
         <div>
           Total
-          <span className="ml-1.5 text-[11px] text-fg-faint">
-            · this period
-          </span>
         </div>
         <div className="justify-self-end font-mono tabular-nums text-fg">
           {fmt(grandReq)}
         </div>
         <div />
         <div />
-        <div />
         <div className="justify-self-end font-mono tabular-nums text-fg">
           {fmtSpend(grandSpend)}
         </div>
+        <div />
       </div>
-    </div>
-  );
-}
-
-function LimitsPanel({
-  balance,
-  included,
-  networkFeeUsdMicros,
-  endUserBillableUsdMicros,
-  requestCount,
-}: {
-  balance: {
-    balanceUsdMicros: string;
-    consumedUsdMicros: string;
-    lifetimeGrantedUsdMicros: string;
-    hasAccess: boolean;
-  } | null;
-  included: IncludedUsageSummary | null;
-  networkFeeUsdMicros: string;
-  endUserBillableUsdMicros: string;
-  requestCount: number;
-}) {
-  const includedLimit = included
-    ? {
-        label: included.planName
-          ? `${included.planName} included usage`
-          : "Included usage",
-        used: microsToUsdDisplay(included.consumedUsdMicros),
-        max: `$${included.totalUsd}`,
-        pct:
-          BigInt(included.totalUsdMicros || "0") > BigInt(0)
-            ? Math.min(
-                100,
-                Number(
-                  (BigInt(included.consumedUsdMicros || "0") * BigInt(10000)) /
-                    BigInt(included.totalUsdMicros || "1")
-                ) / 100
-              )
-            : 0,
-      }
-    : null;
-  const prepaidLimit = balance
-    ? {
-        label: "Prepaid credits",
-        used: `$${microsToUsdDisplay(balance.balanceUsdMicros)}`,
-        max: "—",
-        pct: balance.hasAccess ? 40 : 100,
-      }
-    : null;
-  const limits =
-    includedLimit || prepaidLimit
-      ? [includedLimit, prepaidLimit].filter(
-          (row): row is NonNullable<typeof row> => row !== null
-        )
-      : [
-          {
-            label: "Signed requests",
-            used: fmt(requestCount),
-            max: "—",
-            pct: 50,
-          },
-        ];
-
-  const extra = [
-    {
-      label: "Network cost (metered)",
-      used: `$${microsToUsdDisplay(networkFeeUsdMicros)}`,
-      max: "pass-through",
-      pct: 30,
-    },
-    {
-      label: "Billable (retail estimate)",
-      used: `$${microsToUsdDisplay(endUserBillableUsdMicros)}`,
-      max: "—",
-      pct: 45,
-    },
-  ];
-
-  return (
-    <div className="mt-4 overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
-        <div>
-          <p className="text-[17px] font-bold text-fg">Limits & metering</p>
-          <p className="mt-0.5 text-[12px] text-fg-muted">
-            OpenMeter subscription allowance · network_spend meter
-          </p>
-        </div>
-        <Link
-          href="/settings?tab=billing"
-          className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-2.5 text-[12px] text-fg-strong transition-colors hover:border-subtle hover:text-fg"
-        >
-          Manage plan
-        </Link>
-      </div>
-      <div className="py-1">
-        {[...limits, ...extra].map((l) => {
-          const overWarn = l.pct > 80;
-          return (
-            <div
-              key={l.label}
-              className="border-b border-hairline px-4 py-2.5 last:border-b-0"
-            >
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <span className="text-[13px] text-fg-strong">{l.label}</span>
-                <span className="font-mono text-[12px] tabular-nums text-fg-faint">
-                  <b className="font-medium text-fg">{l.used}</b>
-                  <span className="text-fg-disabled"> / {l.max}</span>
-                </span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-[2px] bg-dark-card">
-                <div
-                  className="h-full rounded-[2px]"
-                  style={{
-                    width: `${Math.min(100, l.pct)}%`,
-                    background: overWarn ? "#fbbf24" : "#40bf86",
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
