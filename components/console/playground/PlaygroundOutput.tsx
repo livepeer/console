@@ -115,7 +115,7 @@ function AudioPlaygroundOutput({
         : "Fill in the form and click Run";
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-hairline bg-dark-surface px-5 py-6">
+    <div className="flex flex-col gap-4 rounded-md border border-hairline bg-dark-lighter px-5 py-6">
       {state === "result" && url ? (
         <WaveSurferAudio url={url} />
       ) : (

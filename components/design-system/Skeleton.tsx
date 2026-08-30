@@ -14,7 +14,7 @@ const VARIANT_DEFAULTS: Record<
   { width: string; height: string; rounded: string }
 > = {
   text: { width: "w-full", height: "h-3.5", rounded: "rounded" },
-  card: { width: "w-full", height: "h-24", rounded: "rounded-xl" },
+  card: { width: "w-full", height: "h-24", rounded: "rounded-md" },
   circle: { width: "w-8", height: "h-8", rounded: "rounded-full" },
   chart: { width: "w-full", height: "h-48", rounded: "rounded-lg" },
 };

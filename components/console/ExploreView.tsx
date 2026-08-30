@@ -379,7 +379,7 @@ function ExploreFilterPill({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-hairline bg-dark-card px-2 text-[12px] text-fg-strong transition-colors hover:bg-dark-lighter"
+      className="btn-outline inline-flex h-[26px] items-center gap-1.5 rounded-[4px] px-2 text-[12px] transition-colors"
     >
       <span className="font-mono text-[10.5px] uppercase tracking-[0.05em] text-fg-faint">
         {label}

@@ -77,7 +77,7 @@ function TopPipelinesGrid() {
     <div className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
       <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
         <div>
-          <p className="text-[17px] font-bold text-fg">Top pipelines</p>
+          <p className="text-base font-semibold text-fg">Top pipelines</p>
           <p className="mt-0.5 text-[12px] text-fg-muted">
             By request volume · last 3 months
           </p>

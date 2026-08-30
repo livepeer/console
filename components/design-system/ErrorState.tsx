@@ -44,7 +44,7 @@ export default function ErrorState({
   return (
     <div
       role="alert"
-      className={`flex flex-col items-start gap-3 rounded-xl border border-hairline bg-dark-card/40 ${
+      className={`flex flex-col items-start gap-3 rounded-md border border-hairline bg-dark-card/40 ${
         compact ? "p-4" : "p-6"
       }`}
     >
