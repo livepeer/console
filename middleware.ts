@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { devMockResponse } from "@/lib/console/dev-mock";
 import {
   isAllowlistExemptPath,
   isAllowlistGatedPath,
@@ -14,6 +15,19 @@ function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
 }
 
 export async function middleware(request: NextRequest) {
+  // Dev-only: answer auth + PymtHouse endpoints from fixtures so auth-gated
+  // surfaces can be designed without credentials. See lib/console/dev-mock.ts.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.CONSOLE_DEV_MOCK === "1"
+  ) {
+    const mocked = devMockResponse(
+      request.nextUrl.pathname,
+      request.nextUrl.searchParams
+    );
+    if (mocked) return mocked;
+  }
+
   const authRes = await auth0.middleware(request);
   const { pathname } = request.nextUrl;
   if (isAllowlistExemptPath(pathname) || !isAllowlistGatedPath(pathname)) {
