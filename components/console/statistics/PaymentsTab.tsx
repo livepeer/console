@@ -184,7 +184,7 @@ export default function PaymentsTab() {
         <div className="border-b border-hairline px-4 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[17px] font-bold text-fg">Recent payments</p>
+              <p className="text-base font-semibold text-fg">Recent payments</p>
               <p className="mt-0.5 text-[12px] text-fg-muted">
                 {filteredTxs.length} payments
                 {search ? ` matching "${search}"` : " · all-time"}

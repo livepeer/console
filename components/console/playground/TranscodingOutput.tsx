@@ -315,7 +315,7 @@ export default function TranscodingOutput({
           />
 
           {/* Rendition ladder */}
-          <div className="rounded-xl border border-hairline bg-dark-surface">
+          <div className="rounded-md border border-hairline bg-dark-lighter">
             <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
               <span className="text-[10px] font-medium uppercase tracking-wider text-fg-label">
                 Rendition ladder

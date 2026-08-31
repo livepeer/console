@@ -228,7 +228,12 @@ export default function StackedAreaChart({
         {layers.map((l, i) => (
           <path key={i} d={l.d} fill={l.color} fillOpacity={0.45} />
         ))}
-        <path d={topStroke} fill="none" stroke="#40BF86" strokeWidth="1.25" />
+        <path
+          d={topStroke}
+          fill="none"
+          stroke={colors[colors.length - 1] ?? "var(--color-green-bright)"}
+          strokeWidth="1.25"
+        />
         {activeIndex !== null && (
           <>
             <line

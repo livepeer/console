@@ -108,7 +108,7 @@ export default function AppAnalytics({ model }: { model: App }) {
       </KpiStrip>
 
       {/* Request volume */}
-      <div className="rounded-xl border border-hairline bg-dark-surface p-5">
+      <div className="rounded-md border border-hairline bg-dark-lighter p-5">
         <div>
           <h4 className="text-sm font-medium text-fg-muted">Request volume</h4>
           <p className="mt-1 text-sm text-fg-muted">
@@ -149,7 +149,7 @@ export default function AppAnalytics({ model }: { model: App }) {
       </div>
 
       {/* Latency trend */}
-      <div className="rounded-xl border border-hairline bg-dark-surface p-5">
+      <div className="rounded-md border border-hairline bg-dark-lighter p-5">
         <div className="flex items-start justify-between">
           <div>
             <h4 className="text-sm font-medium text-fg-muted">Latency trend</h4>
@@ -222,7 +222,7 @@ export default function AppAnalytics({ model }: { model: App }) {
       </div>
 
       {/* Regional supply */}
-      <div className="rounded-xl border border-hairline bg-dark-surface p-5">
+      <div className="rounded-md border border-hairline bg-dark-lighter p-5">
         <div>
           <h4 className="text-sm font-medium text-fg-muted">Regional supply</h4>
           <p className="mt-1 text-sm text-fg-muted">
@@ -254,7 +254,7 @@ export default function AppAnalytics({ model }: { model: App }) {
       </div>
 
       {/* Uptime strip */}
-      <div className="rounded-xl border border-hairline bg-dark-surface p-5">
+      <div className="rounded-md border border-hairline bg-dark-lighter p-5">
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-medium text-fg-muted">

@@ -489,7 +489,7 @@ export function SettingsTab({
             onClick={onToggleVisibility}
             className={
               isPublic
-                ? "inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-[6px] border border-hairline bg-dark-card px-3 text-[12.5px] font-medium text-fg-strong transition-colors hover:border-subtle hover:text-fg"
+                ? "btn-outline inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-[6px] px-3 text-[12.5px] font-medium transition-colors"
                 : "btn-primary inline-flex h-[30px] shrink-0 items-center gap-1.5 rounded-[6px] px-3 text-[12.5px] font-medium transition-colors"
             }
           >
@@ -541,7 +541,7 @@ export function SettingsTab({
           <div className="flex shrink-0 gap-2">
             <button
               type="button"
-              className="inline-flex h-[30px] items-center gap-1.5 rounded-[6px] border border-hairline bg-dark-card px-3 text-[12.5px] text-fg-strong transition-colors hover:border-subtle hover:text-fg"
+              className="btn-outline inline-flex h-[30px] items-center gap-1.5 rounded-[6px] px-3 text-[12.5px] transition-colors"
             >
               <Square className="h-3 w-3" aria-hidden="true" />
               Stop

@@ -129,7 +129,7 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
           </Link>
           <Link
             href="/signup"
-            className="inline-flex h-9 items-center justify-center rounded-[6px] border border-hairline bg-dark-card px-4 text-[13px] text-fg-strong transition-colors hover:border-subtle hover:bg-hover hover:text-fg"
+            className="btn-outline inline-flex h-9 items-center justify-center rounded-[6px] px-4 text-[13px] transition-colors"
           >
             Create organization
           </Link>

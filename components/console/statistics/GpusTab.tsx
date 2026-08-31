@@ -367,7 +367,7 @@ export default function GpusTab() {
       {/* GPU Inventory — mix bar + table in one card */}
       <div className="overflow-x-clip rounded-md border border-hairline bg-dark-lighter shadow-card">
         <div className="border-b border-hairline px-4 py-3.5">
-          <p className="text-[17px] font-bold text-fg">GPU inventory</p>
+          <p className="text-base font-semibold text-fg">GPU inventory</p>
           <p className="mt-0.5 text-[12px] text-fg-muted">
             Current GPU types on the network with hardware specifications
           </p>

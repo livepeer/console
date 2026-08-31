@@ -333,7 +333,7 @@ export default function CapabilityLeaderboardPanel() {
       {/* Panel head — title + sub on the left, "View usage" link on the right. */}
       <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3.5">
         <div>
-          <p className="text-[17px] font-bold text-fg">Usage by app</p>
+          <p className="text-base font-semibold text-fg">Usage by app</p>
           <p className="mt-0.5 text-[12px] text-fg-muted">
             Last 30 days · sorted by volume
           </p>

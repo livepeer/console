@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import SectionHeader from "@/components/console/SectionHeader";
 
 /**
  * Shared building blocks for the settings sub-views (General / Members /
@@ -119,17 +120,12 @@ export function SettingsHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mt-7 mb-3 flex items-end justify-between gap-3 first:mt-0">
-      <div>
-        <h2 className="text-[17px] font-medium leading-tight tracking-[-0.01em] text-fg">
-          {title}
-        </h2>
-        {sub && <p className="mt-[3px] text-[12.5px] text-fg-faint">{sub}</p>}
-      </div>
-      {action && (
-        <div className="flex shrink-0 items-center gap-2">{action}</div>
-      )}
-    </div>
+    <SectionHeader
+      variant="default"
+      title={title}
+      description={sub}
+      action={action}
+    />
   );
 }
 

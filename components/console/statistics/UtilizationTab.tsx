@@ -92,7 +92,7 @@ function LiveJobFeed() {
         {/* Row 1: title + sub on the left, LIVE badge on the right. */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[17px] font-bold text-fg">Live job feed</p>
+            <p className="text-base font-semibold text-fg">Live job feed</p>
             <p className="mt-0.5 text-[12px] text-fg-muted">
               {LIVE_JOBS.length} jobs · {activeJobCount + 9} active
               orchestrators
@@ -277,7 +277,7 @@ export default function UtilizationTab() {
         <div className="border-b border-hairline px-4 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[17px] font-bold text-fg">Pipelines</p>
+              <p className="text-base font-semibold text-fg">Pipelines</p>
               <p className="mt-0.5 text-[12px] text-fg-muted">
                 {filteredPipelines.length} active ·{" "}
                 {PIPELINE_UTILIZATION.filter((p) => p.status !== "cold").length}{" "}

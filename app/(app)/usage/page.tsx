@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { BarChart3, Box, ChevronDown } from "lucide-react";
+import { BarChart3, Box } from "lucide-react";
 import { useAuth } from "@/components/console/AuthContext";
 import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
@@ -38,23 +38,13 @@ function UsageContent() {
         icon={BarChart3}
         description="Signed requests, network cost, and prepaid balance usage from PymtHouse OpenMeter."
         actions={
-          <>
-            <button
-              type="button"
-              className="inline-flex h-[26px] items-center gap-1.5 rounded-[4px] border border-transparent px-2.5 text-[12.5px] text-fg-strong transition-colors hover:border-hairline hover:bg-hover hover:text-fg"
-            >
-              <span className="text-fg-faint">Period</span>
-              <span>30 days</span>
-              <ChevronDown className="h-3 w-3" aria-hidden="true" />
-            </button>
-            <Link
-              href="/settings?tab=billing"
-              className="btn-primary inline-flex h-[26px] items-center gap-1.5 rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
-            >
-              <Box className="h-3 w-3" aria-hidden="true" />
-              Manage plan
-            </Link>
-          </>
+          <Link
+            href="/settings?tab=billing"
+            className="btn-primary inline-flex h-[26px] items-center gap-1.5 rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
+          >
+            <Box className="h-3 w-3" aria-hidden="true" />
+            Manage plan
+          </Link>
         }
       />
       <div className="flex flex-1 flex-col overflow-y-auto">

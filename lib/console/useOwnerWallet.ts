@@ -37,6 +37,36 @@ type WalletBillingState =
   | { status: "ready"; wallet: DashboardOwnerWallet }
   | { status: "error"; message: string };
 
+/**
+ * Start a Stripe Checkout top-up. `returnPath` is where Checkout sends the
+ * browser back to; pass the page the user started from so they are not
+ * dropped somewhere else on return.
+ */
+export async function startWalletTopUp(input: {
+  amountUsd: string;
+  returnPath?: string;
+}): Promise<{ checkoutUrl: string }> {
+  const path = input.returnPath ?? "/usage";
+  const join = path.includes("?") ? "&" : "?";
+  const response = await fetch("/api/pymthouse/wallet/top-up", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amountUsd: input.amountUsd,
+      successUrl: `${window.location.origin}${path}${join}topup=succeeded`,
+      cancelUrl: `${window.location.origin}${path}${join}topup=canceled`,
+    }),
+  });
+  const body = await readResponseJson<{
+    checkoutUrl?: string;
+    error?: string;
+  }>(response);
+  if (!response.ok || !body.checkoutUrl) {
+    throw new Error(body.error ?? `Top-up failed (${response.status})`);
+  }
+  return { checkoutUrl: body.checkoutUrl };
+}
+
 /** Wallet GET only — remaining included usage + plan, without PM/invoice lists. */
 export function useWalletBillingState(enabled: boolean) {
   const [state, setState] = useState<WalletBillingState>({ status: "idle" });
@@ -138,25 +168,10 @@ export function useOwnerWallet(enabled: boolean) {
     void load();
   }, [load]);
 
-  const startTopUp = useCallback(async (input: { amountUsd: string }) => {
-    const response = await fetch("/api/pymthouse/wallet/top-up", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amountUsd: input.amountUsd,
-        successUrl: `${window.location.origin}/usage?topup=succeeded`,
-        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
-      }),
-    });
-    const body = await readResponseJson<{
-      checkoutUrl?: string;
-      error?: string;
-    }>(response);
-    if (!response.ok || !body.checkoutUrl) {
-      throw new Error(body.error ?? `Top-up failed (${response.status})`);
-    }
-    return { checkoutUrl: body.checkoutUrl };
-  }, []);
+  const startTopUp = useCallback(
+    (input: { amountUsd: string }) => startWalletTopUp(input),
+    []
+  );
 
   const startPaymentMethodCheckout = useCallback(async () => {
     const response = await fetch("/api/pymthouse/wallet/payment-methods", {

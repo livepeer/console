@@ -49,7 +49,7 @@ const THEME_OPTIONS: ThemeOption[] = [
  * the two surfaces stay in sync. See `ThemeContext.tsx`.
  *
  * Each option is rendered as a tile-style radio so the icon and label
- * read at a glance; matches the density of region chips in `LimitsSection`
+ * read at a glance
  * but with more breathing room since theme is a single-shot choice.
  */
 export default function AppearanceSection() {

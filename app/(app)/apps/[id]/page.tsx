@@ -347,7 +347,7 @@ function ApiTab({ model }: { model: App }) {
         <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-faint">
           Endpoint
         </p>
-        <div className="flex items-center gap-2 rounded-xl border border-hairline bg-dark-surface p-4">
+        <div className="flex items-center gap-2 rounded-md border border-hairline bg-dark-lighter p-4">
           <span className="shrink-0 rounded bg-green/15 px-1.5 py-0.5 text-[10px] font-semibold text-green-bright">
             POST
           </span>
@@ -366,7 +366,7 @@ function ApiTab({ model }: { model: App }) {
       </div>
 
       {/* Pricing footer — compact, since the hero already shows the list price */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-dark-surface px-4 py-3 text-xs text-fg-faint">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline bg-dark-lighter px-4 py-3 text-xs text-fg-faint">
         <span>
           Billed per request. Free tier covers your first 10,000 each month.
         </span>
@@ -561,7 +561,7 @@ function ReadmeTab({ model }: { model: App }) {
   if (inTable) flushTable();
 
   return (
-    <article className="rounded-xl border border-hairline bg-dark-surface p-5">
+    <article className="rounded-md border border-hairline bg-dark-lighter p-5">
       <div className="max-w-3xl space-y-1">{elements}</div>
     </article>
   );

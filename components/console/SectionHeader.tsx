@@ -10,9 +10,10 @@ interface SectionHeaderProps {
   /** Optional count rendered as a mono pill next to the title (mono variant only). */
   count?: number | string;
   /** Visual treatment.
-   *  - `mono` (default): mono uppercase 11px label with optional count chip. Linear-style chrome.
-   *  - `default`: title-cased h2 at the size below.
-   *  - `lg`: title-cased h2 at the largest size. */
+   *  - `mono` (default): mono uppercase 11px label with optional count chip.
+   *  - `default`: 17px title + optional description above a card. The console's
+   *    dominant section pattern.
+   *  - `lg`: same, one step larger. */
   variant?: "mono" | "default" | "lg";
   /** Visual size for the `default` and `lg` variants. */
   size?: "default" | "lg";
@@ -58,21 +59,29 @@ export default function SectionHeader({
     );
   }
 
-  // Legacy title-cased variants (kept for any caller still using them).
+  // Title + description above a card, actions on the same line. This is the
+  // console's dominant section pattern (every Settings section, and now the
+  // data pages) — `SettingsHeader` re-exports it under its old name.
   const effectiveSize = size ?? (variant === "lg" ? "lg" : "default");
   const titleClass =
     effectiveSize === "lg"
-      ? "text-lg font-medium text-fg text-balance"
-      : "text-base font-medium text-fg text-balance";
+      ? "text-xl font-medium leading-tight tracking-[-0.01em] text-fg"
+      : "text-[17px] font-medium leading-tight tracking-[-0.01em] text-fg";
 
   return (
-    <div className={className ?? "mb-4"}>
-      <div className="flex items-center justify-between gap-3">
+    <div
+      className={
+        className ?? "mt-7 mb-3 flex items-end justify-between gap-3 first:mt-0"
+      }
+    >
+      <div>
         <h2 className={titleClass}>{title}</h2>
-        {action && <div className="shrink-0">{action}</div>}
+        {description && (
+          <p className="mt-[3px] text-[12.5px] text-fg-faint">{description}</p>
+        )}
       </div>
-      {description && (
-        <p className="mt-1 text-sm text-fg-faint text-balance">{description}</p>
+      {action && (
+        <div className="flex shrink-0 items-center gap-2">{action}</div>
       )}
     </div>
   );

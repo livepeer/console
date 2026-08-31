@@ -10,7 +10,6 @@ import SignInWall from "@/components/console/SignInWall";
 import GeneralSection from "@/components/console/settings/GeneralSection";
 import MembersSection from "@/components/console/settings/MembersSection";
 import BillingSection from "@/components/console/settings/BillingSection";
-import LimitsSection from "@/components/console/settings/LimitsSection";
 import ProfileSection from "@/components/console/settings/ProfileSection";
 import NotificationsSection from "@/components/console/settings/NotificationsSection";
 import SecuritySection from "@/components/console/settings/SecuritySection";
@@ -25,17 +24,19 @@ type SettingsTab =
   | "organization"
   | "members"
   | "billing"
-  | "usage-limits"
   | "profile"
   | "notifications"
   | "security"
   | "appearance";
 
+// No "usage-limits" tab: concurrent streams, per-key rate limits and allowed
+// regions were dropped (Aug 2026), and the one limit worth keeping — the hard
+// spend cap — belongs on the Usage meter, not in a settings form. See the
+// Spend cap note in CLAUDE.md.
 const VALID_TABS: SettingsTab[] = [
   "organization",
   "members",
   "billing",
-  "usage-limits",
   "profile",
   "notifications",
   "security",
@@ -46,7 +47,6 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   organization: "General",
   members: "Members",
   billing: "Billing",
-  "usage-limits": "Limits",
   profile: "Profile",
   notifications: "Notifications",
   security: "Security",
@@ -138,7 +138,6 @@ function SettingsContent() {
           {tab === "organization" && <GeneralSection />}
           {tab === "members" && <MembersSection />}
           {tab === "billing" && <BillingSection />}
-          {tab === "usage-limits" && <LimitsSection />}
           {tab === "profile" && <ProfileSection />}
           {tab === "notifications" && <NotificationsSection />}
           {tab === "security" && <SecuritySection />}

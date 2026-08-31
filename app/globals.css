@@ -151,6 +151,15 @@ body {
   --color-purple-bright: #a78bfa;
   --color-purple-dark: #5b21b6;
   --color-purple-subtle: rgba(124, 58, 237, 0.15);
+  --color-tone-cyan: #67e8f9;
+  --color-tone-cyan-bg: rgba(34, 211, 238, 0.1);
+  --color-tone-cyan-border: rgba(34, 211, 238, 0.3);
+  --color-tone-violet: #c4b5fd;
+  --color-tone-violet-bg: rgba(167, 139, 250, 0.12);
+  --color-tone-violet-border: rgba(167, 139, 250, 0.3);
+  --color-tone-amber: #fcd34d;
+  --color-tone-amber-bg: rgba(251, 191, 36, 0.1);
+  --color-tone-amber-border: rgba(251, 191, 36, 0.3);
 
   /* Motion vocabulary */
   --motion-duration-fast: 150ms;
@@ -214,6 +223,15 @@ html[data-theme="light"] {
   /* Legibility steps for accents on light surfaces */
   --color-green-bright: #1e9960;
   --color-blue-bright: #0e7490;
+  --color-tone-cyan: #0e7490;
+  --color-tone-cyan-bg: rgba(14, 116, 144, 0.08);
+  --color-tone-cyan-border: rgba(14, 116, 144, 0.28);
+  --color-tone-violet: #6d28d9;
+  --color-tone-violet-bg: rgba(109, 40, 217, 0.08);
+  --color-tone-violet-border: rgba(109, 40, 217, 0.28);
+  --color-tone-amber: #b45309;
+  --color-tone-amber-bg: rgba(180, 83, 9, 0.08);
+  --color-tone-amber-border: rgba(180, 83, 9, 0.28);
 
   --shadow-popover:
     0 8px 16px -4px rgb(24 24 27 / 0.12), 0 2px 4px -1px rgb(24 24 27 / 0.06);
@@ -259,59 +277,80 @@ textarea:-webkit-autofill {
   border-color: var(--color-border-strong);
 }
 
-/* ─── Primary CTA recipe ─── */
+/* ─── Primary CTA recipe ───
+   Ink and paper: the primary action is the highest-contrast neutral we have,
+   not a colour. Green is an accent (status, focus, liveness), so it stays out
+   of button fills — a page with six green buttons has no accent left.
+   Both fills key off foreground/background, so light mode inverts for free. */
 .btn-primary {
+  background-color: var(--color-foreground);
+  color: var(--color-background);
+  border: 1px solid transparent;
+}
+.btn-primary:hover:not(:disabled) {
+  background-color: color-mix(
+    in srgb,
+    var(--color-foreground) 86%,
+    var(--color-background)
+  );
+}
+.btn-primary:active:not(:disabled) {
+  background-color: color-mix(
+    in srgb,
+    var(--color-foreground) 76%,
+    var(--color-background)
+  );
+}
+
+/* The outline recipe. Console chrome comes in several heights (26/30/36px), so
+   this carries only colour and hover — callers keep their own sizing. Pairing
+   it with a Button size is preferred; hand-rolled sizing is fine, a hand-rolled
+   *palette* is not, which is how two different outline looks shipped. */
+.btn-outline {
+  border: 1px solid var(--color-border-hairline);
+  background-color: var(--color-dark-card);
+  color: var(--color-fg-strong);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--color-border-subtle);
+  color: var(--color-fg);
+}
+
+/* Reserved for the rare action that should read as Livepeer-green rather than
+   neutral. Deliberately not the default — see the accent rule in CLAUDE.md. */
+.btn-accent {
   background-color: var(--color-cta);
   color: var(--color-cta-fg);
   border: 1px solid var(--color-cta-border);
 }
-.btn-primary:hover:not(:disabled) {
+.btn-accent:hover:not(:disabled) {
   background-color: var(--color-cta-hover);
 }
-.btn-primary:active:not(:disabled) {
+.btn-accent:active:not(:disabled) {
   background-color: var(--color-cta-active);
 }
 
 /* ─── Tone palette utilities ─── */
 .tone-cyan {
-  color: #67e8f9;
-  background-color: rgba(34, 211, 238, 0.1);
-  border-color: rgba(34, 211, 238, 0.3);
+  color: var(--color-tone-cyan);
+  background-color: var(--color-tone-cyan-bg);
+  border-color: var(--color-tone-cyan-border);
 }
 .tone-violet {
-  color: #c4b5fd;
-  background-color: rgba(167, 139, 250, 0.12);
-  border-color: rgba(167, 139, 250, 0.3);
+  color: var(--color-tone-violet);
+  background-color: var(--color-tone-violet-bg);
+  border-color: var(--color-tone-violet-border);
 }
 .tone-amber {
-  color: #fcd34d;
-  background-color: rgba(251, 191, 36, 0.1);
-  border-color: rgba(251, 191, 36, 0.3);
+  color: var(--color-tone-amber);
+  background-color: var(--color-tone-amber-bg);
+  border-color: var(--color-tone-amber-border);
 }
 .text-tone-amber {
-  color: #fcd34d;
+  color: var(--color-tone-amber);
 }
 .text-tone-amber:hover {
-  color: color-mix(in srgb, #fcd34d 75%, var(--color-foreground));
-}
-
-html[data-theme="light"] .tone-cyan {
-  color: #0e7490;
-  background-color: rgba(14, 116, 144, 0.08);
-  border-color: rgba(14, 116, 144, 0.28);
-}
-html[data-theme="light"] .tone-violet {
-  color: #6d28d9;
-  background-color: rgba(109, 40, 217, 0.08);
-  border-color: rgba(109, 40, 217, 0.28);
-}
-html[data-theme="light"] .tone-amber {
-  color: #b45309;
-  background-color: rgba(180, 83, 9, 0.08);
-  border-color: rgba(180, 83, 9, 0.28);
-}
-html[data-theme="light"] .text-tone-amber {
-  color: #b45309;
+  color: color-mix(in srgb, var(--color-tone-amber) 75%, var(--color-foreground));
 }
 
 /* ─── Console keyframes + animations ─── */
