@@ -4,22 +4,22 @@ import {
   type InferenceRequest,
   type InferenceResult
 } from "@pymthouse/gateway-web";
-import { discoveryServiceUrl, pymthouseSignerUrl } from "./env";
+import { pymthouseSignerUrl } from "./env";
 import type { McpPrincipal } from "./jwt";
-import { exchangeUserJwtForSignerJwt } from "./signer-exchange";
+import { resolveSignerSession } from "./signer-exchange";
 
 export async function runInference(
   principal: McpPrincipal,
   request: InferenceRequest
 ): Promise<InferenceResult> {
-  let session = await exchangeUserJwtForSignerJwt(principal);
+  let session = await resolveSignerSession(principal);
   const timeoutMs = request.timeoutMs ?? request.timeout ?? 120_000;
 
   const attempt = async (signerJwt: string) => {
     const gw = createGateway({
       signerUrl: session.signer_url || pymthouseSignerUrl(),
       signerHeaders: { Authorization: `Bearer ${signerJwt}` },
-      discoveryUrl: session.discovery_url || discoveryServiceUrl(),
+      discoveryUrl: session.discovery_url,
       insecureTls: true,
       timeoutMs
     });
@@ -30,7 +30,7 @@ export async function runInference(
     return await attempt(session.access_token);
   } catch (err) {
     if (err instanceof SignerRefreshRequired) {
-      session = await exchangeUserJwtForSignerJwt(principal);
+      session = await resolveSignerSession(principal);
       return attempt(session.access_token);
     }
     throw err;
