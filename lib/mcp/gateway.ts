@@ -8,8 +8,6 @@ import { discoveryServiceUrl, pymthouseSignerUrl } from "./env";
 import type { McpPrincipal } from "./jwt";
 import { exchangeUserJwtForSignerJwt } from "./signer-exchange";
 
-const SLOW_MS = 90_000;
-
 export async function runInference(
   principal: McpPrincipal,
   request: InferenceRequest
@@ -38,18 +36,3 @@ export async function runInference(
     throw err;
   }
 }
-
-export function isSlowCapability(capability: string): boolean {
-  const cap = capability.toLowerCase();
-  return (
-    cap.includes("video") ||
-    cap.includes("i2v") ||
-    cap.includes("t2v") ||
-    cap.includes("kling") ||
-    cap.includes("seedance") ||
-    cap.includes("wan") ||
-    cap.includes("ltx")
-  );
-}
-
-export { SLOW_MS };
