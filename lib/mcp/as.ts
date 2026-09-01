@@ -4,7 +4,6 @@ function asSecret(): string {
   const value =
     process.env.MCP_AS_SECRET?.trim() ||
     process.env.MCP_OAUTH_BRIDGE_SECRET?.trim() ||
-    process.env.MCP_INTERNAL_MINT_SECRET?.trim() ||
     process.env.AUTH0_SECRET?.trim() ||
     "";
   if (!value) {

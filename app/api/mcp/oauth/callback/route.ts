@@ -13,34 +13,25 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const state = req.nextUrl.searchParams.get("state")?.trim() ?? "";
-  const origin = req.nextUrl.origin;
-
   const pending = parsePending(req.cookies.get(PKCE_COOKIE)?.value);
+  const origin = req.nextUrl.origin;
   const clear = NextResponse.redirect(new URL("/", req.url), 302);
   clear.cookies.set(PKCE_COOKIE, "", { ...pkceCookieOptions(), maxAge: 0 });
 
-  if (!pending || pending.nonce !== state) {
+  if (!pending) {
     return clear;
   }
 
-  // The subject is whoever holds the Console session. Query parameters carry no
-  // identity here — this endpoint is reachable without signing in.
   const session = await auth0.getSession();
   const sub = session?.user?.sub?.trim();
-  if (!sub) {
-    const callback = `${origin}/api/mcp/oauth/callback`;
-    return NextResponse.redirect(
-      new URL(
-        `/login?mcp_oauth=1&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(callback)}`,
-        origin
-      )
-    );
+  if (!session || !sub) {
+    const login = new URL("/login", origin);
+    login.searchParams.set("mcp_oauth", "1");
+    return NextResponse.redirect(login);
   }
 
   const externalUserId = await externalUserIdFromSub(sub);
-  const email = session?.user?.email?.trim() || undefined;
-
+  const email = session.user.email?.trim();
   let code: string;
   try {
     code = issueAuthCode({
@@ -48,7 +39,7 @@ export async function GET(req: NextRequest) {
       codeChallenge: pending.codeChallenge,
       clientId: pending.clientId,
       externalUserId,
-      email
+      email: email || undefined
     });
   } catch {
     return clear;

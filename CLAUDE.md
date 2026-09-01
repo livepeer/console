@@ -35,8 +35,9 @@ app/
 ├── (auth)/                 # /login, /signup — no sidebar
 ├── api/
 │   ├── pymthouse/          # BFF: account-usage, keys, plans, subscribe, wallet, invoices
-│   ├── internal/mcp/       # MCP mint / refresh / signer-session
-│   └── v1/auth/            # device approval + MCP OAuth bridge
+│   ├── mcp/                # Streamable HTTP MCP resource server
+│   └── v1/auth/            # device approval
+├── authorize, token, register, .well-known/   # MCP OAuth AS (DCR + PKCE)
 └── not-found.tsx
 
 components/
@@ -50,6 +51,7 @@ lib/console/                # ~47 modules. Roughly: pymthouse-* (BFF clients + t
                             # useBillingPlans), display helpers (usage-capability-display,
                             # wallet-settlement-display), auth (session-user,
                             # email-allowlist, external-user-id), and mock-data.
+lib/mcp/                    # MCP tools, Streamable HTTP, OAuth AS, gateway inference.
 ```
 
 ## Data layer
