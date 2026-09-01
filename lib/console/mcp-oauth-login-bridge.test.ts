@@ -11,7 +11,7 @@ import {
   parseMcpOauthLoginQuery,
   redeemMcpIdentityCode,
   redeemMcpRefreshToken,
-  resolveMcpMintSubject,
+  resolveMcpMintSubject
 } from "./mcp-oauth-login-bridge";
 
 const CALLBACK = "https://agent.livepeer.org/api/mcp/oauth/callback";
@@ -46,9 +46,33 @@ test("parseMcpOauthLoginQuery rejects evil redirect and missing state", () => {
 
 test("isAllowedMcpRedirectUri derives callback from mint allowlist", () => {
   delete process.env.MCP_OAUTH_REDIRECT_ALLOWLIST;
+  delete process.env.APP_BASE_URL;
   process.env.MCP_INTERNAL_MINT_ALLOWLIST = "https://agent.livepeer.org";
   assert.equal(isAllowedMcpRedirectUri(CALLBACK), true);
   assert.equal(isAllowedMcpRedirectUri("https://evil.example/cb"), false);
+});
+
+test("first-party Console callback is allowed from APP_BASE_URL", () => {
+  delete process.env.MCP_OAUTH_REDIRECT_ALLOWLIST;
+  delete process.env.MCP_INTERNAL_MINT_ALLOWLIST;
+  process.env.APP_BASE_URL = "https://dashboard.livepeer.org";
+  assert.equal(
+    isAllowedMcpRedirectUri(
+      "https://dashboard.livepeer.org/api/mcp/oauth/callback"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedMcpRedirectUri(
+      "http://localhost:3000/api/mcp/oauth/callback",
+      "http://localhost:3000"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedMcpRedirectUri("https://evil.example/api/mcp/oauth/callback"),
+    false
+  );
 });
 
 test("pending cookie round-trips and rejects tampering", () => {

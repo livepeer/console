@@ -27,10 +27,14 @@ export function isAllowlistExemptPath(pathname: string): boolean {
     "/device",
     "/auth",
     "/api",
+    "/authorize",
+    "/token",
+    "/register",
+    "/.well-known",
     "/explore",
     "/apps",
     "/network",
-    "/orgs",
+    "/orgs"
   ];
   return exempt.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
