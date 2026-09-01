@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
 import { parseAuthCode, parseClientId, verifyPkceS256 } from "@/lib/mcp/as";
-import { mintMcpUserTokens } from "@/lib/console/mcp-internal-mint";
-import {
-  redeemMcpRefreshToken,
-  resolveMcpMintSubject
-} from "@/lib/console/mcp-oauth-login-bridge";
+import { mintMcpUserTokens, BillingAppMismatchError } from "@/lib/console/mcp-internal-mint";
+import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,7 +69,13 @@ export async function POST(req: NextRequest) {
         expires_in: minted.expires_in,
         ...(minted.scope ? { scope: minted.scope } : {})
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof BillingAppMismatchError) {
+        return json(req, 503, {
+          error: error.code,
+          error_description: error.message
+        });
+      }
       return json(req, 400, { error: "invalid_grant" });
     }
   }
@@ -106,32 +109,14 @@ export async function POST(req: NextRequest) {
     return json(req, 400, { error: "invalid_grant" });
   }
 
-  // An identity code is the only subject an auth code may assert on its own;
-  // redeem it and require any embedded subject to agree with it.
-  let externalUserId: string | undefined;
-  let email = grant.email;
-  if (grant.identityCode) {
-    const subject = resolveMcpMintSubject({
-      code: grant.identityCode,
-      externalUserId: grant.externalUserId,
-      email: grant.email
-    });
-    if (!subject.ok) {
-      return json(req, 400, { error: "invalid_grant" });
-    }
-    externalUserId = subject.externalUserId;
-    email = subject.email;
-  } else {
-    externalUserId = grant.externalUserId;
-  }
-  if (!externalUserId) {
+  if (!grant.externalUserId) {
     return json(req, 400, { error: "invalid_grant" });
   }
 
   try {
     const minted = await mintMcpUserTokens({
-      externalUserId,
-      email
+      externalUserId: grant.externalUserId,
+      email: grant.email
     });
     return json(req, 200, {
       access_token: minted.access_token,
@@ -140,7 +125,13 @@ export async function POST(req: NextRequest) {
       expires_in: minted.expires_in,
       ...(minted.scope ? { scope: minted.scope } : {})
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof BillingAppMismatchError) {
+      return json(req, 503, {
+        error: error.code,
+        error_description: error.message
+      });
+    }
     return json(req, 400, { error: "invalid_grant" });
   }
 }
