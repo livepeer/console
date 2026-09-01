@@ -4,12 +4,13 @@ import { describeNetworkCapability, listNetworkCapabilities } from "./discovery"
 import { isSlowCapability, runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
 import { defaultSpendCapUsd } from "./env";
+import { fetchMcpUsage } from "./pymthouse-spend";
 import {
   assertSpendHeadroom,
-  readSpendCap,
-  recordSpend,
+  mergeSpendReport,
   resetSpendCap,
   setSpendCap,
+  type SpendReport,
 } from "./spend-cap";
 import {
   cancelJob,
@@ -35,6 +36,13 @@ function text(data: unknown, isError = false) {
 
 function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+}
+
+async function pymthouseSpendReport(
+  principal: McpPrincipal
+): Promise<SpendReport> {
+  const usage = await fetchMcpUsage(principal);
+  return mergeSpendReport(principalId(principal), usage);
 }
 
 export function buildRawMcpServer(principal: McpPrincipal): McpServer {
@@ -155,10 +163,17 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "get_cost_report",
     {
-      description: "24h MCP spend ledger for this principal (soft cap). Hard limit is PymtHouse spendable.",
+      description:
+        "UTC-day PymtHouse OpenMeter spend for this principal (network fee, same meter as /usage). Campaign cap is soft; hasAccess is the PymtHouse spendable hard limit.",
       inputSchema: {},
     },
-    async () => text(readSpendCap(pid)),
+    async () => {
+      try {
+        return text(await pymthouseSpendReport(principal));
+      } catch (err) {
+        return text(err instanceof Error ? err.message : String(err), true);
+      }
+    },
   );
 
   server.registerTool(
@@ -178,10 +193,11 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           if (cap_usd == null) {
             return text("action=set requires cap_usd", true);
           }
-          return text(setSpendCap(pid, cap_usd));
+          setSpendCap(pid, cap_usd);
+        } else if (op === "reset") {
+          resetSpendCap(pid);
         }
-        if (op === "reset") return text(resetSpendCap(pid));
-        return text(readSpendCap(pid));
+        return text(await pymthouseSpendReport(principal));
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
@@ -208,10 +224,17 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "me_usage",
     {
-      description: "Self-scoped MCP spend for this principal.",
+      description:
+        "UTC-day PymtHouse OpenMeter spend for this principal (same meter as /usage).",
       inputSchema: {},
     },
-    async () => text(readSpendCap(pid)),
+    async () => {
+      try {
+        return text(await pymthouseSpendReport(principal));
+      } catch (err) {
+        return text(err instanceof Error ? err.message : String(err), true);
+      }
+    },
   );
 
   server.registerTool(
@@ -253,9 +276,8 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       },
     },
     async ({ capability, inputs, prompt, async: asyncFlag }) => {
-      const estimate = 0.25;
       try {
-        assertSpendHeadroom(pid, estimate);
+        assertSpendHeadroom(await pymthouseSpendReport(principal));
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
@@ -293,7 +315,6 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
                 createdAt: new Date().toISOString(),
               });
             }
-            recordSpend(pid, estimate);
           } catch (err) {
             putJob({
               id: jobId,
@@ -327,7 +348,6 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             createdAt: new Date().toISOString(),
           });
         }
-        recordSpend(pid, estimate);
         return text({
           capability,
           url,

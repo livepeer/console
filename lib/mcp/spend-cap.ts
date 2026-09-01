@@ -1,48 +1,62 @@
 import { defaultSpendCapUsd } from "./env";
+import type { PymthouseUsageSnapshot } from "./pymthouse-spend";
 
-type CapState = { capUsd: number; spentUsd: number; count: number };
+export type SpendReport = {
+  capUsd: number;
+  spentUsd: number;
+  count: number;
+  networkFeeUsdMicros: string;
+  period: { start: string; end: string };
+  remainingIncludedUsd: number;
+  hasAccess: boolean;
+  source: "pymthouse";
+};
 
-const byPrincipal = new Map<string, CapState>();
+const capByPrincipal = new Map<string, number>();
 
-function state(id: string): CapState {
-  const existing = byPrincipal.get(id);
-  if (existing) return existing;
-  const created = { capUsd: defaultSpendCapUsd(), spentUsd: 0, count: 0 };
-  byPrincipal.set(id, created);
-  return created;
+function capUsdFor(principalId: string): number {
+  return capByPrincipal.get(principalId) ?? defaultSpendCapUsd();
 }
 
-export function readSpendCap(principalId: string): CapState {
-  return { ...state(principalId) };
+export function mergeSpendReport(
+  principalId: string,
+  usage: PymthouseUsageSnapshot
+): SpendReport {
+  return {
+    capUsd: capUsdFor(principalId),
+    spentUsd: usage.spentUsd,
+    count: usage.requestCount,
+    networkFeeUsdMicros: usage.networkFeeUsdMicros,
+    period: usage.period,
+    remainingIncludedUsd: usage.remainingIncludedUsd,
+    hasAccess: usage.hasAccess,
+    source: "pymthouse",
+  };
 }
 
-export function setSpendCap(principalId: string, capUsd: number): CapState {
+export function setSpendCap(principalId: string, capUsd: number): number {
   const max = defaultSpendCapUsd();
   if (capUsd > max) {
     throw new Error(`cap_usd cannot exceed campaign max $${max}`);
   }
-  const current = state(principalId);
-  current.capUsd = capUsd;
-  return { ...current };
+  capByPrincipal.set(principalId, capUsd);
+  return capUsd;
 }
 
-export function resetSpendCap(principalId: string): CapState {
-  const current = state(principalId);
-  current.capUsd = defaultSpendCapUsd();
-  return { ...current };
+export function resetSpendCap(principalId: string): number {
+  capByPrincipal.delete(principalId);
+  return defaultSpendCapUsd();
 }
 
-export function assertSpendHeadroom(principalId: string, estimateUsd: number): void {
-  const current = state(principalId);
-  if (current.spentUsd + estimateUsd > current.capUsd) {
+export function assertSpendHeadroom(report: SpendReport): void {
+  if (!report.hasAccess) {
     throw new Error(
-      `spend_cap exceeded: $${current.spentUsd.toFixed(4)} spent of $${current.capUsd} cap`
+      "PymtHouse spendable is exhausted. Add funds or wait for included usage to reset."
     );
   }
-}
-
-export function recordSpend(principalId: string, usd: number): void {
-  const current = state(principalId);
-  current.spentUsd += usd;
-  current.count += 1;
+  if (report.spentUsd >= report.capUsd) {
+    throw new Error(
+      `spend_cap exceeded: $${report.spentUsd.toFixed(4)} spent of $${report.capUsd} cap`
+    );
+  }
 }
