@@ -5,17 +5,7 @@ export type Asset = {
   createdAt: string;
 };
 
-export type Job = {
-  id: string;
-  status: "running" | "succeeded" | "failed" | "cancelled";
-  capability: string;
-  url?: string;
-  error?: string;
-  createdAt: string;
-};
-
 const assets = new Map<string, Asset[]>();
-const jobs = new Map<string, Job>();
 
 export function rememberAsset(principalId: string, asset: Asset): void {
   const list = assets.get(principalId) ?? [];
@@ -43,21 +33,4 @@ export function forgetAssets(principalId: string, ids?: string[]): number {
   const removed = (assets.get(principalId) ?? []).length - list.length;
   assets.set(principalId, list);
   return removed;
-}
-
-export function putJob(job: Job): void {
-  jobs.set(job.id, job);
-}
-
-export function getJob(id: string): Job | undefined {
-  return jobs.get(id);
-}
-
-export function cancelJob(id: string): Job | undefined {
-  const job = jobs.get(id);
-  if (!job) return undefined;
-  if (job.status === "running") {
-    job.status = "cancelled";
-  }
-  return job;
 }

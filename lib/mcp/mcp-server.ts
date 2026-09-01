@@ -1,18 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { describeNetworkCapability, listNetworkCapabilities } from "./discovery";
-import { isSlowCapability, runInference } from "./gateway";
+import { runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
 import { fetchMcpUsage } from "./pymthouse-spend";
 import { assertSpendable } from "./pymthouse-usage";
-import {
-  cancelJob,
-  forgetAssets,
-  getJob,
-  listAssets,
-  putJob,
-  rememberAsset,
-} from "./store";
+import { forgetAssets, listAssets, rememberAsset } from "./store";
 import { principalId } from "./log";
 
 function text(data: unknown, isError = false) {
@@ -195,99 +188,21 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   );
 
   server.registerTool(
-    "get_create_media",
-    {
-      description: "Poll an async run_capability job by job_id.",
-      inputSchema: { job_id: z.string().min(1) },
-    },
-    async ({ job_id }) => {
-      const job = getJob(job_id);
-      if (!job) return text({ error: "not_found", job_id }, true);
-      return text(job);
-    },
-  );
-
-  server.registerTool(
-    "cancel_job",
-    {
-      description: "Mark a running job cancelled (best-effort; in-flight inference may still finish).",
-      inputSchema: { job_id: z.string().min(1) },
-    },
-    async ({ job_id }) => {
-      const job = cancelJob(job_id);
-      if (!job) return text({ error: "not_found", job_id }, true);
-      return text(job);
-    },
-  );
-
-  server.registerTool(
     "run_capability",
     {
       description:
-        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Slow video jobs return a job_id; poll with get_create_media.",
+        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
       inputSchema: {
         capability: z.string().min(1),
         inputs: z.record(z.unknown()).optional(),
         prompt: z.string().optional(),
-        async: z.boolean().optional(),
       },
     },
-    async ({ capability, inputs, prompt, async: asyncFlag }) => {
+    async ({ capability, inputs, prompt }) => {
       try {
         assertSpendable(await fetchMcpUsage(principal));
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
-      }
-
-      const wantAsync = asyncFlag === true || isSlowCapability(capability);
-      if (wantAsync) {
-        const jobId = newId("job");
-        putJob({
-          id: jobId,
-          status: "running",
-          capability,
-          createdAt: new Date().toISOString(),
-        });
-        void (async () => {
-          try {
-            const result = await runInference(principal, {
-              capability,
-              params: (inputs as Record<string, unknown> | undefined) ?? {},
-              prompt,
-            });
-            const current = getJob(jobId);
-            if (current?.status === "cancelled") return;
-            putJob({
-              id: jobId,
-              status: "succeeded",
-              capability,
-              url: result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl ?? undefined,
-              createdAt: current?.createdAt ?? new Date().toISOString(),
-            });
-            if (result.url) {
-              rememberAsset(pid, {
-                id: newId("asset"),
-                url: result.url,
-                capability,
-                createdAt: new Date().toISOString(),
-              });
-            }
-          } catch (err) {
-            putJob({
-              id: jobId,
-              status: "failed",
-              capability,
-              error: err instanceof Error ? err.message : String(err),
-              createdAt: new Date().toISOString(),
-            });
-          }
-        })();
-        return text({
-          job_id: jobId,
-          status: "running",
-          poll: "get_create_media",
-          capability,
-        });
       }
 
       try {
@@ -295,6 +210,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           capability,
           params: (inputs as Record<string, unknown> | undefined) ?? {},
           prompt,
+          timeoutMs: 780_000,
         });
         const url = result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
         if (url) {
