@@ -37,22 +37,22 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "list_capabilities",
     {
       description:
-        "List network capabilities available on Livepeer live-runners. Use exact names with run_capability.",
+        "List live-runner apps from the SignerSession discovery catalog. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent.",
       inputSchema: {},
     },
-    async () => text({ capabilities: await listNetworkCapabilities() }),
+    async () => text({ capabilities: await listNetworkCapabilities(principal) }),
   );
 
   server.registerTool(
     "describe_capability",
     {
-      description: "Describe one capability by exact name or model_id.",
+      description: "Describe one live-runner app by exact name from list_capabilities.",
       inputSchema: {
         name: z.string().min(1),
       },
     },
     async ({ name }) => {
-      const row = await describeNetworkCapability(name);
+      const row = await describeNetworkCapability(principal, name);
       if (!row) return text({ error: "not_found", name }, true);
       return text(row);
     },
@@ -65,7 +65,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       inputSchema: { name: z.string().min(1) },
     },
     async ({ name }) => {
-      const row = await describeNetworkCapability(name);
+      const row = await describeNetworkCapability(principal, name);
       if (!row) return text({ error: "not_found", name }, true);
       return text({ name: row.name, price: row.price ?? null });
     },
