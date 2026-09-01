@@ -72,9 +72,3 @@ export function discoveryServiceUrl(): string {
 export function discoveryOrigin(): string {
   return new URL(discoveryServiceUrl()).origin;
 }
-
-export function defaultSpendCapUsd(): number {
-  const raw = process.env.DEFAULT_SPEND_CAP_USD?.trim();
-  const n = raw ? Number(raw) : 25;
-  return Number.isFinite(n) && n > 0 ? n : 25;
-}

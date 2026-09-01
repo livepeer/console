@@ -3,14 +3,8 @@ import { z } from "zod";
 import { describeNetworkCapability, listNetworkCapabilities } from "./discovery";
 import { isSlowCapability, runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
-import { defaultSpendCapUsd } from "./env";
-import {
-  assertSpendHeadroom,
-  readSpendCap,
-  recordSpend,
-  resetSpendCap,
-  setSpendCap,
-} from "./spend-cap";
+import { fetchMcpUsage } from "./pymthouse-spend";
+import { assertSpendable } from "./pymthouse-usage";
 import {
   cancelJob,
   forgetAssets,
@@ -155,33 +149,13 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "get_cost_report",
     {
-      description: "24h MCP spend ledger for this principal (soft cap). Hard limit is PymtHouse spendable.",
+      description:
+        "Current UTC calendar day OpenMeter network-fee spend (00:00–23:59 UTC). hasAccess is the PymtHouse spendable hard limit.",
       inputSchema: {},
     },
-    async () => text(readSpendCap(pid)),
-  );
-
-  server.registerTool(
-    "spend_cap",
-    {
-      description:
-        "Read or lower the campaign spend cap. Cannot raise above DEFAULT_SPEND_CAP_USD.",
-      inputSchema: {
-        action: z.enum(["read", "set", "reset"]).optional(),
-        cap_usd: z.number().positive().optional(),
-      },
-    },
-    async ({ action, cap_usd }) => {
-      const op = action ?? "read";
+    async () => {
       try {
-        if (op === "set") {
-          if (cap_usd == null) {
-            return text("action=set requires cap_usd", true);
-          }
-          return text(setSpendCap(pid, cap_usd));
-        }
-        if (op === "reset") return text(resetSpendCap(pid));
-        return text(readSpendCap(pid));
+        return text(await fetchMcpUsage(principal));
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
@@ -201,17 +175,23 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         public_client_id: principal.publicClientId,
         email: principal.email ?? null,
         console_access: "unknown",
-        campaign_spend_cap_usd: defaultSpendCapUsd(),
       }),
   );
 
   server.registerTool(
     "me_usage",
     {
-      description: "Self-scoped MCP spend for this principal.",
+      description:
+        "Current UTC calendar day OpenMeter network-fee spend (00:00–23:59 UTC).",
       inputSchema: {},
     },
-    async () => text(readSpendCap(pid)),
+    async () => {
+      try {
+        return text(await fetchMcpUsage(principal));
+      } catch (err) {
+        return text(err instanceof Error ? err.message : String(err), true);
+      }
+    },
   );
 
   server.registerTool(
@@ -253,9 +233,8 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       },
     },
     async ({ capability, inputs, prompt, async: asyncFlag }) => {
-      const estimate = 0.25;
       try {
-        assertSpendHeadroom(pid, estimate);
+        assertSpendable(await fetchMcpUsage(principal));
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
@@ -293,7 +272,6 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
                 createdAt: new Date().toISOString(),
               });
             }
-            recordSpend(pid, estimate);
           } catch (err) {
             putJob({
               id: jobId,
@@ -327,7 +305,6 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             createdAt: new Date().toISOString(),
           });
         }
-        recordSpend(pid, estimate);
         return text({
           capability,
           url,
