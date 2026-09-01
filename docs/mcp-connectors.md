@@ -46,4 +46,4 @@ Hermes opens a browser and waits on a loopback callback. If Hermes is a remote g
 
 ## After login
 
-Use `list_capabilities` then `run_capability` with exact capability names. Stay within the campaign spend cap (`spend_cap` / `me_usage`).
+Use `list_capabilities` then `run_capability` with exact capability names. Spend is PymtHouse OpenMeter (`get_cost_report` / `me_usage`); `run_capability` is refused when spendable (`hasAccess`) is exhausted.
