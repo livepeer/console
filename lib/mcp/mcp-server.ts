@@ -191,14 +191,15 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "run_capability",
     {
       description:
-        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
+        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Persistent apps need `endpoint` (the app path, e.g. /hello). Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
       inputSchema: {
         capability: z.string().min(1),
         inputs: z.record(z.unknown()).optional(),
         prompt: z.string().optional(),
+        endpoint: z.string().optional(),
       },
     },
-    async ({ capability, inputs, prompt }) => {
+    async ({ capability, inputs, prompt, endpoint }) => {
       try {
         assertSpendable(await fetchMcpUsage(principal));
       } catch (err) {
@@ -210,6 +211,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           capability,
           params: (inputs as Record<string, unknown> | undefined) ?? {},
           prompt,
+          endpoint,
           timeoutMs: 780_000,
         });
         const url = result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
