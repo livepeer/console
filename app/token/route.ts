@@ -3,8 +3,8 @@ import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
 import { parseAuthCode, parseClientId, verifyPkceS256 } from "@/lib/mcp/as";
 import { mintMcpUserTokens } from "@/lib/console/mcp-internal-mint";
 import {
-  redeemMcpIdentityCode,
-  redeemMcpRefreshToken
+  redeemMcpRefreshToken,
+  resolveMcpMintSubject
 } from "@/lib/console/mcp-oauth-login-bridge";
 
 export const runtime = "nodejs";
@@ -106,15 +106,23 @@ export async function POST(req: NextRequest) {
     return json(req, 400, { error: "invalid_grant" });
   }
 
-  let externalUserId = grant.externalUserId;
+  // An identity code is the only subject an auth code may assert on its own;
+  // redeem it and require any embedded subject to agree with it.
+  let externalUserId: string | undefined;
   let email = grant.email;
-  if (!externalUserId && grant.identityCode) {
-    const identity = redeemMcpIdentityCode(grant.identityCode);
-    if (!identity) {
+  if (grant.identityCode) {
+    const subject = resolveMcpMintSubject({
+      code: grant.identityCode,
+      externalUserId: grant.externalUserId,
+      email: grant.email
+    });
+    if (!subject.ok) {
       return json(req, 400, { error: "invalid_grant" });
     }
-    externalUserId = identity.externalUserId;
-    email = email ?? identity.email;
+    externalUserId = subject.externalUserId;
+    email = subject.email;
+  } else {
+    externalUserId = grant.externalUserId;
   }
   if (!externalUserId) {
     return json(req, 400, { error: "invalid_grant" });

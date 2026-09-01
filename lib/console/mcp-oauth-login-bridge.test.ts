@@ -112,6 +112,20 @@ test("identity code round-trips and mint subject requires matching eu", () => {
   );
 });
 
+test("an unsigned identity code cannot assert a subject", () => {
+  process.env.MCP_OAUTH_BRIDGE_SECRET = "test-bridge-secret";
+  // /token resolves the subject through this; a caller who supplies a forged
+  // code plus the subject it wants must not mint for that subject.
+  assert.equal(
+    resolveMcpMintSubject({
+      code: "mcp_id_forged",
+      externalUserId: "eu_victim",
+    }).ok,
+    false
+  );
+  assert.equal(resolveMcpMintSubject({ externalUserId: "eu_victim" }).ok, false);
+});
+
 test("refresh token round-trips eu", () => {
   process.env.MCP_OAUTH_BRIDGE_SECRET = "test-bridge-secret";
   const token = issueMcpRefreshToken("eu_abc");

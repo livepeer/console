@@ -63,5 +63,5 @@ export function extractBearer(authorization: string | null): string | null {
   if (value.toLowerCase().startsWith("bearer ")) {
     return value.slice(7).trim() || null;
   }
-  return value;
+  return null;
 }

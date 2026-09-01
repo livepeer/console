@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+
+import { auth0 } from "@/lib/auth0";
+import { externalUserIdFromSub } from "@/lib/console/external-user-id";
 import {
   issueAuthCode,
   parsePending,
@@ -10,24 +13,37 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const identityCode = req.nextUrl.searchParams.get("code")?.trim() ?? "";
   const state = req.nextUrl.searchParams.get("state")?.trim() ?? "";
-  const externalUserId =
-    req.nextUrl.searchParams.get("external_user_id")?.trim() || undefined;
-  const email = req.nextUrl.searchParams.get("email")?.trim() || undefined;
+  const origin = req.nextUrl.origin;
 
   const pending = parsePending(req.cookies.get(PKCE_COOKIE)?.value);
   const clear = NextResponse.redirect(new URL("/", req.url), 302);
   clear.cookies.set(PKCE_COOKIE, "", { ...pkceCookieOptions(), maxAge: 0 });
 
-  if (!pending || !identityCode || pending.nonce !== state) {
+  if (!pending || pending.nonce !== state) {
     return clear;
   }
+
+  // The subject is whoever holds the Console session. Query parameters carry no
+  // identity here — this endpoint is reachable without signing in.
+  const session = await auth0.getSession();
+  const sub = session?.user?.sub?.trim();
+  if (!sub) {
+    const callback = `${origin}/api/mcp/oauth/callback`;
+    return NextResponse.redirect(
+      new URL(
+        `/login?mcp_oauth=1&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(callback)}`,
+        origin
+      )
+    );
+  }
+
+  const externalUserId = await externalUserIdFromSub(sub);
+  const email = session?.user?.email?.trim() || undefined;
 
   let code: string;
   try {
     code = issueAuthCode({
-      identityCode,
       redirectUri: pending.redirectUri,
       codeChallenge: pending.codeChallenge,
       clientId: pending.clientId,
