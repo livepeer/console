@@ -25,6 +25,39 @@ export function parseMintAllowlist(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function trimSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function originFromRaw(raw: string | undefined): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return trimSlash(value);
+  }
+  return trimSlash(`https://${value}`);
+}
+
+export function firstPartyMcpCallbackUrls(requestOrigin?: string): string[] {
+  const origins = new Set<string>();
+  const add = (raw?: string) => {
+    const origin = originFromRaw(raw);
+    if (origin) origins.add(origin);
+  };
+  add(process.env.APP_BASE_URL);
+  add(process.env.MCP_PUBLIC_ORIGIN);
+  add(process.env.VERCEL_PROJECT_PRODUCTION_URL);
+  add(requestOrigin);
+  return [...origins].map((origin) => `${origin}/api/mcp/oauth/callback`);
+}
+
+export function isFirstPartyMcpCallback(
+  redirectUri: string,
+  requestOrigin?: string
+): boolean {
+  return firstPartyMcpCallbackUrls(requestOrigin).includes(redirectUri);
+}
+
 export function mcpOauthRedirectAllowlist(): string[] {
   const explicit = parseMintAllowlist(process.env.MCP_OAUTH_REDIRECT_ALLOWLIST);
   if (explicit.length > 0) return explicit;
@@ -33,14 +66,19 @@ export function mcpOauthRedirectAllowlist(): string[] {
   );
 }
 
-export function isAllowedMcpRedirectUri(redirectUri: string): boolean {
-  return mcpOauthRedirectAllowlist().includes(redirectUri);
+export function isAllowedMcpRedirectUri(
+  redirectUri: string,
+  requestOrigin?: string
+): boolean {
+  if (mcpOauthRedirectAllowlist().includes(redirectUri)) return true;
+  return isFirstPartyMcpCallback(redirectUri, requestOrigin);
 }
 
 export function parseMcpOauthLoginQuery(input: {
   mcpOauth?: string;
   state?: string;
   redirectUri?: string;
+  requestOrigin?: string;
 }): { ok: true; pending: McpOauthPending } | { ok: false; error: string } {
   if (input.mcpOauth !== "1") {
     return { ok: false, error: "mcp_oauth_inactive" };
@@ -50,7 +88,7 @@ export function parseMcpOauthLoginQuery(input: {
   if (!state || state.length > MAX_STATE_CHARS) {
     return { ok: false, error: "invalid_state" };
   }
-  if (!redirectUri || !isAllowedMcpRedirectUri(redirectUri)) {
+  if (!redirectUri || !isAllowedMcpRedirectUri(redirectUri, input.requestOrigin)) {
     return { ok: false, error: "invalid_redirect_uri" };
   }
   return { ok: true, pending: { state, redirectUri } };
@@ -93,7 +131,8 @@ export function encodeMcpOauthPendingCookie(pending: McpOauthPending): string {
 }
 
 export function decodeMcpOauthPendingCookie(
-  value: string | undefined
+  value: string | undefined,
+  requestOrigin?: string
 ): McpOauthPending | null {
   if (!value) return null;
   const payload = verifySignedPayload(value);
@@ -112,7 +151,7 @@ export function decodeMcpOauthPendingCookie(
     ) {
       return null;
     }
-    if (!isAllowedMcpRedirectUri(parsed.redirectUri)) {
+    if (!isAllowedMcpRedirectUri(parsed.redirectUri, requestOrigin)) {
       return null;
     }
     return { state: parsed.state, redirectUri: parsed.redirectUri };

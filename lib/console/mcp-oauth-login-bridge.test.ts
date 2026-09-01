@@ -11,7 +11,7 @@ import {
   parseMcpOauthLoginQuery,
   redeemMcpIdentityCode,
   redeemMcpRefreshToken,
-  resolveMcpMintSubject,
+  resolveMcpMintSubject
 } from "./mcp-oauth-login-bridge";
 
 const CALLBACK = "https://agent.livepeer.org/api/mcp/oauth/callback";
@@ -46,9 +46,33 @@ test("parseMcpOauthLoginQuery rejects evil redirect and missing state", () => {
 
 test("isAllowedMcpRedirectUri derives callback from mint allowlist", () => {
   delete process.env.MCP_OAUTH_REDIRECT_ALLOWLIST;
+  delete process.env.APP_BASE_URL;
   process.env.MCP_INTERNAL_MINT_ALLOWLIST = "https://agent.livepeer.org";
   assert.equal(isAllowedMcpRedirectUri(CALLBACK), true);
   assert.equal(isAllowedMcpRedirectUri("https://evil.example/cb"), false);
+});
+
+test("first-party Console callback is allowed from APP_BASE_URL", () => {
+  delete process.env.MCP_OAUTH_REDIRECT_ALLOWLIST;
+  delete process.env.MCP_INTERNAL_MINT_ALLOWLIST;
+  process.env.APP_BASE_URL = "https://dashboard.livepeer.org";
+  assert.equal(
+    isAllowedMcpRedirectUri(
+      "https://dashboard.livepeer.org/api/mcp/oauth/callback"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedMcpRedirectUri(
+      "http://localhost:3000/api/mcp/oauth/callback",
+      "http://localhost:3000"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedMcpRedirectUri("https://evil.example/api/mcp/oauth/callback"),
+    false
+  );
 });
 
 test("pending cookie round-trips and rejects tampering", () => {
@@ -86,6 +110,20 @@ test("identity code round-trips and mint subject requires matching eu", () => {
     resolveMcpMintSubject({ code, externalUserId: "eu_other" }).ok,
     false
   );
+});
+
+test("an unsigned identity code cannot assert a subject", () => {
+  process.env.MCP_OAUTH_BRIDGE_SECRET = "test-bridge-secret";
+  // /token resolves the subject through this; a caller who supplies a forged
+  // code plus the subject it wants must not mint for that subject.
+  assert.equal(
+    resolveMcpMintSubject({
+      code: "mcp_id_forged",
+      externalUserId: "eu_victim",
+    }).ok,
+    false
+  );
+  assert.equal(resolveMcpMintSubject({ externalUserId: "eu_victim" }).ok, false);
 });
 
 test("refresh token round-trips eu", () => {

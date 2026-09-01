@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     mcpOauth: "1",
     state: request.nextUrl.searchParams.get("state") ?? undefined,
     redirectUri: request.nextUrl.searchParams.get("redirect_uri") ?? undefined,
+    requestOrigin: request.nextUrl.origin
   });
   const origin = request.nextUrl.origin;
   if (!parsed.ok) {
