@@ -45,16 +45,21 @@ export function forgetAssets(principalId: string, ids?: string[]): number {
   return removed;
 }
 
-export function putJob(job: Job): void {
-  jobs.set(job.id, job);
+/** Jobs are keyed per principal so a leaked job_id is not a read/cancel handle. */
+function jobKey(principalId: string, id: string): string {
+  return `${principalId}\u0000${id}`;
 }
 
-export function getJob(id: string): Job | undefined {
-  return jobs.get(id);
+export function putJob(principalId: string, job: Job): void {
+  jobs.set(jobKey(principalId, job.id), job);
 }
 
-export function cancelJob(id: string): Job | undefined {
-  const job = jobs.get(id);
+export function getJob(principalId: string, id: string): Job | undefined {
+  return jobs.get(jobKey(principalId, id));
+}
+
+export function cancelJob(principalId: string, id: string): Job | undefined {
+  const job = getJob(principalId, id);
   if (!job) return undefined;
   if (job.status === "running") {
     job.status = "cancelled";

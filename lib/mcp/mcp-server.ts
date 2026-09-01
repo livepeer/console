@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { after } from "next/server";
 import { z } from "zod";
 import { describeNetworkCapability, listNetworkCapabilities } from "./discovery";
 import { isSlowCapability, runInference } from "./gateway";
@@ -197,11 +198,12 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "get_create_media",
     {
-      description: "Poll an async run_capability job by job_id.",
+      description:
+        "Poll an async run_capability job by job_id. Jobs live in the isolate that started them, so a poll routed to another instance reports not_found.",
       inputSchema: { job_id: z.string().min(1) },
     },
     async ({ job_id }) => {
-      const job = getJob(job_id);
+      const job = getJob(pid, job_id);
       if (!job) return text({ error: "not_found", job_id }, true);
       return text(job);
     },
@@ -214,7 +216,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       inputSchema: { job_id: z.string().min(1) },
     },
     async ({ job_id }) => {
-      const job = cancelJob(job_id);
+      const job = cancelJob(pid, job_id);
       if (!job) return text({ error: "not_found", job_id }, true);
       return text(job);
     },
@@ -242,22 +244,24 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       const wantAsync = asyncFlag === true || isSlowCapability(capability);
       if (wantAsync) {
         const jobId = newId("job");
-        putJob({
+        putJob(pid, {
           id: jobId,
           status: "running",
           capability,
           createdAt: new Date().toISOString(),
         });
-        void (async () => {
+        // `after` keeps the isolate alive past the response; a bare floating
+        // promise can be frozen before the inference returns.
+        after(async () => {
           try {
             const result = await runInference(principal, {
               capability,
               params: (inputs as Record<string, unknown> | undefined) ?? {},
               prompt,
             });
-            const current = getJob(jobId);
+            const current = getJob(pid, jobId);
             if (current?.status === "cancelled") return;
-            putJob({
+            putJob(pid, {
               id: jobId,
               status: "succeeded",
               capability,
@@ -273,7 +277,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
               });
             }
           } catch (err) {
-            putJob({
+            putJob(pid, {
               id: jobId,
               status: "failed",
               capability,
@@ -281,7 +285,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
               createdAt: new Date().toISOString(),
             });
           }
-        })();
+        });
         return text({
           job_id: jobId,
           status: "running",
