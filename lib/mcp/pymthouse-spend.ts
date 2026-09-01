@@ -10,6 +10,7 @@ export type { PymthouseUsageSnapshot };
 export async function fetchMcpUsage(
   principal: McpPrincipal
 ): Promise<PymthouseUsageSnapshot> {
+  // rolling + 1 day is today 00:00–23:59 UTC (BFF calendar window, not last 24h).
   const payload = await fetchAccountUsageForExternalUser({
     externalUserId: principal.externalUserId,
     periodDays: 1,

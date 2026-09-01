@@ -150,7 +150,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "get_cost_report",
     {
       description:
-        "UTC-day PymtHouse OpenMeter spend for this principal (network fee). hasAccess is the PymtHouse spendable hard limit.",
+        "Current UTC calendar day OpenMeter network-fee spend (00:00–23:59 UTC). hasAccess is the PymtHouse spendable hard limit.",
       inputSchema: {},
     },
     async () => {
@@ -182,7 +182,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "me_usage",
     {
       description:
-        "UTC-day PymtHouse OpenMeter spend for this principal (network fee).",
+        "Current UTC calendar day OpenMeter network-fee spend (00:00–23:59 UTC).",
       inputSchema: {},
     },
     async () => {

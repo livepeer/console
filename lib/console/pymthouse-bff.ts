@@ -81,6 +81,7 @@ export async function mintEndUserAccessToken(
   }
 }
 
+/** Last `days` UTC calendar days inclusive of today — not a trailing clock window. */
 function rollingPeriodDays(
   days: number,
   now = new Date()
@@ -151,6 +152,7 @@ async function fetchUsageBalance(
 export async function fetchAccountUsageForExternalUser(input: {
   externalUserId: string;
   periodDays?: number;
+  /** `rolling` = last `periodDays` UTC calendar days inclusive of today; `mtd` = current UTC month. */
   window?: "rolling" | "mtd";
   includePrior?: boolean;
 }): Promise<AccountUsagePayload> {
