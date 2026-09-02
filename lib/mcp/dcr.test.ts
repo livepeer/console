@@ -31,6 +31,31 @@ test("RFC 8252 loopback any path is allowed", () => {
   );
 });
 
+test("Cursor MCP callbacks are allowed", () => {
+  assert.equal(
+    isAllowedClientRedirectUri("cursor://anysphere.cursor-mcp/oauth/callback"),
+    true
+  );
+  assert.equal(
+    isAllowedClientRedirectUri(
+      "https://www.cursor.com/agents/mcp/oauth/callback"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("https://cursor.com/agents/mcp/oauth/callback"),
+    true
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("cursor://evil/oauth/callback"),
+    false
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("https://www.cursor.com/oauth/callback"),
+    false
+  );
+});
+
 test("evil redirects are refused", () => {
   assert.equal(isAllowedClientRedirectUri("https://evil.example/callback"), false);
   assert.equal(
