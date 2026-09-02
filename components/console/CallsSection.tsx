@@ -222,13 +222,21 @@ export default function CallsSection({
             {/* Search only covers loaded rows — the API filters by cursor and
                 limit, nothing else — so an empty result must not read as
                 "this call doesn't exist" while more pages remain. */}
-            <p className="text-[13px] text-fg-faint">
+            <p className="text-[13px] text-fg-muted">
               {query
                 ? requests.nextCursor
                   ? `No loaded calls match “${query}”`
                   : `No calls match “${query}”`
                 : "No signed requests this billing cycle"}
             </p>
+            {!query && (
+              // The timing hint lives here, not on the spend table above:
+              // a new call lands in this log first and rolls up into spend
+              // afterwards.
+              <p className="max-w-sm text-[12.5px] text-fg-faint">
+                Your first call shows up here within about a minute.
+              </p>
+            )}
             {query && (
               <div className="flex items-center gap-2">
                 {requests.nextCursor && (
