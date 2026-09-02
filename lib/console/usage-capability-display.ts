@@ -1,15 +1,22 @@
 import type { AccountUsagePipelineRow } from "@/lib/console/account-usage";
 
+/**
+ * Seven validated categorical slots (see the `--color-series-*` tokens in
+ * globals.css), assigned in fixed order by cost rank. Colour follows the
+ * capability, never its row number, and it never cycles: the 8th capability
+ * and beyond wear the neutral "other" step — past seven, another hue is
+ * indistinguishable under colour-vision deficiency, so the tail is context.
+ */
 const CAPABILITY_COLORS = [
-  "#4ade80",
-  "#38bdf8",
-  "#a78bfa",
-  "#fb923c",
-  "#f472b6",
-  "#facc15",
-  "#2dd4bf",
-  "#818cf8",
+  "var(--color-series-1)",
+  "var(--color-series-2)",
+  "var(--color-series-3)",
+  "var(--color-series-4)",
+  "var(--color-series-5)",
+  "var(--color-series-6)",
+  "var(--color-series-7)",
 ];
+export const CAPABILITY_COLOR_OTHER = "var(--color-series-other)";
 
 export type UsageCapabilityRow = AccountUsagePipelineRow & {
   id: string;
@@ -111,8 +118,26 @@ export function buildUsageCapabilityRows(input: {
   );
   const dayKeys = utcDateKeysForPeriod(input.period.start, input.period.end);
 
+  // Colour follows the capability, not its row. Slots are assigned over the
+  // sorted union of this period's and the prior period's capabilities, so
+  // "Daydream Video is blue" survives a 7d → 30d switch and a change in cost
+  // rank. It was assigned by server order, which repainted survivors
+  // whenever the set changed. Residual limit: a capability's slot can still
+  // shift if a lexically earlier one appears for the first time.
+  const slotByKey = new Map(
+    [
+      ...new Set(
+        [...input.current, ...input.prior].map(
+          (row) => `${row.pipeline}|${row.modelId}`
+        )
+      ),
+    ]
+      .sort()
+      .map((key, slot) => [key, slot] as const)
+  );
+
   return input.current
-    .map((row, index) => {
+    .map((row) => {
       const key = `${row.pipeline}|${row.modelId}`;
       const priorRow = priorByKey.get(key);
       const priorSum = priorRow?.requestCount ?? 0;
@@ -141,7 +166,8 @@ export function buildUsageCapabilityRows(input: {
         ...row,
         id: key,
         name: humanizePipelineModel(row.pipeline, row.modelId),
-        color: CAPABILITY_COLORS[index % CAPABILITY_COLORS.length]!,
+        color:
+          CAPABILITY_COLORS[slotByKey.get(key) ?? -1] ?? CAPABILITY_COLOR_OTHER,
         spendUsd,
         data,
         priorSum,

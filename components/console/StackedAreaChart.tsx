@@ -34,16 +34,25 @@ function formatDayTooltipTitle(dayKey: string, todayKey: string): string {
 }
 
 /** Integer Y-axis ticks from 0 through a padded max. */
+/**
+ * Clean ticks from 0 through a padded max. Steps snap to 1/2/5 × 10^k so
+ * dollar axes read 0 / 5 / 10 rather than 0 / 7 / 14, and sub-unit ranges
+ * (a day of spend under $4) get 0.5 / 1 / 1.5 instead of collapsing to 0 / 1.
+ */
 function buildYTicks(maxValue: number, tickCount = 4): number[] {
   if (maxValue <= 0) {
     return [0];
   }
-  const padded = Math.ceil(maxValue * 1.1);
-  const step = Math.max(1, Math.ceil(padded / tickCount));
+  const padded = maxValue * 1.1;
+  const raw = padded / tickCount;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  const step = nice * mag;
   const top = Math.ceil(padded / step) * step;
   const ticks: number[] = [];
-  for (let v = 0; v <= top; v += step) {
-    ticks.push(v);
+  for (let v = 0; v <= top + step / 2; v += step) {
+    ticks.push(Number(v.toFixed(6)));
   }
   return ticks;
 }
@@ -53,11 +62,27 @@ export default function StackedAreaChart({
   colors,
   dayKeys,
   height = 200,
+  formatValue = (n) => n.toLocaleString("en-US"),
+  unit = (n) => (n === 1 ? "job" : "jobs"),
+  lineColor,
+  breakdown,
 }: {
   series: { name: string; data: number[] }[];
   colors: string[];
   dayKeys?: string[];
   height?: number;
+  /** Axis ticks and tooltip values. Default: integer counts. */
+  formatValue?: (n: number) => string;
+  /** The word after the day's total in the tooltip. Default: job/jobs. */
+  unit?: (n: number) => string;
+  /** The top line. Defaults to the last series colour. */
+  lineColor?: string;
+  /**
+   * Rows for the tooltip only — not plotted. Lets a single-series plot (one
+   * wash, one line) still answer "which capability was that?" on hover
+   * without stacking seven fills on the chart.
+   */
+  breakdown?: { name: string; data: number[]; color: string }[];
 }) {
   const w = 720;
   const h = height;
@@ -147,6 +172,22 @@ export default function StackedAreaChart({
   );
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  // The one day that is a tab stop. Follows the active day so Tab-then-
+  // Shift-Tab returns where you left; otherwise the most recent day, which
+  // is the one a reader most often wants first.
+  const [roving, setRoving] = useState<number | null>(null);
+
+  // Rows under the day's total in the tooltip: the explicit breakdown when
+  // given, else the plotted series themselves (only worth listing if there
+  // is more than one).
+  const tooltipRows = useMemo(
+    () =>
+      breakdown ??
+      (series.length > 1
+        ? series.map((s, si) => ({ ...s, color: colors[si] ?? "" }))
+        : []),
+    [breakdown, series, colors]
+  );
   const plotRef = useRef<HTMLDivElement>(null);
 
   const resolveIndexFromClientX = useCallback(
@@ -200,7 +241,7 @@ export default function StackedAreaChart({
       >
         {[...yTicks].reverse().map((tick) => (
           <span key={tick} className="text-right leading-none">
-            {tick.toLocaleString("en-US")}
+            {formatValue(tick)}
           </span>
         ))}
       </div>
@@ -221,18 +262,23 @@ export default function StackedAreaChart({
             y1={yAt(tick)}
             y2={yAt(tick)}
             stroke="var(--color-tint)"
-            strokeDasharray={tick === 0 ? undefined : "3 4"}
             strokeOpacity={tick === 0 ? 1 : 0.65}
           />
         ))}
         {layers.map((l, i) => (
-          <path key={i} d={l.d} fill={l.color} fillOpacity={0.45} />
+          <path key={i} d={l.d} fill={l.color} fillOpacity={0.12} />
         ))}
         <path
           d={topStroke}
           fill="none"
-          stroke={colors[colors.length - 1] ?? "var(--color-green-bright)"}
-          strokeWidth="1.25"
+          stroke={
+            lineColor ??
+            colors[colors.length - 1] ??
+            "var(--color-green-bright)"
+          }
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
         />
         {activeIndex !== null && (
           <>
@@ -262,7 +308,7 @@ export default function StackedAreaChart({
                   r={3.5}
                   fill={colors[si]}
                   stroke="var(--color-dark-lighter)"
-                  strokeWidth={1.25}
+                  strokeWidth={2}
                 />
               );
             })}
@@ -311,13 +357,48 @@ export default function StackedAreaChart({
           const idx = resolveIndexFromClientX(e.clientX);
           setHoverIndex(idx);
         }}
+        // Keyboard: ONE tab stop enters the chart (roving tabindex — thirty
+        // stops for thirty days was a Tab-key trap); ←/→ walk the days and
+        // reveal the same tooltip hover does. Blur only clears when focus
+        // leaves the plot entirely, so arrowing between days doesn't flicker.
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setHoverIndex(null);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          e.preventDefault();
+          const cur = hoverIndex ?? (e.key === "ArrowRight" ? -1 : days);
+          const next = Math.min(
+            days - 1,
+            Math.max(0, cur + (e.key === "ArrowRight" ? 1 : -1))
+          );
+          setHoverIndex(next);
+          setRoving(next);
+          (
+            e.currentTarget.querySelectorAll("[data-day]")[next] as
+              | HTMLElement
+              | undefined
+          )?.focus();
+        }}
       >
-        <div className="flex h-full w-full">
+        <div
+          className="flex h-full w-full"
+          role="group"
+          aria-label="Spend by day"
+        >
           {Array.from({ length: days }, (_, i) => (
             <div
               key={i}
-              className="h-full min-w-0 flex-1"
-              aria-label={`${formatDayTooltipTitle(labelKeys[i]!, todayKey)}: ${totals[i]} jobs`}
+              data-day={i}
+              tabIndex={i === (roving ?? days - 1) ? 0 : -1}
+              onFocus={() => {
+                setHoverIndex(i);
+                setRoving(i);
+              }}
+              className="h-full min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-bright/30"
+              aria-label={`${formatDayTooltipTitle(labelKeys[i]!, todayKey)}: ${formatValue(totals[i]!)} ${unit(totals[i]!)}`}
             />
           ))}
         </div>
@@ -338,13 +419,13 @@ export default function StackedAreaChart({
             </p>
             <p className="mt-0.5 font-mono text-[10px] tabular-nums text-fg-muted">
               <span className="text-fg-strong">
-                {totals[activeIndex]!.toLocaleString("en-US")}
+                {formatValue(totals[activeIndex]!)}
               </span>{" "}
-              {totals[activeIndex] === 1 ? "job" : "jobs"}
+              {unit(totals[activeIndex]!)}
             </p>
-            {series.length > 0 && (
+            {tooltipRows.length > 0 && (
               <ul className="mt-1.5 space-y-1 border-t border-hairline pt-1.5">
-                {series.map((s, si) => {
+                {tooltipRows.map((s) => {
                   const count = s.data[activeIndex] ?? 0;
                   if (count <= 0) {
                     return null;
@@ -357,13 +438,13 @@ export default function StackedAreaChart({
                       <span className="flex min-w-0 items-center gap-1.5 text-fg-muted">
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-[2px]"
-                          style={{ background: colors[si] }}
+                          style={{ background: s.color }}
                           aria-hidden="true"
                         />
                         <span className="truncate">{s.name}</span>
                       </span>
                       <span className="text-fg-strong">
-                        {count.toLocaleString("en-US")}
+                        {formatValue(count)}
                       </span>
                     </li>
                   );
@@ -429,6 +510,8 @@ export function MiniSpark({
     .join(" ");
   const area = `M0,${chartH} L${pts.replace(/ /g, " L")} L${w},${chartH} Z`;
   const gradId = `mini-spark-${color.replace(/[^a-z0-9]/gi, "")}`;
+  // `color` may be a `var(--color-series-N)`: presentation attributes don't
+  // resolve custom properties, but `style` does.
   return (
     <svg
       viewBox={`0 0 ${w} ${chartH}`}
@@ -438,12 +521,19 @@ export function MiniSpark({
     >
       <defs>
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.18" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
+          <stop offset="0" style={{ stopColor: color }} stopOpacity="0.18" />
+          <stop offset="1" style={{ stopColor: color }} stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gradId})`} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.25" />
+      <polyline
+        points={pts}
+        fill="none"
+        style={{ stroke: color }}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

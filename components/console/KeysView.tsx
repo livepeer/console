@@ -557,7 +557,7 @@ export default function KeysView() {
                       <div
                         ref={menuRef}
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 top-full z-30 mt-1 min-w-[168px] rounded-md border border-subtle bg-dark p-1 shadow-popover"
+                        className="absolute right-0 top-full z-30 mt-1 min-w-[168px] rounded-md border border-subtle bg-dark p-1 shadow-[var(--shadow-popover)]"
                       >
                         <button
                           type="button"

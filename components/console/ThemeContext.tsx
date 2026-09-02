@@ -1,5 +1,7 @@
 "use client";
 
+import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
+
 import {
   createContext,
   useCallback,
@@ -18,6 +20,20 @@ export type ThemePreference = "light" | "dark" | "system";
 
 /** What's actually applied to `<html data-theme="...">`. Always concrete. */
 export type ResolvedTheme = "light" | "dark";
+
+/**
+ * The three choices, in the order every theme control shows them. Shared by
+ * the Appearance settings view and the account menu so they can't drift.
+ */
+export const THEME_OPTIONS: {
+  value: ThemePreference;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
 
 interface ThemeContextValue {
   /** The user's stored preference. */

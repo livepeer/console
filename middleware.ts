@@ -14,13 +14,23 @@ function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
   return to;
 }
 
+// Routes that exist only for a signed-in user. Signed-out requests are
+// redirected here, in middleware, rather than by the page: a client-side
+// redirect runs after the console chrome has already painted, so a cold
+// signed-out load flashed the sidebar for a frame before landing on /login.
+// Usage and Settings are deliberately not listed — they keep the in-shell
+// sign-in wall (see the comment in app/(app)/usage/page.tsx).
+function isSessionOnlyPath(pathname: string): boolean {
+  return pathname === "/" || pathname === "/home";
+}
+
 export async function middleware(request: NextRequest) {
   // Dev-only: answer auth + PymtHouse endpoints from fixtures so auth-gated
   // surfaces can be designed without credentials. See lib/console/dev-mock.ts.
-  if (
+  const devMock =
     process.env.NODE_ENV !== "production" &&
-    process.env.CONSOLE_DEV_MOCK === "1"
-  ) {
+    process.env.CONSOLE_DEV_MOCK === "1";
+  if (devMock) {
     const mocked = devMockResponse(
       request.nextUrl.pathname,
       request.nextUrl.searchParams
@@ -34,16 +44,25 @@ export async function middleware(request: NextRequest) {
     return authRes;
   }
 
+  const redirectTo = (path: string) =>
+    copyAuthCookies(authRes, NextResponse.redirect(new URL(path, request.url)));
+
   try {
     const session = await auth0.getSession(request);
-    if (!session?.user) {
-      return authRes;
+    // The dev mock has no real session cookie but is always "signed in" —
+    // its /auth/profile fixture is what the client reads.
+    const signedIn = devMock || !!session?.user;
+
+    if (!signedIn) {
+      return isSessionOnlyPath(pathname) ? redirectTo("/login") : authRes;
     }
-    if (!isEmailAllowlisted(session.user.email)) {
-      return copyAuthCookies(
-        authRes,
-        NextResponse.redirect(new URL("/waitlist", request.url)),
-      );
+    if (!devMock && !isEmailAllowlisted(session?.user?.email)) {
+      return redirectTo("/waitlist");
+    }
+    // `/` is a pure redirect in both auth states; resolve it here too so the
+    // signed-in case doesn't paint an empty shell before moving to /home.
+    if (pathname === "/") {
+      return redirectTo("/home");
     }
   } catch {
     return authRes;

@@ -69,7 +69,7 @@ function AppsDropdownContent({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <div className="w-72 overflow-hidden rounded-xl border border-hairline bg-dark-card shadow-popover backdrop-blur-xl">
+    <div className="w-72 overflow-hidden rounded-xl border border-hairline bg-[var(--color-surface-raised)] shadow-[var(--shadow-popover)] backdrop-blur-xl">
       <div className="p-1.5">
         {apps.map((app) => {
           const Tag = app.external ? "a" : Link;

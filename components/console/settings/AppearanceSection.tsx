@@ -1,7 +1,7 @@
 "use client";
 
-import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
 import {
+  THEME_OPTIONS,
   useTheme,
   type ThemePreference,
 } from "@/components/console/ThemeContext";
@@ -11,33 +11,11 @@ import {
   SettingsHeader,
 } from "./SettingsPrimitives";
 
-interface ThemeOption {
-  value: ThemePreference;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-}
-
-const THEME_OPTIONS: ThemeOption[] = [
-  {
-    value: "light",
-    label: "Light",
-    description: "Always use the light theme.",
-    icon: Sun,
-  },
-  {
-    value: "dark",
-    label: "Dark",
-    description: "Always use the dark theme.",
-    icon: Moon,
-  },
-  {
-    value: "system",
-    label: "System",
-    description: "Follow your OS preference.",
-    icon: Monitor,
-  },
-];
+const DESCRIPTIONS: Record<ThemePreference, string> = {
+  light: "Always use the light theme.",
+  dark: "Always use the dark theme.",
+  system: "Follow your OS preference.",
+};
 
 /**
  * Account · Appearance — `?tab=appearance`.
@@ -106,7 +84,7 @@ export default function AppearanceSection() {
                       {opt.label}
                     </p>
                     <p className="mt-0.5 text-[11.5px] text-fg-faint">
-                      {opt.description}
+                      {DESCRIPTIONS[opt.value]}
                     </p>
                   </div>
                 </button>

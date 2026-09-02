@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useMemo, useRef, useState } from "react";
 import SectionHeader from "@/components/console/SectionHeader";
+import CallsSection from "@/components/console/CallsSection";
 import { MiniSpark } from "@/components/console/StackedAreaChart";
 import Button from "@/components/design-system/Button";
 import { useAuth } from "@/components/console/AuthContext";
@@ -20,23 +20,38 @@ import {
 } from "@/lib/console/wallet-settlement-display";
 
 /**
- * Usage answers three questions, in this order: what did this period cost,
- * will it run out before it resets, and what drove it. Everything on the page
- * serves one of those.
+ * Usage answers three questions, in order: what this period cost, whether it
+ * runs out before it resets, and what drove it — then lists the calls.
  *
- * Plans, payment methods and invoices deliberately live at
- * /settings?tab=billing — which carries a fuller version of all three — so
- * this page links there rather than restating it.
+ * Three blocks, and no more. The page briefly carried a spend-per-day chart
+ * and a Jobs / Per job / Projected KPI strip underneath the meter. Both came
+ * out: the projection line already says whether the money runs out, which
+ * is the only thing a creator decides on; a daily curve restated it at
+ * 180px, and the strip counted API calls for someone who made forty videos.
+ * On a page whose brief is "hide everything that isn't essential", they were
+ * furniture.
+ *
+ * There is exactly one hero figure (spend). "Remaining" is the meter's
+ * right-hand label, not a second hero — the sidebar already carries it on
+ * every route.
+ *
+ * The breakdown and the call log share one table vocabulary: the same header
+ * recipe, the same row rhythm, the same footer. Clicking a capability filters
+ * the calls instead of navigating; `/calls` redirects here.
  */
 
 type PeriodId = "7d" | "30d" | "90d";
 
-const PERIODS: Array<{ id: PeriodId; label: string; noun: string; days: number }> =
-  [
-    { id: "7d", label: "7d", noun: "7 days", days: 7 },
-    { id: "30d", label: "30d", noun: "30 days", days: 30 },
-    { id: "90d", label: "90d", noun: "90 days", days: 90 },
-  ];
+const PERIODS: Array<{
+  id: PeriodId;
+  label: string;
+  noun: string;
+  days: number;
+}> = [
+  { id: "7d", label: "7d", noun: "7 days", days: 7 },
+  { id: "30d", label: "30d", noun: "30 days", days: 30 },
+  { id: "90d", label: "90d", noun: "90 days", days: 90 },
+];
 
 function fmt(n: number): string {
   return Math.round(n).toLocaleString("en-US");
@@ -50,11 +65,6 @@ function fmtUsd(n: number): string {
   return n >= 1000
     ? `$${Math.round(n).toLocaleString("en-US")}`
     : `$${n.toFixed(2)}`;
-}
-
-function fmtUnit(n: number): string {
-  if (n <= 0) return "—";
-  return n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(4)}`;
 }
 
 /** Cost-descending, so the ranking matches the column the eye lands on. */
@@ -130,17 +140,8 @@ function PeriodTabs({
   );
 }
 
-/**
- * What the period cost, and whether it runs out. Consumed, projected and the
- * ceiling share one track: the answer is the shape of the bar, not a
- * reconciliation of four cards.
- */
-/**
- * The period as an instrument rather than a widget: one rule carrying spend,
- * projection and the included ceiling, with the two figures anchored to the
- * ends they describe. Sans for language, mono for quantity — nothing here is
- * mono unless it is a number.
- */
+// ─── The instrument ─────────────────────────────────────────────────────────
+
 type Runway = {
   /** Included allowance for the cycle. */
   includedTotal: number;
@@ -153,33 +154,25 @@ type Runway = {
 };
 
 /**
- * The period as an instrument. The rule spans the whole runway — included,
- * then credits, then metered overage — because that is the sequence spending
- * actually follows. A rule that stopped at the included allowance made
- * crossing it look terminal when it only means you start paying.
+ * The figure and the rule it sits on. The rule spans the whole runway —
+ * included, then credits, then metered overage — because that is the
+ * sequence spending actually follows. Its unfilled track is a lighter step
+ * of the same green, so the state reads across the whole bar rather than
+ * stopping where the fill does.
  */
-function PeriodMeter({
+function Instrument({
   loading,
   spendUsd,
-  jobs,
-  priorJobs,
-  periodNoun,
   runway,
   projectedUsd,
   resetsAt,
 }: {
   loading: boolean;
   spendUsd: number;
-  jobs: number;
-  priorJobs: number;
-  periodNoun: string;
   runway: Runway | null;
   projectedUsd: number | null;
   resetsAt: string;
 }) {
-  const perJob = jobs > 0 ? spendUsd / jobs : 0;
-  const delta = priorJobs > 0 ? ((jobs - priorJobs) / priorJobs) * 100 : null;
-
   const includedLeft = runway
     ? Math.max(0, runway.includedTotal - runway.consumed)
     : 0;
@@ -208,180 +201,181 @@ function PeriodMeter({
   if (loading) {
     return (
       <section
-        className="rounded-md border border-hairline bg-dark-lighter px-6 py-5 shadow-card"
+        className="rounded-md border border-hairline bg-dark-lighter px-6 pt-5 pb-5 shadow-card"
         aria-busy="true"
       >
-        <div className="flex items-start justify-between gap-6">
-          <div className="w-40">
-            <SkeletonBar className="h-3 w-16" />
-            <SkeletonBar className="mt-2.5 h-8 w-36" />
-          </div>
-          <div className="flex w-40 flex-col items-end">
-            <SkeletonBar className="h-3 w-20" />
-            <SkeletonBar className="mt-2.5 h-8 w-36" />
-            <SkeletonBar className="mt-2.5 h-3 w-28" />
-          </div>
-        </div>
+        <SkeletonBar className="h-3 w-24" />
+        <SkeletonBar className="mt-3 h-10 w-44" />
         <SkeletonBar className="mt-5 h-[3px] w-full" />
-        <SkeletonBar className="mt-4 h-3 w-72" />
-        <SkeletonBar className="mt-2 h-3 w-60" />
+        <SkeletonBar className="mt-3 h-3 w-72" />
       </section>
     );
   }
 
   return (
-    <section className="rounded-md border border-hairline bg-dark-lighter px-6 py-5 shadow-card">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
-            Spend
-          </p>
-          <p className="mt-1.5 font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums text-fg">
-            {fmtUsd(spendUsd)}
-          </p>
-        </div>
-        {runway && (
-          <div className="text-right">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
-              Remaining
-            </p>
-            <p
-              className={`mt-1.5 font-mono text-[32px] font-medium leading-none tracking-[-0.03em] tabular-nums ${
-                remaining <= 0 ? "text-warm" : "text-fg"
-              }`}
-            >
-              {fmtUsd(remaining)}
-            </p>
-            {/* Names the right edge of the rule. Without it the limit is only
-                derivable by adding spend and remaining. */}
-            <p className="mt-1.5 text-[12px] text-fg-faint">
-              of{" "}
-              <span className="font-mono tabular-nums">{fmtUsd(ceiling)}</span>{" "}
-              spend limit
-            </p>
-          </div>
-        )}
-      </div>
+    <section className="rounded-md border border-hairline bg-dark-lighter px-6 pt-5 pb-5 shadow-card">
+      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint">
+        Spend this period
+      </p>
+      {/* The one hero. Mono because it is a figure (house rule); no
+          tabular-nums because it stands alone — equal-width digits make a
+          display-size number read loose. */}
+      <p className="mt-1.5 font-mono text-[40px] font-medium leading-none tracking-[-0.03em] text-fg">
+        {fmtUsd(spendUsd)}
+      </p>
 
       {runway && (
-        <div
-          className="relative mt-5 h-[3px] bg-dark-card"
-          role="img"
-          aria-label={`${fmtUsd(runway.consumed)} spent of ${fmtUsd(ceiling)} available — ${fmtUsd(includedLeft)} included, then ${fmtUsd(runway.credits)} credits, then ${fmtUsd(runway.overage ?? 0)} metered overage`}
-        >
-          {projectedPct > consumedPct && (
-            <div
-              className="absolute inset-y-0"
-              style={{
-                left: `${consumedPct}%`,
-                width: `${Math.max(0, projectedPct - consumedPct)}%`,
-                background: willBlock
-                  ? "color-mix(in srgb, var(--color-warm) 35%, transparent)"
-                  : "color-mix(in srgb, var(--color-green-bright) 25%, transparent)",
-              }}
-            />
-          )}
+        <>
           <div
-            className="absolute inset-y-0 left-0 bg-green-bright transition-[width] duration-[var(--motion-duration-slow)] ease-[var(--motion-easing-out)] motion-reduce:transition-none"
-            style={{ width: `${consumedPct}%` }}
-          />
-          {/* Where included usage ends and metered overage begins. */}
-          <div
-            className="absolute -top-1 -bottom-1 w-px bg-border-strong"
-            style={{ left: `${includedPct}%` }}
-            aria-hidden="true"
-          />
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5 text-[12px] text-fg-faint">
-        <p>
-          <span className="font-mono tabular-nums text-fg-strong">
-            {fmt(jobs)}
-          </span>{" "}
-          jobs
-          {perJob > 0 && (
-            <>
-              {" · "}
-              <span className="font-mono tabular-nums text-fg-strong">
-                {fmtUnit(perJob)}
-              </span>{" "}
-              per job
-            </>
-          )}
-          {delta !== null && (
-            <>
-              {" · "}
-              <span
-                className={`font-mono tabular-nums ${delta >= 0 ? "text-fg-strong" : "text-fg-disabled"}`}
-              >
-                {delta > 0 ? "+" : ""}
-                {delta.toFixed(0)}%
-              </span>{" "}
-              vs prior {periodNoun}
-            </>
-          )}
-        </p>
-        {runway && (
-          <p className={willBlock ? "text-warm" : undefined}>
-            {projectedUsd === null ? (
-              <>Resets {resetsAt}</>
-            ) : willBlock ? (
-              <>
-                Projected{" "}
-                <span className="font-mono tabular-nums">
-                  {fmtUsd(projectedUsd)}
-                </span>{" "}
-                by {resetsAt} — over your limit by{" "}
-                <span className="font-mono tabular-nums">
-                  {fmtUsd(overCeiling)}
-                </span>
-              </>
-            ) : intoOverage > 0 ? (
-              <>
-                Projected{" "}
-                <span className="font-mono tabular-nums">
-                  {fmtUsd(projectedUsd)}
-                </span>{" "}
-                by {resetsAt} ·{" "}
-                <span className="font-mono tabular-nums">
-                  {fmtUsd(intoOverage)}
-                </span>{" "}
-                billed as overage
-              </>
-            ) : (
-              <>
-                Projected{" "}
-                <span className="font-mono tabular-nums">
-                  {fmtUsd(projectedUsd)}
-                </span>{" "}
-                by {resetsAt} · within included
-              </>
+            className="relative mt-5 h-[3px] rounded-full bg-green-subtle"
+            role="img"
+            aria-label={`${fmtUsd(runway.consumed)} spent of ${fmtUsd(ceiling)} available — ${fmtUsd(includedLeft)} included, then ${fmtUsd(runway.credits)} credits, then ${fmtUsd(runway.overage ?? 0)} metered overage`}
+          >
+            {projectedPct > consumedPct && (
+              <div
+                className="absolute inset-y-0 rounded-full"
+                style={{
+                  left: `${consumedPct}%`,
+                  width: `${Math.max(0, projectedPct - consumedPct)}%`,
+                  background: willBlock
+                    ? "color-mix(in srgb, var(--color-warm) 35%, transparent)"
+                    : "color-mix(in srgb, var(--color-green-bright) 30%, transparent)",
+                }}
+              />
             )}
-          </p>
-        )}
-      </div>
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-green-bright transition-[width] duration-[var(--motion-duration-slow)] ease-[var(--motion-easing-out)] motion-reduce:transition-none"
+              style={{ width: `${consumedPct}%` }}
+            />
+            {/* Where included usage ends and metered overage begins. */}
+            <div
+              className="absolute -top-1 -bottom-1 w-px bg-border-strong"
+              style={{ left: `${includedPct}%` }}
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[12px] text-fg-faint">
+            <p className={willBlock ? "text-warm" : undefined}>
+              {projectedUsd === null ? (
+                <>Resets {resetsAt}</>
+              ) : willBlock ? (
+                <>
+                  Projected{" "}
+                  <span className="font-mono tabular-nums">
+                    {fmtUsd(projectedUsd)}
+                  </span>{" "}
+                  by {resetsAt} — over your limit by{" "}
+                  <span className="font-mono tabular-nums">
+                    {fmtUsd(overCeiling)}
+                  </span>
+                </>
+              ) : intoOverage > 0 ? (
+                <>
+                  Projected{" "}
+                  <span className="font-mono tabular-nums">
+                    {fmtUsd(projectedUsd)}
+                  </span>{" "}
+                  by {resetsAt} ·{" "}
+                  <span className="font-mono tabular-nums">
+                    {fmtUsd(intoOverage)}
+                  </span>{" "}
+                  billed as overage
+                </>
+              ) : (
+                <>
+                  Projected{" "}
+                  <span className="font-mono tabular-nums">
+                    {fmtUsd(projectedUsd)}
+                  </span>{" "}
+                  by {resetsAt} · within included
+                </>
+              )}
+            </p>
+            <p>
+              <span
+                className={`font-mono tabular-nums ${remaining <= 0 ? "text-warm" : "text-fg-strong"}`}
+              >
+                {fmtUsd(remaining)}
+              </span>{" "}
+              left of{" "}
+              <span className="font-mono tabular-nums">{fmtUsd(ceiling)}</span>
+            </p>
+          </div>
+        </>
+      )}
     </section>
   );
 }
+
+// ─── The view ───────────────────────────────────────────────────────────────
 
 export default function UsageView() {
   const { isConnected, user } = useAuth();
   const [period, setPeriod] = useState<PeriodId>("30d");
   const active = PERIODS.find((p) => p.id === period) ?? PERIODS[1]!;
+  // Clicking a capability in the table filters the call list below instead
+  // of navigating — the two now live on one page.
+  const [callsQuery, setCallsQuery] = useState("");
+  const callsRef = useRef<HTMLDivElement>(null);
+  // Takes the capability's display name: it's built by the same
+  // `humanizePipelineModel` the call mapper uses for `row.model`, so it
+  // matches exactly what the search box searches.
+  const focusCapability = useCallback((capabilityName: string) => {
+    setCallsQuery(capabilityName);
+    callsRef.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "start",
+    });
+  }, []);
 
   const usageState = useAccountUsage(isConnected, { periodDays: active.days });
   const walletState = useWalletBillingState(isConnected);
-  const data = usageState.status === "ready" ? usageState.data : null;
+  const fresh = usageState.status === "ready" ? usageState.data : null;
+
+  // Refetch keeps the frame. Switching 7d → 30d re-fetches, and the hook
+  // reports `loading` with no data for a beat; rendering skeletons there
+  // made the whole page jump. Hold the last payload and dim it instead —
+  // the skeleton is only for the very first load, when there is nothing to
+  // hold.
+  const lastDataRef = useRef<typeof fresh>(null);
+  if (fresh) lastDataRef.current = fresh;
+  const data = fresh ?? lastDataRef.current;
+  const refetching = usageState.status === "loading" && data !== null;
 
   const capabilityRows = useMemo(() => {
     if (!data) return [];
-    return orderByCost(buildUsageCapabilityRows({
-      current: data.current.pipelineModels,
-      prior: data.prior.pipelineModels,
-      period: data.period,
-      dailyByPipeline: data.current.dailyByPipeline,
-    }));
+    return orderByCost(
+      buildUsageCapabilityRows({
+        current: data.current.pipelineModels,
+        prior: data.prior.pipelineModels,
+        period: data.period,
+        dailyByPipeline: data.current.dailyByPipeline,
+      })
+    );
+  }, [data]);
+
+  /** Capability display name → series colour, shared with the call list so
+   *  a call's dot matches its row in the breakdown. Keyed by display name
+   *  because that is what the call rows carry (and what the filter uses). */
+  const colorByCapability = useMemo(
+    () => new Map(capabilityRows.map((c) => [c.name, c.color] as const)),
+    [capabilityRows]
+  );
+
+  /** Total fee per day, for the burn-rate projection. */
+  const dailyTotal = useMemo(() => {
+    if (!data) return null;
+    const index = new Map(data.periodDayKeys.map((k, i) => [k, i] as const));
+    const total = new Array<number>(data.periodDayKeys.length).fill(0);
+    for (const row of data.current.dailyByPipeline) {
+      const i = index.get(row.date);
+      if (i === undefined) continue;
+      total[i] = (total[i] ?? 0) + microsToUsd(row.networkFeeUsdMicros);
+    }
+    return total;
   }, [data]);
 
   const included: IncludedUsageSummary | null =
@@ -396,9 +390,7 @@ export default function UsageView() {
     return {
       includedTotal: microsToUsd(included.totalUsdMicros),
       consumed: microsToUsd(included.consumedUsdMicros),
-      credits: microsToUsd(
-        walletState.state.wallet.balance?.usdMicros ?? "0"
-      ),
+      credits: microsToUsd(walletState.state.wallet.balance?.usdMicros ?? "0"),
       overage:
         overage.eligible && overage.remaining
           ? microsToUsd(overage.remaining.usdMicros)
@@ -421,17 +413,9 @@ export default function UsageView() {
    * a balance it never touches.
    */
   const projectedUsd = useMemo(() => {
-    if (!data || !included?.resetsAt) return null;
-    const byDay = new Map<string, number>();
-    for (const row of data.current.dailyByPipeline) {
-      byDay.set(
-        row.date,
-        (byDay.get(row.date) ?? 0) + microsToUsd(row.networkFeeUsdMicros)
-      );
-    }
-    const daily = data.periodDayKeys.map((k) => byDay.get(k) ?? 0);
-    if (daily.length === 0) return null;
-    const window = daily.slice(-7);
+    if (!dailyTotal || !included?.resetsAt) return null;
+    const window = dailyTotal.slice(-7);
+    if (window.length === 0) return null;
     const rate = window.reduce((a, b) => a + b, 0) / Math.max(1, window.length);
     const daysLeft = Math.max(
       0,
@@ -439,7 +423,7 @@ export default function UsageView() {
     );
     if (daysLeft === 0 || rate <= 0) return null;
     return microsToUsd(included.consumedUsdMicros) + rate * daysLeft;
-  }, [data, included]);
+  }, [dailyTotal, included]);
 
   const rangeLabel = useMemo(() => {
     if (!data) return `Last ${active.noun}`;
@@ -451,84 +435,106 @@ export default function UsageView() {
     return `${fmtDay(data.period.start)} – ${fmtDay(data.period.end)}`;
   }, [data, active.noun]);
 
-  const loading = usageState.status === "loading" || usageState.status === "idle";
+  const loading =
+    (usageState.status === "loading" || usageState.status === "idle") &&
+    data === null;
   const grandReq = capabilityRows.reduce((a, c) => a + c.requestCount, 0);
   const grandSpend = capabilityRows.reduce(
     (a, c) => a + microsToUsd(c.networkFeeUsdMicros),
     0
   );
+  const spendUsd = data ? microsToUsd(data.current.networkFeeUsdMicros) : 0;
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-7 pb-20 pt-7">
+      {/* The one filter row. It scopes the instrument and the table; the
+          call log is per billing cycle and says so in its own header. */}
       <SectionHeader
         variant="default"
         className="mb-3 flex items-end justify-between gap-3"
-        title="This period"
-        description={rangeLabel}
+        title={rangeLabel}
+        description={`Last ${active.noun}`}
         action={
           <PeriodTabs value={period} onChange={setPeriod} disabled={loading} />
         }
       />
-      <PeriodMeter
-        loading={loading}
-        spendUsd={data ? microsToUsd(data.current.networkFeeUsdMicros) : 0}
-        jobs={data?.current.requestCount ?? 0}
-        priorJobs={data?.prior.requestCount ?? 0}
-        periodNoun={active.noun}
-        runway={runway}
-        projectedUsd={projectedUsd}
-        resetsAt={resetsAt}
-      />
 
-      {usageState.status === "error" ? (
-        <div className="mt-4">
-          <UsageLoadError message={usageState.message} onRetry={usageState.reload} />
-        </div>
-      ) : loading ? (
-        <>
-          <SectionHeader
-            variant="default"
-            className="mt-7 mb-3 flex items-end justify-between gap-3"
-            title="Spend by capability"
-            description="Loading…"
-          />
-          <div
-            className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card"
-            aria-busy="true"
-          >
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between gap-4 border-b border-hairline px-5 py-3.5 last:border-b-0"
-              >
-                <SkeletonBar className="h-3.5 w-40" />
-                <SkeletonBar className="h-3.5 w-20" />
-              </div>
-            ))}
+      <div
+        className={`transition-opacity duration-[var(--motion-duration-base)] ${
+          refetching ? "opacity-60" : ""
+        }`}
+        aria-busy={refetching || undefined}
+      >
+        <Instrument
+          loading={loading}
+          spendUsd={spendUsd}
+          runway={runway}
+          projectedUsd={projectedUsd}
+          resetsAt={resetsAt}
+        />
+
+        {usageState.status === "error" ? (
+          <div className="mt-4">
+            <UsageLoadError
+              message={usageState.message}
+              onRetry={usageState.reload}
+            />
           </div>
-        </>
-      ) : capabilityRows.length === 0 ? (
-        <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-14 text-center">
-          <p className="text-sm text-fg-muted">No jobs in this period.</p>
-          <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-fg-faint">
-            Signed requests appear here within a minute of your first call.
-          </p>
-        </div>
-      ) : (
-        <>
-          <SectionHeader
-            variant="default"
-            className="mt-7 mb-3 flex items-end justify-between gap-3"
-            title="Spend by capability"
-            description={`${capabilityRows.length} capabilities · ranked by cost`}
-          />
-          <BreakdownSection
-            rows={capabilityRows}
-            grandReq={grandReq}
-                grandSpend={grandSpend}
-          />
-        </>
-      )}
+        ) : loading ? (
+          <>
+            <SectionHeader
+              variant="default"
+              className="mt-7 mb-3 flex items-end justify-between gap-3"
+              title="Spend by capability"
+              description="Loading…"
+            />
+            <div
+              className="overflow-hidden rounded-md border border-hairline bg-dark-lighter shadow-card"
+              aria-busy="true"
+            >
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-4 border-b border-hairline px-5 py-3 last:border-b-0"
+                >
+                  <SkeletonBar className="h-3.5 w-40" />
+                  <SkeletonBar className="h-3.5 w-20" />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : capabilityRows.length === 0 ? (
+          <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-14 text-center">
+            <p className="text-sm text-fg-muted">No calls in this period.</p>
+            <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-fg-faint">
+              Signed requests appear here within a minute of your first call.
+            </p>
+          </div>
+        ) : (
+          <>
+            <SectionHeader
+              variant="default"
+              className="mt-7 mb-3 flex items-end justify-between gap-3"
+              title="Spend by capability"
+              description="Ranked by cost"
+            />
+            <BreakdownTable
+              rows={capabilityRows}
+              grandReq={grandReq}
+              grandSpend={grandSpend}
+              onSelectCapability={focusCapability}
+            />
+          </>
+        )}
+      </div>
+
+      <div ref={callsRef} className="scroll-mt-4">
+        <CallsSection
+          query={callsQuery}
+          onQueryChange={setCallsQuery}
+          colorByCapability={colorByCapability}
+        />
+      </div>
 
       {user?.id && (
         <p className="mt-8 break-all font-mono text-[10.5px] text-fg-disabled">
@@ -539,120 +545,107 @@ export default function UsageView() {
   );
 }
 
-function BreakdownSection({
-  rows,
-  grandReq,
-  grandSpend,
-}: {
-  rows: UsageCapabilityRow[];
-  grandReq: number;
-  grandSpend: number;
-}) {
-  return (
-    <>
-      <BreakdownTable
-        rows={rows}
-        grandReq={grandReq}
-        grandSpend={grandSpend}
-      />
-    </>
-  );
-}
+// ─── Spend by capability ────────────────────────────────────────────────────
+
+/**
+ * Shares its vocabulary with the call log below — the same header recipe
+ * (sans, 11px, uppercase: column labels are language), the same row rhythm,
+ * the same footer band — so the two tables read as one system. The count
+ * column is "Calls", the same noun the log uses; the page used to say jobs,
+ * requests and calls for the same thing.
+ */
+export const TABLE_HEAD_CLASS =
+  "border-b border-hairline bg-dark py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint";
+export const TABLE_FOOT_CLASS =
+  "border-t border-hairline bg-dark py-2.5 text-[12.5px]";
 
 function BreakdownTable({
   rows,
   grandReq,
   grandSpend,
+  onSelectCapability,
 }: {
   rows: UsageCapabilityRow[];
   grandReq: number;
   grandSpend: number;
+  /** Filters the call list below to this capability, by display name. */
+  onSelectCapability: (capabilityName: string) => void;
 }) {
   const cols =
-    "grid grid-cols-[minmax(0,1.7fr)_0.8fr_0.9fr_0.75fr_0.9fr_0.8fr] items-center gap-3 px-5"
+    "grid grid-cols-[minmax(0,1.9fr)_0.8fr_0.9fr_0.9fr_0.8fr] items-center gap-3 px-5";
 
   return (
-    <div className="overflow-x-auto overflow-y-hidden rounded-md border border-hairline bg-dark-lighter shadow-card">
-      <div className="min-w-[620px]">
-      <div
-        className={`${cols} border-b border-hairline bg-dark py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-faint`}
-      >
-        <div>Capability</div>
-        <div className="justify-self-end whitespace-nowrap">Jobs</div>
-        <div className="justify-self-end whitespace-nowrap">Trend</div>
-        <div className="justify-self-end whitespace-nowrap">Change</div>
-        <div className="justify-self-end whitespace-nowrap">Cost</div>
-        <div className="justify-self-end whitespace-nowrap">Per job</div>
-      </div>
+    <div className="overflow-x-auto rounded-md border border-hairline bg-dark-lighter shadow-card">
+      <div className="min-w-[560px]">
+        <div className={`${cols} ${TABLE_HEAD_CLASS}`}>
+          <div>Capability</div>
+          <div className="justify-self-end whitespace-nowrap">Calls</div>
+          <div className="justify-self-end whitespace-nowrap">Trend</div>
+          <div className="justify-self-end whitespace-nowrap">Cost</div>
+          <div className="justify-self-end whitespace-nowrap">Per call</div>
+        </div>
 
-      {rows.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-fg-faint">
-          No matching capabilities.
-        </p>
-      ) : (
-        rows.map((c) => {
-          const cost = microsToUsd(c.networkFeeUsdMicros);
-          const unitCost = c.requestCount > 0 ? cost / c.requestCount : 0;
-          return (
-            <div
-              key={c.id}
-              className={`${cols} border-b border-hairline py-2.5 text-[13px] text-fg-strong transition-colors last:border-b-0 hover:bg-zebra`}
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: c.color }}
-                  aria-hidden="true"
-                />
-                <Link
-                  href={`/calls?capability=${encodeURIComponent(c.id)}`}
-                  className="truncate text-[13px] text-fg transition-colors hover:text-green-bright"
-                  title={c.id}
-                >
-                  {c.name}
-                </Link>
-              </div>
-              <div className="justify-self-end font-mono text-[13px] tabular-nums text-fg-strong">
-                {fmt(c.requestCount)}
-              </div>
-              <div className="justify-self-end opacity-80">
-                <MiniSpark data={c.data} color={c.color} height={16} width={64} />
-              </div>
+        <div className="max-h-[340px] overflow-y-auto">
+          {rows.map((c) => {
+            const cost = microsToUsd(c.networkFeeUsdMicros);
+            const unitCost = c.requestCount > 0 ? cost / c.requestCount : 0;
+            return (
               <div
-                className={`justify-self-end font-mono text-[12.5px] tabular-nums ${
-                  c.delta >= 0 ? "text-fg-strong" : "text-fg-disabled"
-                }`}
+                key={c.id}
+                className={`${cols} border-b border-hairline py-2.5 text-[12.5px] text-fg-strong transition-colors last:border-b-0 hover:bg-hover`}
               >
-                {c.delta > 0 ? "+" : ""}
-                {c.delta.toFixed(0)}%
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: c.color }}
+                    aria-hidden="true"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onSelectCapability(c.name)}
+                    className="truncate rounded-[3px] text-left font-medium text-fg-strong transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-bright/30"
+                    title={`Show calls for ${c.name}`}
+                  >
+                    {c.name}
+                  </button>
+                </div>
+                <div className="justify-self-end font-mono text-[11.5px] tabular-nums text-fg-strong">
+                  {fmt(c.requestCount)}
+                </div>
+                <div className="justify-self-end opacity-90">
+                  <MiniSpark
+                    data={c.data}
+                    color={c.color}
+                    height={16}
+                    width={64}
+                  />
+                </div>
+                <div className="justify-self-end font-mono text-[11.5px] tabular-nums text-fg">
+                  {fmtSpend(cost)}
+                </div>
+                <div className="justify-self-end font-mono text-[11.5px] tabular-nums text-fg-faint">
+                  {unitCost > 0 ? `$${unitCost.toFixed(4)}` : "—"}
+                </div>
               </div>
-              <div className="justify-self-end font-mono text-[13px] tabular-nums text-fg">
-                {fmtSpend(cost)}
-              </div>
-              <div className="justify-self-end font-mono text-[12.5px] tabular-nums text-fg-faint">
-                {unitCost > 0 ? `$${unitCost.toFixed(4)}` : "—"}
-              </div>
-            </div>
-          );
-        })
-      )}
+            );
+          })}
+        </div>
 
-      <div
-        className={`${cols} bg-dark py-2.5 text-[13px] font-medium text-fg-strong`}
-      >
-        <div>
-          Total
+        {/* Total sits outside the scroll region so it stays put while the
+            rows move under it. */}
+        <div
+          className={`${cols} ${TABLE_FOOT_CLASS} font-medium text-fg-strong`}
+        >
+          <div>Total</div>
+          <div className="justify-self-end font-mono text-[11.5px] tabular-nums text-fg">
+            {fmt(grandReq)}
+          </div>
+          <div />
+          <div className="justify-self-end font-mono text-[11.5px] tabular-nums text-fg">
+            {fmtSpend(grandSpend)}
+          </div>
+          <div />
         </div>
-        <div className="justify-self-end font-mono tabular-nums text-fg">
-          {fmt(grandReq)}
-        </div>
-        <div />
-        <div />
-        <div className="justify-self-end font-mono tabular-nums text-fg">
-          {fmtSpend(grandSpend)}
-        </div>
-        <div />
-      </div>
       </div>
     </div>
   );

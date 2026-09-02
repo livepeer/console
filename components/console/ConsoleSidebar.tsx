@@ -4,51 +4,39 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowUpRight,
   House,
   LayoutGrid,
-  Activity,
   BarChart3,
-  Bell,
-  BookOpen,
-  Box,
   ChevronLeft,
-  CreditCard,
-  ExternalLink,
   Globe,
-  Key,
-  Lock,
   Menu,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Settings as SettingsIcon,
   User as UserIcon,
-  Users as UsersIcon,
   type LucideIcon,
 } from "lucide-react";
 import {
   LivepeerWordmark,
   LivepeerSymbol,
 } from "@/components/design-system/LivepeerLogo";
-import { PORTAL_NAV_ITEMS } from "@/lib/constants";
+import { EXTERNAL_LINKS, PORTAL_NAV_ITEMS } from "@/lib/constants";
 import { useAuth } from "@/components/console/AuthContext";
 import Drawer from "@/components/design-system/Drawer";
+import Tooltip from "@/components/design-system/Tooltip";
 import NavLink from "@/components/console/NavLink";
-import StatusDot from "@/components/console/StatusDot";
 import SidebarUsageCard from "@/components/console/SidebarUsageCard";
 import OrganizationMenu from "@/components/console/OrganizationMenu";
-import Tooltip from "@/components/design-system/Tooltip";
-import { APPS, SETTINGS_API_KEYS } from "@/lib/console/mock-data";
+import { APPS } from "@/lib/console/mock-data";
 import { formatRuns } from "@/lib/console/utils";
 
 const NAV_ICONS = {
   House,
   LayoutGrid,
-  Activity,
   BarChart3,
   Globe,
-  Key,
-  Box,
   Settings: SettingsIcon,
 } as const;
 
@@ -63,6 +51,55 @@ function getNavActive(itemHref: string, pathname: string): boolean {
     return pathname.startsWith(path);
   }
   return pathname.startsWith(itemHref);
+}
+
+// ─── Site link ──────────────────────────────────────────────────────────────
+//
+// The one footer row the rail keeps: a way back to livepeer.org. It sits
+// below the usage card in every rail state (expanded, collapsed, settings,
+// signed out) and opens in a new tab — leaving for the marketing site is a
+// detour, not a sign-out, so the console stays where it was. Deliberately a
+// single row: the Docs / status strip this replaces grew because footers
+// accrete, and this one should not.
+
+function SiteLink({ collapsed, padX }: { collapsed: boolean; padX: string }) {
+  const label = "livepeer.org";
+  const link = (
+    <a
+      href={EXTERNAL_LINKS.site}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${label} (opens in a new tab)`}
+      className={`flex h-[26px] items-center rounded-[4px] text-[12px] text-fg-faint transition-colors hover:bg-hover hover:text-fg ${
+        collapsed ? "w-[26px] justify-center" : "w-full gap-2 px-2.5"
+      }`}
+    >
+      <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <ArrowUpRight
+            className="h-3 w-3 shrink-0 text-fg-disabled"
+            aria-hidden="true"
+          />
+        </>
+      )}
+    </a>
+  );
+
+  return (
+    <div className={`shrink-0 border-t border-hairline py-1.5 ${padX}`}>
+      {collapsed ? (
+        <div className="flex justify-center">
+          <Tooltip content={label} side="right">
+            {link}
+          </Tooltip>
+        </div>
+      ) : (
+        link
+      )}
+    </div>
+  );
 }
 
 // ─── Sidebar content (shared between desktop + mobile drawer) ───────────────
@@ -230,7 +267,9 @@ function SignedOutSidebarContent({
         )}
       </div>
 
-      {/* Public nav — Explore + Stats + Docs */}
+      {/* Public nav — Explore + Stats. (Docs is not linked: docs.livepeer.org
+          is orchestrator-only today and documents none of the agent surface.
+          Restore the entry once the agent docs land.) */}
       <nav aria-label="Public navigation" className={`pb-2 ${padX}`}>
         <ul className="space-y-px">
           <li>
@@ -251,16 +290,6 @@ function SignedOutSidebarContent({
               label="Stats"
               active={pathname.startsWith("/network")}
               collapsed={collapsed}
-              onNavigate={onNavigate}
-            />
-          </li>
-          <li>
-            <NavLink
-              href="https://docs.livepeer.org"
-              icon={BookOpen}
-              label="Docs"
-              collapsed={collapsed}
-              external
               onNavigate={onNavigate}
             />
           </li>
@@ -336,44 +365,7 @@ function SignedOutSidebarContent({
         </div>
       )}
 
-      {/* Status row. (Explore / Stats / Docs live in the public nav above.) */}
-      <div className={`shrink-0 border-t border-hairline ${padX} py-2`}>
-        {collapsed ? (
-          // Tooltip's inline-flex wrapper would left-align the link inside
-          // the padded `<div>` parent. Centering wrapper here matches the
-          // recipe used inside `NavLink` for the same reason.
-          <div className="flex justify-center">
-            <Tooltip content="All services operational" side="right">
-              <a
-                href="https://status.livepeer.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Status: all services operational (opens in new tab)"
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-[4px] transition-colors hover:bg-hover"
-              >
-                <StatusDot tone="green" size="md" />
-              </a>
-            </Tooltip>
-          </div>
-        ) : (
-          <a
-            href="https://status.livepeer.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Status: all services operational (opens in new tab)"
-            className="flex h-7 w-full items-center gap-2 rounded-md px-2 font-mono text-[11px] tracking-[0.02em] text-fg-faint transition-colors hover:bg-zebra hover:text-fg-muted"
-          >
-            <StatusDot tone="green" />
-            <span className="min-w-0 flex-1 truncate">
-              All systems operational
-            </span>
-            <ExternalLink
-              className="h-3 w-3 shrink-0 text-fg-disabled"
-              aria-hidden="true"
-            />
-          </a>
-        )}
-      </div>
+      <SiteLink collapsed={collapsed} padX={padX} />
     </div>
   );
 }
@@ -381,12 +373,17 @@ function SignedOutSidebarContent({
 // ─── Settings rail ──────────────────────────────────────────────────────────
 //
 // Renders inline inside the signed-in `SidebarContent` when the user is on a
-// `/settings*` route. Per the v6 prototype's `SettingsRail` (see
-// `components.jsx`): a back-arrow header that returns to `/home`,
-// followed by a `Organization` group (General / Members / Billing / Limits) and
-// an `Account` group (Profile / Notifications / Security). The organization
-// switcher and search above stay put; the usage strip and footer below stay
-// put — only the main nav block + Pinned section swap to this rail.
+// `/settings*` route: a back-arrow header that returns to `/home`, then the
+// settings destinations. The organization switcher and search above stay put;
+// the usage strip below stays put — only the main nav block swaps to this
+// rail.
+//
+// The pilot rail is FLAT — two entries, no group eyebrows. It used to carry an
+// `Organization` group (General / Members / Billing) and an `Account` group
+// (Profile / Notifications / Security). Members, Billing, Notifications and
+// Security are all hidden for the pilot, and General and Profile merged into
+// one page, which leaves two items: keeping two group headers over a
+// one-item-each split would be labelling for its own sake.
 //
 // Active item is determined by `?tab=<id>` on the current path. Items whose
 // content isn't built yet still navigate (the route renders the closest
@@ -399,27 +396,14 @@ function SignedOutSidebarContent({
 // `typeof window` check instead makes the server pick the default tab while
 // the client picks the real one, which is a hydration mismatch.
 
-const SETTINGS_RAIL_GROUPS: {
-  group: string;
-  items: { id: string; label: string; icon: LucideIcon; meta?: string }[];
+const SETTINGS_RAIL_ITEMS: {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  meta?: string;
 }[] = [
-  {
-    group: "Organization",
-    items: [
-      { id: "organization", label: "General", icon: Box },
-      { id: "members", label: "Members", icon: UsersIcon, meta: "4" },
-      { id: "billing", label: "Billing", icon: CreditCard },
-    ],
-  },
-  {
-    group: "Account",
-    items: [
-      { id: "profile", label: "Profile", icon: UserIcon },
-      { id: "notifications", label: "Notifications", icon: Bell },
-      { id: "security", label: "Security", icon: Lock },
-      { id: "appearance", label: "Appearance", icon: Palette },
-    ],
-  },
+  { id: "account", label: "Account", icon: UserIcon },
+  { id: "appearance", label: "Appearance", icon: Palette },
 ];
 
 function SettingsRailView({
@@ -449,34 +433,21 @@ function SettingsRailView({
         <span className="font-medium">Settings</span>
       </button>
 
-      {SETTINGS_RAIL_GROUPS.map((g) => (
-        <div key={g.group} className="mt-2.5">
-          <div className="flex items-center gap-2 px-2.5 pt-1 pb-1">
-            <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-fg-disabled">
-              {g.group}
-            </span>
-          </div>
-          <ul className="space-y-px">
-            {g.items.map((it) => {
-              const href = `/settings?tab=${it.id}`;
-              const active = activeTab === it.id;
-              return (
-                <li key={it.id}>
-                  <NavLink
-                    href={href}
-                    icon={it.icon}
-                    label={it.label}
-                    active={active}
-                    collapsed={false}
-                    meta={it.meta}
-                    onNavigate={onNavigate}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+      <ul className="mt-2.5 space-y-px">
+        {SETTINGS_RAIL_ITEMS.map((it) => (
+          <li key={it.id}>
+            <NavLink
+              href={`/settings?tab=${it.id}`}
+              icon={it.icon}
+              label={it.label}
+              active={activeTab === it.id}
+              collapsed={false}
+              meta={it.meta}
+              onNavigate={onNavigate}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -488,9 +459,9 @@ function SettingsRailNav({
   padX: string;
   onNavigate?: () => void;
 }) {
-  // Default to "organization" when on `/settings` with no tab param — matches
-  // the prototype's fallback (`route === 'settings' ? 'organization' : ...`).
-  const activeTab = useSearchParams().get("tab") ?? "organization";
+  // Default to "account" when on `/settings` with no tab param — Account is
+  // the page /settings renders with no tab.
+  const activeTab = useSearchParams().get("tab") ?? "account";
 
   return (
     <SettingsRailView
@@ -509,7 +480,7 @@ function SettingsRail({
   onNavigate?: () => void;
 }) {
   // The fallback renders the rail with nothing marked active rather than
-  // guessing "organization": a brief un-highlighted rail is honest, whereas a
+  // guessing "account": a brief un-highlighted rail is honest, whereas a
   // defaulted one flashes the wrong tab before the real one resolves.
   return (
     <Suspense
@@ -550,12 +521,9 @@ function SidebarContent({
   const renderNavItem = (item: (typeof PORTAL_NAV_ITEMS)[number]) => {
     const Icon = NAV_ICONS[item.icon];
     const active = getNavActive(item.href, pathname);
-    // Right-aligned mono meta counts. Only render expanded; collapsed shows
-    // icon only.
-    let meta: string | undefined;
-    if (!collapsed && item.href === "/keys") {
-      meta = formatRuns(SETTINGS_API_KEYS.length);
-    }
+    // No nav item carries a right-aligned count any more — the one that did
+    // was API keys, which the pilot doesn't provision.
+    const meta: string | undefined = undefined;
     const itemKbd = "kbd" in item ? (item.kbd as string) : undefined;
     const itemSubmenu = "submenu" in item ? Boolean(item.submenu) : false;
     return (
@@ -736,60 +704,10 @@ function SidebarContent({
         </div>
       )}
 
-      {/* Footer: Docs. (Settings now sits under Usage in the primary list.)
-          Logged-out users get a separate footer rendered by
-          `SignedOutSidebarContent`; this one is signed-in only. */}
-      <div
-        className={`shrink-0 border-t border-hairline pt-2 pb-2 ${padX} space-y-px`}
-      >
-        <NavLink
-          href="https://docs.livepeer.org"
-          icon={BookOpen}
-          label="Docs"
-          collapsed={collapsed}
-          external
-          onNavigate={onNavigate}
-        />
-      </div>
-
-      {/* Statuspage row — operational health, external link. */}
-      <div className={`shrink-0 border-t border-hairline ${padX} py-2`}>
-        {collapsed ? (
-          // Tooltip's inline-flex wrapper would left-align the link inside
-          // the padded `<div>` parent. Centering wrapper here matches the
-          // recipe used inside `NavLink` for the same reason.
-          <div className="flex justify-center">
-            <Tooltip content="All services operational" side="right">
-              <a
-                href="https://status.livepeer.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Status: all services operational (opens in new tab)"
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-[4px] transition-colors hover:bg-hover"
-              >
-                <StatusDot tone="green" size="md" />
-              </a>
-            </Tooltip>
-          </div>
-        ) : (
-          <a
-            href="https://status.livepeer.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Status: all services operational (opens in new tab)"
-            className="flex h-7 w-full items-center gap-2 rounded-md px-2 font-mono text-[11px] tracking-[0.02em] text-fg-faint transition-colors hover:bg-zebra hover:text-fg-muted"
-          >
-            <StatusDot tone="green" />
-            <span className="min-w-0 flex-1 truncate">
-              All systems operational
-            </span>
-            <ExternalLink
-              className="h-3 w-3 shrink-0 text-fg-disabled"
-              aria-hidden="true"
-            />
-          </a>
-        )}
-      </div>
+      {/* Footer — the single livepeer.org row. Docs was removed from here
+          because docs.livepeer.org is orchestrator-only and says nothing
+          about the agent; restore it beside this row once agent docs land. */}
+      <SiteLink collapsed={collapsed} padX={padX} />
     </div>
   );
 }

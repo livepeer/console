@@ -1,19 +1,24 @@
-// Primary nav for the console sidebar, grouped into three tiers by scope:
-//   - "home"        → Home (the ungrouped console root)
-//   - "network"     → Explore (the global capability catalog you *consume*) and
-//                     Stats (network-wide orchestrator/GPU/payment health).
-//                     Network-wide, not environment-scoped.
-//   - "environment" → API keys (your call credential, scoped to the active
-//                     environment). The environment switcher heads this group.
-//                     API keys here are the *call* credential (env-scoped,
-//                     Stripe-style).
-//   - "organization"   → Usage, Calls, and Settings (members, billing, plan,
-//                     profile, deploy tokens) — env-agnostic. Usage is one
-//                     free-tier pool / one bill across all environments
-//                     (matching Modal's organization-level "Usage & Billing"),
-//                     so it sits OUTSIDE the environment switcher's scope.
-//                     Calls is the per-request log behind Usage — every call
-//                     this organization made (batch + live).
+// Primary nav for the console sidebar. During the creator pilot (Sep 2026)
+// this is deliberately three destinations:
+//
+//   - "home"         → Home — MCP install instructions and harness connection
+//                      state. The only onboarding surface.
+//   - "organization" → Usage (spend, plus the calls log folded in underneath)
+//                      and Settings.
+//
+// Two zones are defined but not rendered in the signed-in rail:
+//   - "network"      → Explore and Stats. Still real routes, still linkable,
+//                      and still the signed-out landing — they just aren't
+//                      console destinations. Filtered out in ConsoleSidebar.
+//
+// Removed for the pilot (see the Sep 1 2026 sync with Peace):
+//   - API keys — auth happens over OAuth when a harness adds the MCP
+//     connector, so there is no key to provision. `/keys` still exists but is
+//     unreachable from the nav; bring the entry back with the route when
+//     developer-issued keys return.
+//   - Calls — the per-request log now renders underneath Spend by capability
+//     on /usage rather than as its own destination.
+//
 // Settings carries a chev-right (rendered by NavLink via `submenu: true`)
 // instead of a count, signaling that it leads into a sub-experience.
 export const PORTAL_NAV_ITEMS = [
@@ -37,21 +42,9 @@ export const PORTAL_NAV_ITEMS = [
     zone: "network" as const,
   },
   {
-    label: "API keys",
-    href: "/keys",
-    icon: "Key" as const,
-    zone: "environment" as const,
-  },
-  {
     label: "Usage",
     href: "/usage",
     icon: "BarChart3" as const,
-    zone: "organization" as const,
-  },
-  {
-    label: "Calls",
-    href: "/calls",
-    icon: "Activity" as const,
     zone: "organization" as const,
   },
   {
@@ -64,7 +57,14 @@ export const PORTAL_NAV_ITEMS = [
 ] as const;
 
 export const EXTERNAL_LINKS = {
+  site: "https://livepeer.org",
   docs: "https://docs.livepeer.org",
   discord: "https://discord.gg/55SZFEEH5y",
   github: "https://github.com/livepeer",
 } as const;
+
+/**
+ * The MCP endpoint a harness connects to. Adding it kicks off an OAuth
+ * round-trip back to this console, which is why the pilot ships no API keys.
+ */
+export const MCP_SERVER_URL = "https://agent.livepeer.org/api/mcp";

@@ -404,6 +404,61 @@ function buildInvoices() {
 }
 
 /**
+ * Per-request rows for the Calls section on /usage.
+ *
+ * Drawn from the same CAPABILITIES mix as the usage totals so the two halves
+ * of the page agree with each other: the capability that dominates Spend by
+ * capability is also the one that dominates the call list under it. Weighted
+ * by `base` for the same reason.
+ */
+function buildRequests(limit: number, cursor: string | null) {
+  const offset = cursor ? Number.parseInt(cursor, 10) || 0 : 0;
+  const TOTAL = 180;
+  const rand = seeded(0x5ca11 + offset);
+
+  // Pick capabilities in proportion to their daily volume.
+  const weights = CAPABILITIES.map((c) => c.base);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const pick = () => {
+    let r = rand() * totalWeight;
+    for (let i = 0; i < CAPABILITIES.length; i++) {
+      r -= weights[i]!;
+      if (r <= 0) return CAPABILITIES[i]!;
+    }
+    return CAPABILITIES[0]!;
+  };
+
+  const count = Math.min(limit, TOTAL - offset);
+  const items = Array.from({ length: Math.max(0, count) }, (_, i) => {
+    const index = offset + i;
+    const cap = pick();
+    // Roughly one call every few minutes, walking backwards from now.
+    const minutesAgo = index * 4 + Math.floor(rand() * 4);
+    const fee = Math.round(cap.unit * (0.7 + rand() * 0.6) * 1_000_000);
+    return {
+      time: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+      clientId: "cli_devmock",
+      appName: "Livepeer Agent",
+      externalUserId: "eu_devmock",
+      gatewayRequestId: `req_${(0x100000 + index * 7919).toString(16)}`,
+      pipeline: cap.pipeline,
+      modelId: cap.modelId,
+      networkFeeUsdMicros: String(fee),
+      eventId: `evt_${index}`,
+    };
+  });
+
+  const next = offset + items.length;
+  return {
+    items,
+    nextCursor: next < TOTAL ? String(next) : null,
+    openMeterConfigured: true,
+    clientId: "cli_devmock",
+    externalUserId: "eu_devmock",
+  };
+}
+
+/**
  * Returns a fixture response for the console's auth + PymtHouse endpoints,
  * or null to let the request fall through to the real handler.
  */
@@ -439,6 +494,15 @@ export function devMockResponse(
       (search.get("includePrior") ?? "1").toLowerCase()
     );
     return json(buildUsage(periodDays, includePrior));
+  }
+
+  if (pathname === "/api/pymthouse/account-requests") {
+    const rawLimit = Number.parseInt(search.get("limit") ?? "", 10);
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 200
+        ? rawLimit
+        : 50;
+    return json(buildRequests(limit, search.get("cursor")));
   }
 
   if (pathname === "/api/pymthouse/wallet") return json(buildWallet());

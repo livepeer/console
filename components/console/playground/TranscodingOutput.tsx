@@ -125,7 +125,7 @@ function HlsPlayerMock({
           <span className="text-fg-faint">▾</span>
         </button>
         {menuOpen && (
-          <div className="absolute right-0 mt-1 min-w-[120px] rounded-lg border border-hairline bg-dark-card p-1 shadow-popover backdrop-blur-sm">
+          <div className="absolute right-0 mt-1 min-w-[120px] rounded-lg border border-hairline bg-[var(--color-surface-raised)] p-1 shadow-[var(--shadow-popover)] backdrop-blur-sm">
             {DEFAULT_LADDER.map((r) => (
               <button
                 key={r.label}

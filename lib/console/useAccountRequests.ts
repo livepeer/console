@@ -13,6 +13,9 @@ type AccountRequestsState =
       rows: AccountActivityRow[];
       nextCursor: string | null;
       openMeterConfigured: boolean;
+      /** Set when a further page failed to load. The rows already on screen
+       *  are kept; only the append is retried. */
+      loadMoreError: string | null;
     }
   | { status: "error"; message: string };
 
@@ -60,14 +63,17 @@ export function useAccountRequests(enabled: boolean) {
             rows: append ? [...priorRows, ...mapped] : mapped,
             nextCursor: body.nextCursor,
             openMeterConfigured: body.openMeterConfigured !== false,
+            loadMoreError: null,
           };
         });
       } catch (error) {
-        setState({
-          status: "error",
-          message:
-            error instanceof Error ? error.message : "Failed to load requests",
-        });
+        const message =
+          error instanceof Error ? error.message : "Failed to load requests";
+        setState((prev) =>
+          append && prev.status === "ready"
+            ? { ...prev, loadMoreError: message }
+            : { status: "error", message }
+        );
       }
     },
     [enabled]

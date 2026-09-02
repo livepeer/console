@@ -83,7 +83,7 @@ export default function EnvironmentFilter({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 min-w-[200px] overflow-hidden rounded-md border border-subtle bg-dark-card p-1 shadow-popover"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[200px] overflow-hidden rounded-md border border-subtle bg-[var(--color-surface-raised)] p-1 shadow-[var(--shadow-popover)]"
         >
           {options.map((o) => {
             const c = dotColor(o.kind);

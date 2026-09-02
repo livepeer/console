@@ -1,24 +1,21 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import CallsView from "@/components/console/CallsView";
-import SignInWall from "@/components/console/SignInWall";
-import { useAuth } from "@/components/console/AuthContext";
-
-// Note: page metadata isn't valid in client components, so the previous
-// `metadata` export moves out alongside this auth gate. Title/description for
-// the calls route now come from the parent layout's defaults; if we want
-// per-route SEO back, we'll need to split the wall + content into a server
-// component shell that owns metadata and a client component that owns auth.
-
-export default function CallsPage() {
-  const { isConnected, isLoading } = useAuth();
-
-  // Avoid flashing either state while auth hydrates from localStorage.
-  if (isLoading) return null;
-
-  // Organization-only route — logged-out users see the route-specific sign-in
-  // wall ("Calls are organization-only") instead of an empty list.
-  if (!isConnected) return <SignInWall route="calls" />;
-
-  return <CallsView />;
+/**
+ * `/calls` folded into `/usage` for the creator pilot — the call log now
+ * renders underneath Spend by capability rather than as its own destination.
+ *
+ * The route stays as a redirect because `?request=<id>` links to a single call
+ * are already in the wild (the app-detail log table, the Home activity panel
+ * before it was removed, anything anyone bookmarked). The param carries over
+ * so those still open the call drawer, just on Usage.
+ */
+export default async function CallsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const request = params.request;
+  const id = Array.isArray(request) ? request[0] : request;
+  redirect(id ? `/usage?request=${encodeURIComponent(id)}` : "/usage");
 }

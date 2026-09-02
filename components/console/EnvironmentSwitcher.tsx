@@ -148,7 +148,7 @@ export default function EnvironmentSwitcher({
             animate="visible"
             exit="exit"
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className={`absolute z-[100] min-w-[240px] overflow-hidden rounded-xl border border-subtle bg-dark-card shadow-popover ${
+            className={`absolute z-[100] min-w-[240px] overflow-hidden rounded-xl border border-subtle bg-[var(--color-surface-raised)] shadow-[var(--shadow-popover)] ${
               collapsed
                 ? "left-full top-0 ml-2 origin-top-left"
                 : "left-0 top-full mt-1 origin-top-left"
