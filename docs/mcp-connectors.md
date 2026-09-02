@@ -20,6 +20,23 @@ Claude will:
 4. Open a browser. Sign in with Console Auth0
 5. Store the user JWT + refresh token
 
+## Cursor
+
+Add a Streamable HTTP MCP server in `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "livepeer-agent": {
+      "type": "http",
+      "url": "https://<APP_BASE_URL>/api/mcp"
+    }
+  }
+}
+```
+
+Cursor DCR registers `cursor://anysphere.cursor-mcp/oauth/callback` (desktop) and/or `https://www.cursor.com/agents/mcp/oauth/callback` (web / agents). Complete the Console Auth0 browser login. `http://localhost:8787/callback` is already covered as RFC 8252 loopback.
+
 ## Codex
 
 Add a Streamable HTTP MCP server in `~/.codex/config.toml` and log in:
@@ -42,7 +59,7 @@ hermes mcp add livepeer --url https://<APP_BASE_URL>/api/mcp --auth oauth
 hermes mcp login livepeer
 ```
 
-Hermes opens a browser and waits on a loopback callback. If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path — the Console AS still only accepts RFC 8252 loopback redirects (plus Claude HTTPS callbacks).
+Hermes opens a browser and waits on a loopback callback. If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path — the Console AS accepts RFC 8252 loopback, Claude HTTPS callbacks, and Cursor's documented MCP callbacks.
 
 ## After login
 
