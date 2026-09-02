@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   DashboardOwnerWallet,
   DashboardWalletInvoice,
   DashboardWalletPaymentMethod,
 } from "@/lib/console/pymthouse-wallet";
+import { createClientCache } from "@/lib/console/client-cache";
 import { readResponseJson } from "@/lib/console/read-response-json";
 
 /** Map missing/unroutable upstream wallet APIs to an actionable message. */
@@ -67,42 +68,84 @@ export async function startWalletTopUp(input: {
   return { checkoutUrl: body.checkoutUrl };
 }
 
+/** Billing state changes on top-up / plan change, both of which reload. */
+const WALLET_CACHE_TTL_MS = 60_000;
+const WALLET_CACHE_KEY = "owner-wallet";
+const walletCache =
+  createClientCache<DashboardOwnerWallet>(WALLET_CACHE_TTL_MS);
+
+async function fetchOwnerWallet(): Promise<DashboardOwnerWallet> {
+  const walletResponse = await fetch("/api/pymthouse/wallet");
+  const walletBody = await readResponseJson<
+    DashboardOwnerWallet & { error?: string }
+  >(walletResponse);
+  if (!walletResponse.ok) {
+    throw new Error(
+      walletUpstreamMessage(walletResponse.status, walletBody.error)
+    );
+  }
+  return walletBody;
+}
+
 /** Wallet GET only — remaining included usage + plan, without PM/invoice lists. */
 export function useWalletBillingState(enabled: boolean) {
-  const [state, setState] = useState<WalletBillingState>({ status: "idle" });
+  // Seeded from the module cache so a remount (Home → Usage → Home) paints
+  // the meter's runway bar on its first frame instead of after a round trip.
+  const [state, setState] = useState<WalletBillingState>(() => {
+    const cached = enabled ? walletCache.peek(WALLET_CACHE_KEY) : undefined;
+    return cached
+      ? { status: "ready", wallet: cached.data }
+      : { status: "idle" };
+  });
+  const requestId = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setState({ status: "idle" });
-      return;
-    }
-
-    setState({ status: "loading" });
-    try {
-      const walletResponse = await fetch("/api/pymthouse/wallet");
-      const walletBody = await readResponseJson<
-        DashboardOwnerWallet & { error?: string }
-      >(walletResponse);
-      if (!walletResponse.ok) {
-        throw new Error(
-          walletUpstreamMessage(walletResponse.status, walletBody.error)
-        );
+  const load = useCallback(
+    async (force = false) => {
+      if (!enabled) {
+        setState({ status: "idle" });
+        return;
       }
-      setState({ status: "ready", wallet: walletBody });
-    } catch (error) {
-      setState({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Failed to load wallet",
-      });
-    }
-  }, [enabled]);
+
+      const id = ++requestId.current;
+      const cached = walletCache.peek(WALLET_CACHE_KEY);
+
+      if (cached) {
+        setState({ status: "ready", wallet: cached.data });
+        if (walletCache.isFresh(cached) && !force) return;
+      } else {
+        setState({ status: "loading" });
+      }
+
+      if (force) walletCache.delete(WALLET_CACHE_KEY);
+
+      try {
+        const wallet = await walletCache.fetch(
+          WALLET_CACHE_KEY,
+          fetchOwnerWallet
+        );
+        if (id !== requestId.current) return;
+        setState({ status: "ready", wallet });
+      } catch (error) {
+        if (id !== requestId.current) return;
+        // A failed revalidation should not throw away a good cached wallet.
+        if (cached) return;
+        setState({
+          status: "error",
+          message:
+            error instanceof Error ? error.message : "Failed to load wallet",
+        });
+      }
+    },
+    [enabled]
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  return { state, reload: load };
+  const reload = useCallback(() => load(true), [load]);
+
+  return { state, reload };
 }
 
 export function useOwnerWallet(enabled: boolean) {
