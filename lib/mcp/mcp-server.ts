@@ -191,7 +191,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "run_capability",
     {
       description:
-        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Persistent apps need `endpoint` (the app path, e.g. /hello). Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
+        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Persistent apps need `endpoint` (the app path, e.g. /set). Each call reserves and stops — there is no session reuse across tool calls, so a persistent app pays a full reserve per call. Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
       inputSchema: {
         capability: z.string().min(1),
         inputs: z.record(z.unknown()).optional(),
