@@ -63,4 +63,4 @@ Hermes opens a browser and waits on a loopback callback. If Hermes is a remote g
 
 ## After login
 
-Use `list_capabilities` then `run_capability` with exact capability names. Spend is PymtHouse OpenMeter for the current UTC calendar day, 00:00–23:59 UTC (`get_cost_report` / `me_usage`); `run_capability` is refused when spendable (`hasAccess`) is exhausted.
+Use `list_capabilities` then `run_capability` with exact capability names. Persistent apps need `endpoint`. Each `run_capability` reserves and stops; session reuse is not available. Spend is PymtHouse OpenMeter for the current UTC calendar day, 00:00–23:59 UTC (`get_cost_report` / `me_usage`); `run_capability` is refused when spendable (`hasAccess`) is exhausted.
