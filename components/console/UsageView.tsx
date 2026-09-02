@@ -504,12 +504,25 @@ export default function UsageView() {
             </div>
           </>
         ) : capabilityRows.length === 0 ? (
-          <div className="mt-4 rounded-md border border-hairline bg-dark-lighter px-4 py-14 text-center">
-            <p className="text-sm text-fg-muted">No calls in this period.</p>
-            <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-fg-faint">
-              Signed requests appear here within a minute of your first call.
-            </p>
-          </div>
+          <>
+            {/* Same heading as the populated table so the section keeps its
+                name when empty. The card is a short note, not a window: the
+                call log directly below is the tall one, and stacking two
+                look-alike "no calls" boxes read as a duplicate. */}
+            <SectionHeader
+              variant="default"
+              className="mt-7 mb-3 flex items-end justify-between gap-3"
+              title="Spend by capability"
+              description={`No spend in the last ${active.noun}`}
+            />
+            <div className="rounded-md border border-hairline bg-dark-lighter px-4 py-8 text-center shadow-card">
+              <p className="text-sm text-fg-muted">Nothing to rank yet.</p>
+              <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] text-fg-faint">
+                Once you&apos;ve made calls, each capability appears here ranked
+                by what it cost.
+              </p>
+            </div>
+          </>
         ) : (
           <>
             <SectionHeader
