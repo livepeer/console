@@ -7,51 +7,51 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useAuth } from "@/components/console/AuthContext";
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
 import SignInWall from "@/components/console/SignInWall";
-import GeneralSection from "@/components/console/settings/GeneralSection";
-import MembersSection from "@/components/console/settings/MembersSection";
-import BillingSection from "@/components/console/settings/BillingSection";
-import ProfileSection from "@/components/console/settings/ProfileSection";
-import NotificationsSection from "@/components/console/settings/NotificationsSection";
-import SecuritySection from "@/components/console/settings/SecuritySection";
+import AccountSection from "@/components/console/settings/AccountSection";
 import AppearanceSection from "@/components/console/settings/AppearanceSection";
 
-// The 7 settings sub-tabs, two groups (Organization + Account). The sidebar's
-// SettingsRail is the navigation surface — there's no horizontal TabStrip on
-// this page; the rail and the breadcrumb together tell the user where they
-// are. `appearance` is the local-only theme picker (light/dark/system) added
-// in the theme-modes pass.
-type SettingsTab =
-  | "organization"
-  | "members"
-  | "billing"
-  | "profile"
-  | "notifications"
-  | "security"
-  | "appearance";
-
+// Settings is two tabs for the creator pilot:
+//   - `account`    — the merged former General + Profile (see AccountSection)
+//   - `appearance` — the local-only theme picker (light/dark/system)
+//
+// Four tabs are hidden rather than deleted; their sections still exist under
+// components/console/settings/ and come back by re-adding them here and to
+// SETTINGS_RAIL_ITEMS in ConsoleSidebar:
+//   - `members`       — team workspaces are backlogged; nothing behind the UI.
+//   - `billing`       — blocked on an unresolved question about which entity
+//                       bills (PymtHouse vs. Foundation vs. Inc). Shipping a
+//                       billing page before that is settled reads as "billing
+//                       is done" when the dependency is still open.
+//   - `notifications` — no notification delivery exists.
+//   - `security`      — session/2FA controls are owned by Auth0, not by us.
+//
 // No "usage-limits" tab: concurrent streams, per-key rate limits and allowed
 // regions were dropped (Aug 2026), and the one limit worth keeping — the hard
 // spend cap — belongs on the Usage meter, not in a settings form. See the
 // Spend cap note in CLAUDE.md.
-const VALID_TABS: SettingsTab[] = [
-  "organization",
-  "members",
-  "billing",
-  "profile",
-  "notifications",
-  "security",
-  "appearance",
-];
+type SettingsTab = "account" | "appearance";
+
+const VALID_TABS: SettingsTab[] = ["account", "appearance"];
 
 const TAB_LABELS: Record<SettingsTab, string> = {
-  organization: "General",
-  members: "Members",
-  billing: "Billing",
-  profile: "Profile",
-  notifications: "Notifications",
-  security: "Security",
+  account: "Account",
   appearance: "Appearance",
 };
+
+/**
+ * Old tab ids that still resolve. `organization` and `profile` are the two
+ * pages that merged into `account`; the rest are hidden sections whose links
+ * are still in the wild (bookmarks, the org menu's old Billing entry). All of
+ * them land on Account rather than 404-ing or rendering a hidden section.
+ */
+const RETIRED_TABS = new Set([
+  "organization",
+  "profile",
+  "members",
+  "billing",
+  "notifications",
+  "security",
+]);
 
 export default function SettingsPage() {
   return (
@@ -79,15 +79,21 @@ function SettingsContent() {
   const rawTab = searchParams.get("tab");
 
   // Back-compat redirects for old tab ids.
-  // - `tab=tokens` → /keys (API keys is its own primary route now)
-  // - `tab=account` → drop the param entirely (defaulting to General)
+  // - `tab=tokens` → /keys (kept so the URL still resolves even though API
+  //   keys is out of the nav for the pilot)
   // - `tab=usage` → /usage (top-level route)
+  // - retired/merged tabs → drop the param entirely, landing on Account
   useEffect(() => {
     if (rawTab === "tokens") {
       router.replace("/keys");
     } else if (rawTab === "usage") {
       router.replace("/usage");
-    } else if (rawTab === "account") {
+    } else if (rawTab === "account" || rawTab === null) {
+      // Already canonical — nothing to do.
+    } else if (
+      RETIRED_TABS.has(rawTab) ||
+      !VALID_TABS.includes(rawTab as SettingsTab)
+    ) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("tab");
       const qs = params.toString();
@@ -95,10 +101,10 @@ function SettingsContent() {
     }
   }, [rawTab, router, pathname, searchParams]);
 
-  // Default to "organization" (General) when no tab param is set.
+  // Default to "account" when no tab param is set.
   const tab: SettingsTab = VALID_TABS.includes(rawTab as SettingsTab)
     ? (rawTab as SettingsTab)
-    : "organization";
+    : "account";
 
   // Wait for auth to hydrate so we don't flash the wrong state.
   if (isLoading) return null;
@@ -135,12 +141,7 @@ function SettingsContent() {
           `.settings-shell-solo` (max-width 880px, padding 4px 28px 80px). */}
       <div className="flex-1">
         <div className="mx-auto w-full max-w-[880px] px-7 pt-6 pb-20">
-          {tab === "organization" && <GeneralSection />}
-          {tab === "members" && <MembersSection />}
-          {tab === "billing" && <BillingSection />}
-          {tab === "profile" && <ProfileSection />}
-          {tab === "notifications" && <NotificationsSection />}
-          {tab === "security" && <SecuritySection />}
+          {tab === "account" && <AccountSection />}
           {tab === "appearance" && <AppearanceSection />}
         </div>
       </div>

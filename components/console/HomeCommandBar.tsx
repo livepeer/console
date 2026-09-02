@@ -1,36 +1,22 @@
 "use client";
 
 /**
- * HomeCommandBar — the page masthead.
+ * HomeCommandBar — the page masthead: a warm sans-serif greeting.
  *
- *   flipbook                                                   ← system readout
- *   Good morning, adamsoffer                                   ← human greeting
- *
- * Plain and quiet: the org slug as a terminal title-bar line, then a warm
- * sans-serif greeting. (The operator attention line — erroring/building apps —
- * lives in the stacked apps PR, not here.)
+ * There used to be a mono "system readout" line above it carrying the
+ * organization slug (hardcoded to `flipbook`), later the signed-in email. With
+ * organizations gone the line had nothing left to report — the email is one
+ * click away in the account menu, and the greeting already names the person.
+ * Three places on one screen saying who you are is two too many.
  */
-export default function HomeCommandBar({
-  organization,
-  firstName,
-}: {
-  organization: string;
-  firstName: string;
-}) {
-  const orgSlug = organization.toLowerCase();
+export default function HomeCommandBar({ firstName }: { firstName: string }) {
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
     <header>
-      {/* System readout — the terminal title-bar line. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] tracking-[0.02em] text-fg-faint">
-        <span className="text-fg-strong">{orgSlug}</span>
-      </div>
-
-      {/* Greeting — the only sans-serif line up here, for warmth. */}
-      <h1 className="mt-2.5 text-[28px] font-bold leading-[1.05] tracking-[-0.02em] text-fg">
+      <h1 className="text-[28px] font-bold leading-[1.05] tracking-[-0.02em] text-fg">
         {greeting}, {firstName}
       </h1>
     </header>

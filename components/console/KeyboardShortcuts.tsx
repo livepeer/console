@@ -37,19 +37,17 @@ const GROUPS: Group[] = [
       { keys: ["G", "H"], label: "Go to Home" },
       { keys: ["G", "E"], label: "Go to Explore" },
       { keys: ["G", "U"], label: "Go to Usage" },
-      { keys: ["G", "C"], label: "Go to Calls" },
-      { keys: ["G", "K"], label: "Go to API keys" },
       { keys: ["G", "S"], label: "Go to Settings" },
     ],
   },
 ];
 
+// G-C (Calls) and G-K (API keys) are gone with their destinations: calls are
+// a section of /usage now, and the pilot provisions no API keys.
 const NAV_TARGETS: Record<string, string> = {
   h: "/home",
   e: "/explore",
   u: "/usage",
-  c: "/calls",
-  k: "/keys",
   s: "/settings",
 };
 

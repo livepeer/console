@@ -14,6 +14,11 @@ import { includedUsageSummary } from "@/lib/console/wallet-settlement-display";
 /**
  * Sidebar usage meter. Remaining included usage comes from the wallet
  * billing state when the live plan has an allowance; otherwise period spend.
+ *
+ * The eyebrow names the *kind* of figure, never the plan. It used to fall back
+ * to the live plan's name, which spent the card's most prominent slot on a
+ * label nobody can act on — and on a pilot balance the plan name says nothing
+ * the figure underneath doesn't say better.
  */
 export default function SidebarUsageCard() {
   const { isConnected } = useAuth();
@@ -65,8 +70,8 @@ export default function SidebarUsageCard() {
         day: "numeric",
       })
     : formatPeriodResetLabel(data.period.end);
-  const planLabel =
-    included?.planName?.trim() || (showUsdAllowance ? "Included usage" : "Usage");
+  // One word. The rail card is ~150px wide, so a two-word eyebrow wraps.
+  const meterLabel = showUsdAllowance ? "Included" : "Usage";
 
   let primaryUsed: number;
   let primaryLimit: number | null;
@@ -78,18 +83,15 @@ export default function SidebarUsageCard() {
     const consumed = BigInt(included.consumedUsdMicros || "0");
     primaryUsed = Number((consumed * BigInt(10000)) / granted) / 100;
     primaryLimit = 100;
+    // Consumed leads on the top row; the allowance it came out of moves to
+    // the footer. Carrying "$475.78 / $500.00" beside the eyebrow overran the
+    // 150px rail and wrapped the figure onto two lines.
     primaryDisplay = (
-      <>
-        <b className="font-medium text-fg">
-          ${microsToUsd(included.consumedUsdMicros).toFixed(2)}
-        </b>
-        <span className="text-fg-faint">
-          {" "}
-          / ${microsToUsd(included.totalUsdMicros).toFixed(2)}
-        </span>
-      </>
+      <b className="font-medium text-fg">
+        ${microsToUsd(included.consumedUsdMicros).toFixed(2)}
+      </b>
     );
-    footerLeft = "used";
+    footerLeft = `of $${microsToUsd(included.totalUsdMicros).toFixed(2)}`;
   } else {
     const spendUsd =
       Number(
@@ -120,7 +122,7 @@ export default function SidebarUsageCard() {
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-faint">
-          {planLabel}
+          {meterLabel}
         </span>
         <span className="font-mono text-[12px] tabular-nums text-fg-strong">
           {primaryDisplay}

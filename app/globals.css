@@ -135,6 +135,21 @@ body {
   --color-sidebar-card-bg: #181818;
   --color-sidebar-card-bg-hover: #1e1e1e;
 
+  /* Chart series — categorical identity for capabilities (table dots,
+     sparklines, tooltips). Seven slots in a FIXED order; never cycled — an
+     8th+ capability wears `series-other`. Validated with the dataviz
+     palette checks against #181818 (dark) and #ffffff (light): lightness
+     band, chroma floor, adjacent-pair CVD separation, normal-vision floor,
+     3:1 contrast. Red is deliberately absent — it is the failure colour. */
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
+  --color-series-7: #9085e9;
+  --color-series-other: rgba(255, 255, 255, 0.28);
+
   /* CTA */
   --color-cta: var(--color-green);
   --color-cta-hover: var(--color-green-light);
@@ -182,10 +197,13 @@ body {
   --chart-9: #84cc16;
   --chart-10: #a855f7;
 
-  /* Elevation */
+  /* Elevation. Floating surfaces read `--shadow-popover` at runtime via
+     `shadow-[var(--shadow-popover)]` — the plain `shadow-popover` utility
+     inlines the value at build time, so the light-mode override below could
+     never reach it. */
   --shadow-card: 0 0 0 0 transparent;
   --shadow-popover:
-    0 8px 24px -4px rgb(0 0 0 / 0.45), 0 2px 6px -1px rgb(0 0 0 / 0.3);
+    0 8px 20px -6px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.22);
 }
 
 /* Light-mode console token overrides */
@@ -214,6 +232,18 @@ html[data-theme="light"] {
   --color-sidebar-card-bg: transparent;
   --color-sidebar-card-bg-hover: rgba(24, 24, 27, 0.05);
 
+  /* Chart series — the light-surface steps of the same seven slots. Three
+     (aqua, yellow, magenta) sit under 3:1 on white; the breakdown table is
+     the chart's labelled twin, which is the relief the rule asks for. */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+  --color-series-7: #4a3aa7;
+  --color-series-other: rgba(24, 24, 27, 0.3);
+
   /* Light-mode CTA flips to zinc-900 (Vercel/Linear/Stripe convention) */
   --color-cta: #18181b;
   --color-cta-hover: #27272a;
@@ -233,8 +263,10 @@ html[data-theme="light"] {
   --color-tone-amber-bg: rgba(180, 83, 9, 0.08);
   --color-tone-amber-border: rgba(180, 83, 9, 0.28);
 
+  /* Light popovers sit as white on the grey shell, so the surface does the
+     separating and the shadow only has to suggest lift. */
   --shadow-popover:
-    0 8px 16px -4px rgb(24 24 27 / 0.12), 0 2px 4px -1px rgb(24 24 27 / 0.06);
+    0 6px 16px -6px rgb(24 24 27 / 0.14), 0 1px 2px rgb(24 24 27 / 0.06);
 }
 
 /* ─── Branded text selection + caret ─── */
@@ -350,7 +382,11 @@ textarea:-webkit-autofill {
   color: var(--color-tone-amber);
 }
 .text-tone-amber:hover {
-  color: color-mix(in srgb, var(--color-tone-amber) 75%, var(--color-foreground));
+  color: color-mix(
+    in srgb,
+    var(--color-tone-amber) 75%,
+    var(--color-foreground)
+  );
 }
 
 /* ─── Console keyframes + animations ─── */

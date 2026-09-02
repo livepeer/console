@@ -1,8 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
-import { BarChart3, Box } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { useAuth } from "@/components/console/AuthContext";
 import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import ConsolePageSkeleton from "@/components/console/ConsolePageSkeleton";
@@ -31,21 +30,14 @@ function UsageContent() {
   // "Explore capabilities" escape hatch.
   if (!isConnected) return <SignInWall route="usage" />;
 
+  // No header action. "Manage plan" linked to /settings?tab=billing, which is
+  // hidden for the pilot — see the tab notes in app/(app)/settings/page.tsx.
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
       <ConsolePageHeader
         title="Usage"
         icon={BarChart3}
-        description="Signed requests, network cost, and prepaid balance usage from PymtHouse OpenMeter."
-        actions={
-          <Link
-            href="/settings?tab=billing"
-            className="btn-primary inline-flex h-[26px] items-center gap-1.5 rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
-          >
-            <Box className="h-3 w-3" aria-hidden="true" />
-            Manage plan
-          </Link>
-        }
+        description="What this period cost, and the calls behind it."
       />
       <div className="flex flex-1 flex-col overflow-y-auto">
         <UsageView />
