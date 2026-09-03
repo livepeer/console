@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   catalogFromDiscoverOrchestrators,
+  enrichCapabilityDetail,
   findCapability
 } from "./discovery";
 import {
@@ -138,6 +139,29 @@ test("describe hits listed apps and misses Railway verbs", () => {
   assert.equal(findCapability(rows, "vllm/qwen3-coder-30b")?.mode, "single-shot");
   assert.equal(findCapability(rows, "transcode/ffmpeg")?.mode, "persistent");
   assert.equal(findCapability(rows, "chat"), null);
+});
+
+test("enrichCapabilityDetail adds fal catalog metadata", () => {
+  const row = findCapability(
+    catalogFromDiscoverOrchestrators([
+      {
+        address: "https://orch:8936",
+        runners: [
+          {
+            app: "livepeer-example/fal-flux-schnell",
+            mode: "single-shot",
+            capacity_available: 4,
+            price_info: { price: 0.0001, currency: "usd", unit: "fixed" }
+          }
+        ]
+      }
+    ]),
+    "livepeer-example/fal-flux-schnell"
+  );
+  assert.ok(row);
+  const detail = enrichCapabilityDetail(row);
+  assert.equal(detail.catalog?.endpoint_id, "fal-ai/flux/schnell");
+  assert.match(detail.inputs_hint ?? "", /prompt/);
 });
 
 test("resolveDiscoveryUrl prefers session.discovery_url over signer fallback", () => {

@@ -3,6 +3,8 @@ export type Asset = {
   url: string;
   capability: string;
   createdAt: string;
+  /** Joins this asset to its ticket rows in PymtHouse metering. */
+  gatewayRequestId: string;
 };
 
 const assets = new Map<string, Asset[]>();
