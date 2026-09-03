@@ -1,10 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { describeNetworkCapability, listNetworkCapabilities } from "./discovery";
+import {
+  describeNetworkCapability,
+  listNetworkCapabilities,
+} from "./discovery";
 import { runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
 import { fetchMcpUsage } from "./pymthouse-spend";
 import { assertSpendable } from "./pymthouse-usage";
+import { extractQueueHandle, isQueueControlUrl } from "./queue";
 import { forgetAssets, listAssets, rememberAsset } from "./store";
 import { principalId } from "./log";
 
@@ -24,6 +28,41 @@ function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
+const RUN_CAPABILITY_TIMEOUT_MS = 780_000;
+
+async function sendRunProgress(
+  extra: {
+    _meta?: { progressToken?: string | number };
+    sendNotification: (notification: {
+      method: "notifications/progress";
+      params: {
+        progressToken: string | number;
+        progress: number;
+        total: number;
+        message: string;
+      };
+    }) => Promise<void>;
+  },
+  elapsedMs: number,
+  message: string
+): Promise<void> {
+  const token = extra._meta?.progressToken;
+  if (token == null) return;
+  try {
+    await extra.sendNotification({
+      method: "notifications/progress",
+      params: {
+        progressToken: token,
+        progress: elapsedMs,
+        total: RUN_CAPABILITY_TIMEOUT_MS,
+        message,
+      },
+    });
+  } catch {
+    // Client may have disconnected; keep the job running.
+  }
+}
+
 export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   const pid = principalId(principal);
   const server = new McpServer({
@@ -40,7 +79,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         "List live-runner apps from the SignerSession discovery catalog. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent. Includes 73 curated fal routes under livepeer-example/fal-*.",
       inputSchema: {},
     },
-    async () => text({ capabilities: await listNetworkCapabilities(principal) }),
+    async () => text({ capabilities: await listNetworkCapabilities(principal) })
   );
 
   server.registerTool(
@@ -56,20 +95,21 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       const row = await describeNetworkCapability(principal, name);
       if (!row) return text({ error: "not_found", name }, true);
       return text(row);
-    },
+    }
   );
 
   server.registerTool(
     "get_pricing",
     {
-      description: "Return discovery price metadata for a capability if present.",
+      description:
+        "Return discovery price metadata for a capability if present.",
       inputSchema: { name: z.string().min(1) },
     },
     async ({ name }) => {
       const row = await describeNetworkCapability(principal, name);
       if (!row) return text({ error: "not_found", name }, true);
       return text({ name: row.name, price: row.price ?? null });
-    },
+    }
   );
 
   server.registerTool(
@@ -84,20 +124,21 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         error: "pass_https_url",
         message:
           "Pass a publicly reachable https URL in run_capability inputs (image_url, source_url, audio_url). No local upload store on this MCP.",
-      }),
+      })
   );
 
   server.registerTool(
     "upload_image",
     {
-      description: "Alias of upload — pass a public https image URL to run_capability.",
+      description:
+        "Alias of upload — pass a public https image URL to run_capability.",
       inputSchema: { hint: z.string().optional() },
     },
     async () =>
       text({
         error: "pass_https_url",
         message: "Pass image_url as a public https URL to run_capability.",
-      }),
+      })
   );
 
   server.registerTool(
@@ -109,8 +150,9 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     async () =>
       text({
         error: "pass_https_url",
-        message: "create_upload_url is not hosted here. Host the file yourself and pass https.",
-      }),
+        message:
+          "create_upload_url is not hosted here. Host the file yourself and pass https.",
+      })
   );
 
   server.registerTool(
@@ -119,7 +161,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       description: "Assets produced in this isolate for the current principal.",
       inputSchema: {},
     },
-    async () => text({ assets: listAssets(pid) }),
+    async () => text({ assets: listAssets(pid) })
   );
 
   server.registerTool(
@@ -128,16 +170,17 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       description: "Search recent assets by capability or URL substring.",
       inputSchema: { query: z.string().min(1) },
     },
-    async ({ query }) => text({ assets: listAssets(pid, query) }),
+    async ({ query }) => text({ assets: listAssets(pid, query) })
   );
 
   server.registerTool(
     "forget_assets",
     {
-      description: "Drop remembered assets for this principal (this isolate only).",
+      description:
+        "Drop remembered assets for this principal (this isolate only).",
       inputSchema: { ids: z.array(z.string()).optional() },
     },
-    async ({ ids }) => text({ forgotten: forgetAssets(pid, ids) }),
+    async ({ ids }) => text({ forgotten: forgetAssets(pid, ids) })
   );
 
   server.registerTool(
@@ -153,13 +196,14 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
-    },
+    }
   );
 
   server.registerTool(
     "me",
     {
-      description: "Who this token is keyed as. console_access is unknown on this host (check Console).",
+      description:
+        "Who this token is keyed as. console_access is unknown on this host (check Console).",
       inputSchema: {},
     },
     async () =>
@@ -169,7 +213,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         public_client_id: principal.publicClientId,
         email: principal.email ?? null,
         console_access: "unknown",
-      }),
+      })
   );
 
   server.registerTool(
@@ -185,14 +229,14 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       } catch (err) {
         return text(err instanceof Error ? err.message : String(err), true);
       }
-    },
+    }
   );
 
   server.registerTool(
     "run_capability",
     {
       description:
-        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Single-shot capabilities POST the discovery URL as published — do not pass endpoint. Persistent apps require endpoint (the app path, e.g. /hello). Use describe_capability for fal route input hints. Blocks until the runner returns.",
+        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Single-shot capabilities POST the discovery URL as published — do not pass endpoint. Persistent apps require endpoint (the app path, e.g. /hello). Use describe_capability for fal route input hints. Blocks until the runner (or fal queue) completes, up to 13 minutes. Queue receipts are polled via status_url; if polling is unauthorized the handle is returned instead of url:null.",
       inputSchema: {
         capability: z.string().min(1),
         inputs: z.record(z.unknown()).optional(),
@@ -200,7 +244,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         endpoint: z.string().optional(),
       },
     },
-    async ({ capability, inputs, prompt, endpoint }) => {
+    async ({ capability, inputs, prompt, endpoint }, extra) => {
       try {
         assertSpendable(await fetchMcpUsage(principal));
       } catch (err) {
@@ -218,31 +262,41 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
               capability,
               mode: row?.mode ?? null,
             },
-            true,
+            true
           );
         }
       } else if (row?.mode === "persistent") {
         return text(
           {
             error: "endpoint_required",
-            message: "Persistent capabilities require endpoint (app path, e.g. /hello)",
+            message:
+              "Persistent capabilities require endpoint (app path, e.g. /hello)",
             capability,
           },
-          true,
+          true
         );
       }
 
       const gatewayRequestId = newId("job");
+      const started = Date.now();
+      const heartbeat = setInterval(() => {
+        void sendRunProgress(extra, Date.now() - started, "waiting on runner");
+      }, 5_000);
+      void sendRunProgress(extra, 0, "waiting on runner");
       try {
         const result = await runInference(principal, {
           capability,
           params: (inputs as Record<string, unknown> | undefined) ?? {},
           prompt,
           endpoint: row?.mode === "persistent" ? endpoint : undefined,
-          timeoutMs: 780_000,
+          timeoutMs: RUN_CAPABILITY_TIMEOUT_MS,
           gatewayRequestId,
+          onProgress: (info) =>
+            sendRunProgress(extra, info.elapsedMs, `queue ${info.status}`),
         });
-        const url = result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
+        const urlRaw =
+          result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
+        const url = urlRaw && !isQueueControlUrl(urlRaw) ? urlRaw : null;
         if (url) {
           rememberAsset(pid, {
             id: newId("asset"),
@@ -252,12 +306,18 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             gatewayRequestId: result.gatewayRequestId,
           });
         }
+        const handle = extractQueueHandle(result.data);
         return text({
           capability,
           url,
+          status: url ? "completed" : (handle?.status ?? null),
+          request_id: handle?.requestId ?? null,
+          status_url: url ? null : (handle?.statusUrl ?? null),
+          response_url: url ? null : (handle?.responseUrl ?? null),
           orchestrator: result.orchestrator,
           elapsed_ms: result.elapsedMs,
           gateway_request_id: result.gatewayRequestId,
+          ...(url ? {} : { data: result.data }),
         });
       } catch (err) {
         // A call can fail after tickets were already paid, so the id must be
@@ -269,8 +329,10 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           },
           true
         );
+      } finally {
+        clearInterval(heartbeat);
       }
-    },
+    }
   );
 
   return server;

@@ -22,7 +22,7 @@ export function identityResponse(req: Request): Response {
       authorization_servers: [origin],
       docs: `${origin}/`,
     },
-    { headers: corsHeaders(req) },
+    { headers: corsHeaders(req) }
   );
 }
 
@@ -76,7 +76,8 @@ export async function handleMcpRequest(req: Request): Promise<Response> {
   const server = buildRawMcpServer(principal);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
-    enableJsonResponse: true,
+    // SSE so progress notifications flush during 13-minute queue polls.
+    enableJsonResponse: false,
   });
   await server.connect(transport);
   try {
