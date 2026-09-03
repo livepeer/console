@@ -37,7 +37,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "list_capabilities",
     {
       description:
-        "List live-runner apps from the SignerSession discovery catalog. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent.",
+        "List live-runner apps from the SignerSession discovery catalog. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent. Includes 73 curated fal routes under livepeer-example/fal-*.",
       inputSchema: {},
     },
     async () => text({ capabilities: await listNetworkCapabilities(principal) }),
@@ -46,7 +46,8 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "describe_capability",
     {
-      description: "Describe one live-runner app by exact name from list_capabilities.",
+      description:
+        "Describe one live-runner app by exact name from list_capabilities. Returns mode, price, fal endpoint_id/schema metadata when known, and an inputs_hint for run_capability.",
       inputSchema: {
         name: z.string().min(1),
       },
@@ -191,7 +192,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "run_capability",
     {
       description:
-        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Persistent apps need `endpoint` (the app path, e.g. /hello). Blocks until the runner returns. If the host times out, retry the same call — there is no job_id to poll.",
+        "Deterministic passthrough: name a Livepeer capability and pass its exact inputs. Single-shot capabilities POST the discovery URL as published — do not pass endpoint. Persistent apps require endpoint (the app path, e.g. /hello). Use describe_capability for fal route input hints. Blocks until the runner returns.",
       inputSchema: {
         capability: z.string().min(1),
         inputs: z.record(z.unknown()).optional(),
@@ -206,13 +207,38 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         return text(err instanceof Error ? err.message : String(err), true);
       }
 
+      const row = await describeNetworkCapability(principal, capability);
+      if (endpoint?.trim()) {
+        if (!row || row.mode !== "persistent") {
+          return text(
+            {
+              error: "endpoint_not_supported",
+              message:
+                "endpoint is only valid for persistent capabilities; single-shot apps POST the discovery URL as published",
+              capability,
+              mode: row?.mode ?? null,
+            },
+            true,
+          );
+        }
+      } else if (row?.mode === "persistent") {
+        return text(
+          {
+            error: "endpoint_required",
+            message: "Persistent capabilities require endpoint (app path, e.g. /hello)",
+            capability,
+          },
+          true,
+        );
+      }
+
       const gatewayRequestId = newId("job");
       try {
         const result = await runInference(principal, {
           capability,
           params: (inputs as Record<string, unknown> | undefined) ?? {},
           prompt,
-          endpoint,
+          endpoint: row?.mode === "persistent" ? endpoint : undefined,
           timeoutMs: 780_000,
           gatewayRequestId,
         });
