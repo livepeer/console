@@ -1,3 +1,4 @@
+import { isQueueControlUrl } from "@pymthouse/gateway-web";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
@@ -6,9 +7,12 @@ import {
 } from "./discovery";
 import { runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
+import {
+  runCapabilityFailurePayload,
+  validateRunCapabilityEndpoint,
+} from "./run-capability";
 import { fetchMcpUsage } from "./pymthouse-spend";
 import { assertSpendable } from "./pymthouse-usage";
-import { extractQueueHandle, isQueueControlUrl } from "./queue";
 import { forgetAssets, listAssets, rememberAsset } from "./store";
 import { principalId } from "./log";
 
@@ -76,7 +80,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
     "list_capabilities",
     {
       description:
-        "List live-runner apps from the SignerSession discovery catalog. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent. Includes 73 curated fal routes under livepeer-example/fal-*.",
+        "List live-runner apps currently advertised in discovery. Use exact `name` (app id) with run_capability. `mode` is single-shot or persistent. Use describe_capability for fal route input hints when the app is listed.",
       inputSchema: {},
     },
     async () => text({ capabilities: await listNetworkCapabilities(principal) })
@@ -252,30 +256,12 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       }
 
       const row = await describeNetworkCapability(principal, capability);
-      if (endpoint?.trim()) {
-        if (!row || row.mode !== "persistent") {
-          return text(
-            {
-              error: "endpoint_not_supported",
-              message:
-                "endpoint is only valid for persistent capabilities; single-shot apps POST the discovery URL as published",
-              capability,
-              mode: row?.mode ?? null,
-            },
-            true
-          );
-        }
-      } else if (row?.mode === "persistent") {
-        return text(
-          {
-            error: "endpoint_required",
-            message:
-              "Persistent capabilities require endpoint (app path, e.g. /hello)",
-            capability,
-          },
-          true
-        );
-      }
+      const endpointError = validateRunCapabilityEndpoint(
+        capability,
+        row,
+        endpoint
+      );
+      if (endpointError) return text(endpointError, true);
 
       const gatewayRequestId = newId("job");
       const started = Date.now();
@@ -306,14 +292,13 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             gatewayRequestId: result.gatewayRequestId,
           });
         }
-        const handle = extractQueueHandle(result.data);
         return text({
           capability,
           url,
-          status: url ? "completed" : (handle?.status ?? null),
-          request_id: handle?.requestId ?? null,
-          status_url: url ? null : (handle?.statusUrl ?? null),
-          response_url: url ? null : (handle?.responseUrl ?? null),
+          status: result.status,
+          request_id: result.providerRequestId,
+          status_url: result.statusUrl,
+          response_url: result.responseUrl,
           orchestrator: result.orchestrator,
           elapsed_ms: result.elapsedMs,
           gateway_request_id: result.gatewayRequestId,
@@ -322,13 +307,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       } catch (err) {
         // A call can fail after tickets were already paid, so the id must be
         // reported here too or that spend is unattributable.
-        return text(
-          {
-            error: err instanceof Error ? err.message : String(err),
-            gateway_request_id: gatewayRequestId,
-          },
-          true
-        );
+        return text(runCapabilityFailurePayload(err, gatewayRequestId), true);
       } finally {
         clearInterval(heartbeat);
       }
