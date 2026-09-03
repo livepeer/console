@@ -115,8 +115,8 @@ export default function PlansPanel() {
         try {
           const result = await changePlan({
             planId: resumePlanId,
-            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(resumePlanId)}`,
-            cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
+            successUrl: `${window.location.origin}/home?checkout=success&changePlan=${encodeURIComponent(resumePlanId)}`,
+            cancelUrl: `${window.location.origin}/home?checkout=cancel`,
           });
           if (result.checkoutUrl) {
             redirectToCheckout(result.checkoutUrl);
@@ -166,8 +166,8 @@ export default function PlansPanel() {
     if (!isConnected) return;
     const result = await changePlan({
       planId,
-      successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
-      cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
+      successUrl: `${window.location.origin}/home?checkout=success&changePlan=${encodeURIComponent(planId)}`,
+      cancelUrl: `${window.location.origin}/home?checkout=cancel`,
       ...timing,
     });
     if (result.checkoutUrl) {
@@ -179,7 +179,7 @@ export default function PlansPanel() {
     const targetPlan = plans.find((p) => p.id === planId);
     setError(
       targetPlan && isUsagePlan(targetPlan)
-        ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
+        ? "Plan updated. Pay-per-use auto-debit is ready once a payment method is on file."
         : "Plan updated."
     );
   }
@@ -221,8 +221,8 @@ export default function PlansPanel() {
         } else {
           const result = await subscribe({
             planId,
-            successUrl: `${window.location.origin}/usage?checkout=success&changePlan=${encodeURIComponent(planId)}`,
-            cancelUrl: `${window.location.origin}/usage?checkout=cancel`,
+            successUrl: `${window.location.origin}/home?checkout=success&changePlan=${encodeURIComponent(planId)}`,
+            cancelUrl: `${window.location.origin}/home?checkout=cancel`,
           });
           if (result.checkoutUrl) {
             redirectToCheckout(result.checkoutUrl);
@@ -231,7 +231,7 @@ export default function PlansPanel() {
           await reload();
           setError(
             targetPlan && isUsagePlan(targetPlan)
-              ? "Plan updated. Add a payment method in Settings → Billing for pay-per-use auto-debit."
+              ? "Plan updated. Pay-per-use auto-debit is ready once a payment method is on file."
               : "Plan updated."
           );
         }

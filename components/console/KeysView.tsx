@@ -304,7 +304,6 @@ export default function KeysView() {
     <>
       <ConsolePageHeader
         title="API keys"
-        icon={KeyIcon}
         actions={
           <>
             <a

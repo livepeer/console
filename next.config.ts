@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["studio.tail0de21e.ts.net"],
   // Bundler-agnostic polling interval for file watching — works with both
   // Turbopack (default in Next 15) and Webpack. Needed because the native
   // file watcher doesn't pick up changes reliably in git worktrees.
@@ -35,6 +36,16 @@ const nextConfig: NextConfig = {
         source: "/apps/:id/manage",
         destination: "/apps/:id?tab=overview",
         permanent: true,
+      },
+      {
+        source: "/settings/:path*",
+        destination: "/home",
+        permanent: false,
+      },
+      {
+        source: "/usage",
+        destination: "/home",
+        permanent: false,
       },
       // Old livepeer.org routes → new site equivalents
       {

@@ -551,7 +551,6 @@ function ExplorePageInner() {
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
       <ConsolePageHeader
         title="Explore"
-        icon={LayoutGrid}
         actions={
           <>
             {/* Grid / list view toggle — segmented control per v3 `.view-toggle` */}

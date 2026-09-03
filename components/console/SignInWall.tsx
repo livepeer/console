@@ -9,13 +9,12 @@ import {
   Box,
   Globe,
   Key,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 
 /**
  * SignInWall — what a logged-out user sees when they hit a private organization
- * route (Home / Jobs / Usage / API keys / Settings / Network). Mirrors the
+ * route (Home / Jobs / Usage / API keys / Network). Mirrors the
  * Livepeer Dashboard v4 prototype's `wall-shell` block: route-aware icon +
  * eyebrow + title + description, "Sign in" / "Create organization" CTAs, and an
  * `→ Explore apps` escape hatch. The sidebar around it stays in its
@@ -35,8 +34,7 @@ export type SignInWallRoute =
   | "calls"
   | "usage"
   | "keys"
-  | "network"
-  | "settings";
+  | "network";
 
 interface RouteCopy {
   icon: LucideIcon;
@@ -80,11 +78,6 @@ const ROUTE_COPY: Record<SignInWallRoute, RouteCopy> = {
     title: "Network metrics — sign in",
     description:
       "Your network performance view is per-organization. Sign in to see GPU pool health and routing.",
-  },
-  settings: {
-    icon: Settings,
-    title: "Settings — sign in",
-    description: "Organization and account settings live behind sign-in.",
   },
 };
 

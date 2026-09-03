@@ -14,7 +14,10 @@ interface DrawerProps {
   /** aria-label when no title is provided. */
   ariaLabel?: string;
   /** Which edge the drawer slides in from. Defaults to "bottom". */
-  side?: "bottom" | "left" | "right";
+  side?: "bottom" | "left" | "right" | "top";
+  backdropClassName?: string;
+  panelClassName?: string;
+  contentClassName?: string;
   children: ReactNode;
 }
 
@@ -35,6 +38,9 @@ export default function Drawer({
   title,
   ariaLabel,
   side = "bottom",
+  backdropClassName = "",
+  panelClassName = "",
+  contentClassName = "",
   children,
 }: DrawerProps) {
   const [mounted, setMounted] = useState(false);
@@ -94,7 +100,7 @@ export default function Drawer({
         onClick={onClose}
         className={`absolute inset-0 h-full w-full cursor-default bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0"
-        }`}
+        } ${backdropClassName}`}
       />
 
       {/* Panel */}
@@ -109,14 +115,18 @@ export default function Drawer({
           side === "left"
             ? `absolute bottom-0 left-0 top-0 flex w-[min(280px,80vw)] flex-col overflow-hidden rounded-r-2xl border-r border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
                 open ? "translate-x-0" : "-translate-x-full"
-              }`
+              } ${panelClassName}`
             : side === "right"
               ? `absolute bottom-0 right-0 top-0 flex w-[min(480px,92vw)] flex-col overflow-hidden rounded-l-2xl border-l border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
                   open ? "translate-x-0" : "translate-x-full"
-                }`
-              : `absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
-                  open ? "translate-y-0" : "translate-y-full"
-                }`
+                } ${panelClassName}`
+              : side === "top"
+                ? `absolute inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden border-0 bg-background text-foreground shadow-none outline-none transition-opacity duration-200 ease-out motion-reduce:transition-none ${
+                    open ? "opacity-100" : "opacity-0"
+                  } ${panelClassName}`
+                : `absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border-t border-white/10 bg-dark shadow-2xl shadow-black/60 outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+                    open ? "translate-y-0" : "translate-y-full"
+                  } ${panelClassName}`
         }
       >
         {/* Drag handle — bottom sheet only */}
@@ -145,8 +155,10 @@ export default function Drawer({
         <div
           className={
             side === "bottom"
-              ? "flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),1rem)]"
-              : "flex-1 overflow-y-auto"
+              ? `flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),1rem)] ${contentClassName}`
+              : side === "top"
+                ? `flex-1 overflow-hidden ${contentClassName}`
+                : `flex-1 overflow-y-auto ${contentClassName}`
           }
         >
           {children}

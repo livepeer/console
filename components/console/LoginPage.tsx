@@ -86,7 +86,7 @@ export default function LoginPage({
               className="text-balance text-center text-base font-normal leading-[1.4] tracking-tight text-fg-muted sm:text-lg"
             >
               {mode === "signin"
-                ? "Log in to the Livepeer Console"
+                ? "Log in to Livepeer Early Access"
                 : "Get started with Livepeer"}
             </motion.h1>
           </AnimatePresence>

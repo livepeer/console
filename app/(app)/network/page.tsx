@@ -5,7 +5,6 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   BarChart3,
   Activity,
-  Globe,
   Wallet,
   Cpu,
   ArrowUpRight,
@@ -106,8 +105,7 @@ function NetworkContent() {
   return (
     <main id="main-content" className="flex flex-1 flex-col bg-dark">
       <ConsolePageHeader
-        title="Network"
-        icon={Globe}
+        title="Stats"
         description="Live state of the open GPU network — orchestrators, payments, hardware."
         actions={
           <>

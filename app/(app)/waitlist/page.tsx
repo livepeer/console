@@ -1,4 +1,3 @@
-import { Mail } from "lucide-react";
 import { auth0 } from "@/lib/auth0";
 import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import SectionHeader from "@/components/console/SectionHeader";
@@ -13,7 +12,7 @@ export default async function WaitlistPage() {
 
   return (
     <>
-      <ConsolePageHeader title="Waitlist" icon={Mail} />
+      <ConsolePageHeader title="Waitlist" />
       <main className="mx-auto w-full max-w-5xl px-5 py-8">
         <SectionHeader
           variant="default"

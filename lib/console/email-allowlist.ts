@@ -43,9 +43,9 @@ export function isAllowlistGatedPath(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname === "/home" ||
+    pathname === "/install" ||
     pathname.startsWith("/usage") ||
     pathname.startsWith("/keys") ||
-    pathname.startsWith("/calls") ||
-    pathname.startsWith("/settings")
+    pathname.startsWith("/calls")
   );
 }

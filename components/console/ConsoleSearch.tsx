@@ -28,11 +28,6 @@ const SUGGESTIONS: SearchResult[] = [
     href: "/explore",
   },
   {
-    title: "Get your API key",
-    subtitle: "Authenticate and start sending requests",
-    href: "/settings?tab=tokens",
-  },
-  {
     title: "Transcode a stream",
     subtitle: "Live transcoding on GPU infrastructure",
     href: "/apps/frameworks-transcoding",
@@ -93,24 +88,8 @@ const ALL_RESULTS: SearchResult[] = [
     subtitle: "Text-to-speech synthesis",
     href: "/apps/kokoro-tts",
   },
-  { title: "Home", subtitle: "Console overview", href: "/home" },
-  {
-    title: "API Tokens",
-    subtitle: "Manage your API keys",
-    href: "/settings?tab=tokens",
-  },
-  {
-    title: "Billing",
-    subtitle: "Manage billing and payments",
-    href: "/settings?tab=billing",
-  },
-  { title: "Usage", subtitle: "Request volume and spend", href: "/usage" },
-  {
-    title: "Account",
-    subtitle: "Profile and security",
-    href: "/settings?tab=account",
-  },
-  { title: "Settings", subtitle: "Account settings", href: "/settings" },
+  { title: "Install", subtitle: "Agent setup", href: "/install" },
+  { title: "Home", subtitle: "Request volume and spend", href: "/home" },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────

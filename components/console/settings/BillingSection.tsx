@@ -161,15 +161,14 @@ function clearCheckoutQueryParam(): void {
 }
 
 function billingChangePlanSuccessUrl(planId: string): string {
-  const url = new URL("/settings", window.location.origin);
-  url.searchParams.set("tab", "billing");
+  const url = new URL("/home", window.location.origin);
   url.searchParams.set("checkout", "success");
   url.searchParams.set("changePlan", planId);
   return url.toString();
 }
 
 function billingChangePlanCancelUrl(): string {
-  return `${window.location.origin}/settings?tab=billing&checkout=cancel`;
+  return `${window.location.origin}/home?checkout=cancel`;
 }
 
 /**
@@ -244,7 +243,7 @@ export default function BillingSection() {
     try {
       const { checkoutUrl } = await startWalletTopUp({
         amountUsd: topUpAmount.trim(),
-        returnPath: "/settings?tab=billing",
+        returnPath: "/home",
       });
       redirectToCheckout(checkoutUrl);
     } catch (err) {

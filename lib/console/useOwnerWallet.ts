@@ -47,7 +47,7 @@ export async function startWalletTopUp(input: {
   amountUsd: string;
   returnPath?: string;
 }): Promise<{ checkoutUrl: string }> {
-  const path = input.returnPath ?? "/usage";
+  const path = input.returnPath ?? "/home";
   const join = path.includes("?") ? "&" : "?";
   const response = await fetch("/api/pymthouse/wallet/top-up", {
     method: "POST",
@@ -221,8 +221,8 @@ export function useOwnerWallet(enabled: boolean) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        successUrl: `${window.location.origin}/usage?topup=pm-saved`,
-        cancelUrl: `${window.location.origin}/usage?topup=canceled`,
+        successUrl: `${window.location.origin}/home?topup=pm-saved`,
+        cancelUrl: `${window.location.origin}/home?topup=canceled`,
       }),
     });
     const body = await readResponseJson<{
