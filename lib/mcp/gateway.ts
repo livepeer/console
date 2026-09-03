@@ -21,7 +21,8 @@ export async function runInference(
       signerHeaders: { Authorization: `Bearer ${signerJwt}` },
       discoveryUrl: session.discovery_url,
       insecureTls: true,
-      timeoutMs
+      timeoutMs,
+      attributionSource: "pymthouse_gateway"
     });
     return gw.runInference(request);
   };

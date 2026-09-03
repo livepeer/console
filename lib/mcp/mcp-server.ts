@@ -206,6 +206,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         return text(err instanceof Error ? err.message : String(err), true);
       }
 
+      const gatewayRequestId = newId("job");
       try {
         const result = await runInference(principal, {
           capability,
@@ -213,6 +214,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           prompt,
           endpoint,
           timeoutMs: 780_000,
+          gatewayRequestId,
         });
         const url = result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
         if (url) {
@@ -221,6 +223,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             url,
             capability,
             createdAt: new Date().toISOString(),
+            gatewayRequestId: result.gatewayRequestId,
           });
         }
         return text({
@@ -228,9 +231,18 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           url,
           orchestrator: result.orchestrator,
           elapsed_ms: result.elapsedMs,
+          gateway_request_id: result.gatewayRequestId,
         });
       } catch (err) {
-        return text(err instanceof Error ? err.message : String(err), true);
+        // A call can fail after tickets were already paid, so the id must be
+        // reported here too or that spend is unattributable.
+        return text(
+          {
+            error: err instanceof Error ? err.message : String(err),
+            gateway_request_id: gatewayRequestId,
+          },
+          true
+        );
       }
     },
   );
