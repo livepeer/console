@@ -33,7 +33,6 @@ interface TabStripProps<T extends string = string> {
  * TabStrip — horizontal pill tab strip with a sliding active indicator.
  *
  * Used across:
- *  - `/settings` (Account / API Tokens / Billing)
  *  - `/network` (Overview / Utilization / Payments / GPUs)
  *  - `/` (the Tasks/category row)
  *

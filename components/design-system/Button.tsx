@@ -40,7 +40,7 @@ export default function Button(props: AsLink | AsButton) {
     className = "",
     ...rest
   } = props;
-  const base = `inline-flex items-center justify-center gap-2 select-none font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green ${sizeStyles[size]} ${variantStyles[variant]} ${className}`;
+  const base = `inline-flex items-center justify-center gap-2 select-none font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${sizeStyles[size]} ${variantStyles[variant]} ${className}`;
 
   if ("href" in rest) {
     return (

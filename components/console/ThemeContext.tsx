@@ -1,7 +1,5 @@
 "use client";
 
-import { Monitor, Moon, Sun, type LucideIcon } from "lucide-react";
-
 import {
   createContext,
   useCallback,
@@ -21,35 +19,17 @@ export type ThemePreference = "light" | "dark" | "system";
 /** What's actually applied to `<html data-theme="...">`. Always concrete. */
 export type ResolvedTheme = "light" | "dark";
 
-/**
- * The three choices, in the order every theme control shows them. Shared by
- * the Appearance settings view and the account menu so they can't drift.
- */
-export const THEME_OPTIONS: {
-  value: ThemePreference;
-  label: string;
-  icon: LucideIcon;
-}[] = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
-];
-
 interface ThemeContextValue {
-  /** The user's stored preference. */
+  /** The console is system-only; this always reports "system". */
   preference: ThemePreference;
   /** The concrete theme currently applied (resolved through `system`). */
   resolved: ResolvedTheme;
-  /** True until we've read localStorage on the client; consumers can avoid
-   *  flashing UI driven by `preference` during this window. */
+  /** True until the first OS theme read has completed on the client. */
   isLoading: boolean;
-  /** Persist a new preference and re-apply `data-theme`. */
+  /** Kept for API compatibility; resets back to system. */
   setPreference: (p: ThemePreference) => void;
 }
 
-// Shared with the marketing site's ThemeToggle (components/layout/ThemeToggle.tsx)
-// and the root layout's inline init script (app/layout.tsx). Same key on both
-// sides means flipping the toggle in either context propagates to the other.
 const THEME_STORAGE_KEY = "theme";
 
 const ThemeContext = createContext<ThemeContextValue>({
@@ -69,33 +49,20 @@ function prefersDarkOS(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-/** Combine a user preference with the live OS pref to get a concrete theme. */
-function resolvePreference(p: ThemePreference): ResolvedTheme {
-  if (p === "light") return "light";
-  if (p === "dark") return "dark";
+/** Resolve the live OS preference to a concrete theme. */
+function resolveSystemPreference(): ResolvedTheme {
   return prefersDarkOS() ? "dark" : "light";
 }
 
 /**
- * ThemeProvider — owns the user's theme preference for the console.
- *
- * Source of truth: `localStorage["theme"]`. Same key the marketing site's
- * ThemeToggle uses — flipping the toggle on either surface propagates to the
- * other. Default is "system" for first-time visitors: we follow
- * `prefers-color-scheme` via a matchMedia listener so OS theme changes flip
- * the console in real time. Users can pin "light" or "dark" via
- * Settings → Appearance, which tears the listener down.
+ * ThemeProvider — keeps the console on the system theme.
  *
  * The `<html data-theme="...">` attribute is set both by an inline script in
  * the console layout (`app/(app)/layout.tsx` — runs before
  * paint, prevents FOUT) and by this provider (keeps the attribute in sync
- * after hydration). The provider is the canonical writer post-mount; the
- * inline script just gets us through the first frame.
+ * after hydration).
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Default to "system" — concrete value gets re-read from localStorage in
-  // useEffect below. Server render uses this fallback.
-  const [preference, setPreferenceState] = useState<ThemePreference>("system");
   const [resolved, setResolved] = useState<ResolvedTheme>("dark");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -109,59 +76,40 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Hydration: read stored preference from localStorage and resolve it.
+  // Hydration: ignore old stored light/dark values and resolve from the OS.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let stored: ThemePreference = "system";
-    try {
-      const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (raw === "light" || raw === "dark" || raw === "system") {
-        stored = raw;
-      }
-    } catch {
-      // localStorage may throw in iframes / private mode — fall through.
-    }
-    setPreferenceState(stored);
-    applyResolved(resolvePreference(stored));
-    setIsLoading(false);
-  }, [applyResolved]);
 
-  // Subscribe to OS preference changes ONLY while in "system" mode. The
-  // listener is torn down whenever the user pins a theme.
-  //
-  // We deliberately do NOT fire the listener immediately on attach: the
-  // hydration effect above has already called `applyResolved(resolvePreference
-  // (stored))` with the correct preference. Firing onChange() here would race
-  // it — during the first render `preference` is still the initial "system"
-  // default (closure-captured), so this effect would re-resolve to OS-pref
-  // and clobber the user's persisted choice during the brief two-render
-  // hydration window. Listener fires only on future OS changes.
-  useEffect(() => {
-    if (preference !== "system") return;
-    if (typeof window === "undefined") return;
-    if (isLoading) return; // wait until hydration committed
+    try {
+      window.localStorage.removeItem(THEME_STORAGE_KEY);
+    } catch {
+      // localStorage may throw in iframes / private mode.
+    }
+
+    applyResolved(resolveSystemPreference());
+    setIsLoading(false);
+
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyResolved(prefersDarkOS() ? "dark" : "light");
+    const onChange = () => applyResolved(resolveSystemPreference());
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
-  }, [preference, isLoading, applyResolved]);
+  }, [applyResolved]);
 
-  const setPreference = useCallback(
-    (p: ThemePreference) => {
-      setPreferenceState(p);
-      applyResolved(resolvePreference(p));
+  const setPreference: ThemeContextValue["setPreference"] = useCallback(
+    () => {
       try {
-        window.localStorage.setItem(THEME_STORAGE_KEY, p);
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
       } catch {
-        // ignore — preference still applies for the session.
+        // ignore
       }
+      applyResolved(resolveSystemPreference());
     },
     [applyResolved]
   );
 
   return (
     <ThemeContext.Provider
-      value={{ preference, resolved, isLoading, setPreference }}
+      value={{ preference: "system", resolved, isLoading, setPreference }}
     >
       {children}
     </ThemeContext.Provider>

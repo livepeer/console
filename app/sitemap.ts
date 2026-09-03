@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const BASE_URL = "https://dashboard.livepeer.org";
+const BASE_URL = "https://earlyaccess.livepeer.org";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
