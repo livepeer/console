@@ -224,26 +224,23 @@ function buildUsage(
   };
 }
 
-/** 30-day totals, shared so the wallet and the usage payload agree. */
-let baseTotals: { networkFee: number; billable: number } | null = null;
-function periodTotals() {
-  if (!baseTotals) {
-    const base = buildUsage(PERIOD_DAYS, false);
-    baseTotals = {
-      networkFee: Number(base.current.networkFeeUsdMicros) / 1_000_000,
-      billable: Number(base.current.endUserBillableUsdMicros) / 1_000_000,
-    };
-  }
-  return baseTotals;
+function devRedirect(path: string | null, requestUrl: string): Response {
+  const safePath = path?.startsWith("/") && !path.startsWith("//") ? path : "/home";
+  const baseUrl = process.env.APP_BASE_URL || requestUrl;
+
+  return new Response(null, {
+    status: 307,
+    headers: { location: new URL(safePath, baseUrl).toString() },
+  });
 }
 
-const INCLUDED_TOTAL_USD = 500;
+const INCLUDED_TOTAL_USD = 250;
 
 function buildWallet() {
   const resetsAt = new Date();
   resetsAt.setUTCDate(resetsAt.getUTCDate() + 11);
-  const consumed = periodTotals().networkFee;
-  const remaining = Math.max(0, INCLUDED_TOTAL_USD - consumed);
+  const consumed = 0;
+  const remaining = INCLUDED_TOTAL_USD;
 
   return {
     clientId: "app_dev_mock_console",
@@ -404,7 +401,7 @@ function buildInvoices() {
 }
 
 /**
- * Per-request rows for the Calls section on /usage.
+ * Per-request rows for the Calls section on /home.
  *
  * Drawn from the same CAPABILITIES mix as the usage totals so the two halves
  * of the page agree with each other: the capability that dominates Spend by
@@ -464,7 +461,8 @@ function buildRequests(limit: number, cursor: string | null) {
  */
 export function devMockResponse(
   pathname: string,
-  search: URLSearchParams
+  search: URLSearchParams,
+  requestUrl: string
 ): Response | null {
   // Auth0's client `useUser()` reads this; a body here makes the app "signed in".
   if (pathname === "/auth/profile") {
@@ -481,7 +479,7 @@ export function devMockResponse(
 
   // Logging out of a fake session would bounce to a real Auth0 tenant.
   if (pathname === "/auth/logout" || pathname === "/auth/login") {
-    return new Response(null, { status: 307, headers: { location: "/home" } });
+    return devRedirect(search.get("returnTo"), requestUrl);
   }
 
   if (pathname === "/api/pymthouse/account-usage") {

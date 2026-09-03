@@ -179,10 +179,8 @@ export function buildUsageCapabilityRows(input: {
 
 export function microsToUsdDisplay(micros: string): string {
   const usd = microsToUsd(micros);
-  if (usd >= 100) return usd.toFixed(2);
-  if (usd >= 1) return usd.toFixed(2);
-  if (usd >= 0.01) return usd.toFixed(3);
-  return usd.toFixed(4);
+  if (usd < 0.01) return "<$0.01";
+  return `$${usd.toFixed(2)}`;
 }
 
 export function formatPeriodResetLabel(periodEndIso: string): string {
