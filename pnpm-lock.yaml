@@ -18,8 +18,8 @@ importers:
         specifier: ^0.6.5
         version: 0.6.5
       '@pymthouse/gateway-web':
-        specifier: 0.3.0-rc.7
-        version: 0.3.0-rc.7
+        specifier: 0.3.1
+        version: 0.3.1
       framer-motion:
         specifier: ^11.15.0
         version: 11.18.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -440,8 +440,8 @@ packages:
     resolution: {integrity: sha512-oWQC3y7vTqOKG+fEaZRc7TtbIMJaLZZoS6kCqBzF5M4489wGS31LlE2gwhYDEuVNAeyoJwaK/Uu+mfEe8TwGFw==}
     engines: {node: '>=20'}
 
-  '@pymthouse/gateway-web@0.3.0-rc.7':
-    resolution: {integrity: sha512-1ZPS344XNQ5joAm7c9kS1c32lTj0htWHHS/NLype7SGYrtETnz15ek36F+Hom7HSNYIIFxgpVVu+VrA/BfvYIg==}
+  '@pymthouse/gateway-web@0.3.1':
+    resolution: {integrity: sha512-FmCZaQnTB9r0giu0WjCmgsCZzIv42LpUXybJ9Gay2ndBySfIdSYCjyLo7vWqBjolfBbV820FDyjYry88VkoFvQ==}
     engines: {node: '>=20'}
 
   '@reduxjs/toolkit@2.11.2':
@@ -2657,7 +2657,7 @@ snapshots:
     dependencies:
       oauth4webapi: 3.8.7
 
-  '@pymthouse/gateway-web@0.3.0-rc.7':
+  '@pymthouse/gateway-web@0.3.1':
     dependencies:
       undici: 7.29.0
 

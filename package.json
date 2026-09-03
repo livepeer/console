@@ -16,7 +16,7 @@
     "@auth0/nextjs-auth0": "^4.27.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@pymthouse/builder-sdk": "^0.6.5",
-    "@pymthouse/gateway-web": "0.3.0-rc.7",
+    "@pymthouse/gateway-web": "0.3.1",
     "framer-motion": "^11.15.0",
     "geist": "^1.7.0",
     "jose": "^6.2.10",
