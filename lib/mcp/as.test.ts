@@ -29,10 +29,12 @@ test("pending and auth code round-trip with external user", () => {
     clientId: "mcp_c_x",
     clientState: "claude-state",
     redirectUri: "https://claude.ai/api/mcp/auth_callback",
-    codeChallenge: "challenge"
+    codeChallenge: "challenge",
+    issuer: "https://dashboard.livepeer.org"
   });
   const parsed = parsePending(pending);
   assert.equal(parsed?.nonce, "n1");
+  assert.equal(parsed?.issuer, "https://dashboard.livepeer.org");
   const code = issueAuthCode({
     redirectUri: parsed!.redirectUri,
     codeChallenge: parsed!.codeChallenge,
