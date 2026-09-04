@@ -46,6 +46,13 @@ export type AdminPrincipal = {
   userId?: string;
 };
 
+/** Public signup context only; never authority, consent, or account identifiers. */
+export type WaitlistEnrollmentContext = {
+  source: "waitlist_auth";
+  referralCode?: string;
+  attribution: Record<string, string>;
+};
+
 export type AccessAction = "approve" | "revoke";
 export type BulkAccessOutcome = {
   signupId: string;
@@ -84,4 +91,5 @@ export type ConsoleSessionProfile = {
   email: string;
   avatarUrl?: string;
   provider: "github" | "google" | "email";
+  isAdmin: boolean;
 };

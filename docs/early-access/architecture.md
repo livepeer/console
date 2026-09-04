@@ -166,3 +166,42 @@ This is an actively used protocol-security table, not a speculative MCP-client
 or activity schema. Data owner alone authored the migration. Coordinator authored
 the consuming fix after the agent runtime rejected both original-author recall
 and replacement spawning at its thread limit. Security reviewer remains independent.
+
+## Contract amendment 4 — Auth0-first waitlist and Console administration
+
+User-approved replacement for v1's magic-link administration: joining and signing
+in from `/waitlist` use Auth0. Resend remains delivery infrastructure, not session
+authority. Existing waitlist rows, referrals, consent history and admin grants are
+preserved. Legacy verification links may confirm their original enrollment but
+must no longer create sessions or authorize membership, consent or administration.
+
+`GET /api/waitlist/join` carries bounded public referral/attribution parameters
+through Auth0's transaction-bound returnTo to `/api/identity/sync`. These fields
+never convey email ownership, consent, roles, approval or external account IDs.
+`enrollAuthenticatedUser(identity, canonical, context?)` accepts the shared
+`WaitlistEnrollmentContext`; context applies only to a new enrollment, preserving
+existing attribution/referrals. No implicit newsletter consent.
+
+`getAdminPrincipalForUser(userId)` is a session-independent database permission
+resolver: active user, trusted linked confirmed signup, active admin grant, and
+no explicit revoked product grant. `getAdminPrincipal()` authenticates using the
+provider adapter and resolves trusted enrollment before this permission lookup.
+Neither Auth0 role claims nor legacy waitlist cookies grant permissions. The
+shared access decision admits an active administrator or approved access grant;
+disabled/revoked takes precedence, and database failures remain unavailable.
+
+For ordinary post-login landing: admin → `/admin`, approved → `/home`, otherwise
+→ `/access-pending`. Explicit safe protocol/device return paths remain intact
+and enforce their existing server-side approval gates. `/admin` moves inside
+Console chrome but retains its independent server-side admin check. The Console
+session profile adds `isAdmin` for navigation only, never authorization.
+
+`getCurrentWaitlistSession()` and newsletter preference endpoints use Auth0 and
+trusted canonical signup ownership without requiring product approval. Anonymous
+POST `/api/waitlist` no longer enrolls or sends sign-in links. The UI starts
+Auth0 instead; legacy routes cannot bypass the new authentication boundary.
+Auth0 logout replaces the custom waitlist-session logout in the browser.
+
+This amendment needs no database migration or credential-provider change.
+Production remains on hold. PR48 will include PR46 by targeting main; neither
+PR is merged as part of this work.
