@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { auth0 } from "@/lib/auth0";
+import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { authLoginHref, safeReturnTo } from "@/lib/console/auth-login";
 import LoginPage from "@/components/console/LoginPage";
-import { syncCanonicalUserBestEffort } from "@/lib/identity/canonical-user";
+import { identitySyncPath } from "@/lib/identity/sync-return";
 
 import type { Metadata } from "next";
 
@@ -24,18 +24,9 @@ export default async function LoginRoute({
   const mcpOauth = params.mcp_oauth === "1";
   const returnTo = safeReturnTo(params.returnTo);
 
-  const session = await auth0.getSession();
-  if (session) {
-    const sub = session.user.sub?.trim();
-    if (sub) {
-      await syncCanonicalUserBestEffort({
-        sub,
-        email: session.user.email?.trim() || undefined,
-        emailVerified: session.user.email_verified === true,
-      });
-    }
-    redirect(mcpOauth ? MCP_CALLBACK_PATH : returnTo);
-  }
+  const identity = await getAuthenticatedIdentity();
+  if (identity)
+    redirect(identitySyncPath(mcpOauth ? MCP_CALLBACK_PATH : returnTo));
 
   // MCP flow must go directly to Auth0 — no interactive UI step.
   if (mcpOauth) {

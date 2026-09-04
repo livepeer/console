@@ -90,6 +90,14 @@ export function WaitingContent({
             Sign out
           </a>
         </div>
+        {state === "pending" ? (
+          <a
+            href="/waitlist"
+            className="mt-6 inline-block text-sm text-white/70 underline underline-offset-4"
+          >
+            Manage waitlist &amp; email preferences
+          </a>
+        ) : null}
         <p className="mt-8 text-xs leading-relaxed text-white/45">
           Waitlist membership does not subscribe you to marketing emails.
         </p>

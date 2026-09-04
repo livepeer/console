@@ -475,6 +475,7 @@ export function devMockResponse(
       name: "Design Preview",
       email: MOCK_EMAIL,
       provider: "google",
+      isAdmin: false,
     });
   }
   // Auth0's client `useUser()` reads this; a body here makes the app "signed in".
