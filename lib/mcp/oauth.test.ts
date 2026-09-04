@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { asMetadata, consoleLoginUrl, isAllowedMcpResource } from "./oauth";
+import {
+  asMetadata,
+  consoleLoginUrl,
+  isAllowedMcpResource,
+  mcpIdentityBody,
+  prmBody
+} from "./oauth";
 
 test("RFC 8707 resource is optional and must match /api/mcp when present", () => {
   process.env.MCP_PUBLIC_ORIGIN = "https://dashboard.livepeer.org";
@@ -26,6 +32,17 @@ test("consoleLoginUrl sends MCP clients straight to Auth0", () => {
   assert.equal(url.pathname, "/auth/login");
   assert.equal(url.searchParams.get("returnTo"), "/api/mcp/oauth/callback");
   assert.equal(url.searchParams.get("mcp_oauth"), null);
+});
+
+test("GET /api/mcp identity is valid RFC 9728 protected resource metadata", () => {
+  process.env.MCP_PUBLIC_ORIGIN = "https://dashboard.livepeer.org";
+  const req = new Request("https://dashboard.livepeer.org/api/mcp");
+  const identity = mcpIdentityBody(req);
+  const prm = prmBody(req);
+  assert.equal(identity.resource, "https://dashboard.livepeer.org/api/mcp");
+  assert.equal(identity.mcp_url, identity.resource);
+  assert.deepEqual(identity.authorization_servers, prm.authorization_servers);
+  assert.deepEqual(identity.scopes_supported, prm.scopes_supported);
 });
 
 test("AS metadata advertises CIMD and RFC 9207 iss", () => {

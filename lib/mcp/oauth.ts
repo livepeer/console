@@ -18,6 +18,21 @@ export function prmBody(req: Request) {
   };
 }
 
+/** GET /api/mcp identity. Codex treats a 200 here as RFC 9728 PRM, so `resource` is required. */
+export function mcpIdentityBody(req: Request) {
+  const origin = mcpPublicOrigin(req);
+  return {
+    ...prmBody(req),
+    name: "Livepeer Agent MCP",
+    profile: "raw",
+    statement:
+      "Deterministic passthrough: name a capability, pass its exact inputs, get exactly that capability.",
+    transport: "streamable-http",
+    mcp_url: mcpResourceUrl(req),
+    docs: `${origin}/`
+  };
+}
+
 export function asMetadata(req: Request) {
   const origin = mcpPublicOrigin(req);
   return {

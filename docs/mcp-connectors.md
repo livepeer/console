@@ -52,7 +52,7 @@ url = "https://<APP_BASE_URL>/api/mcp"
 codex mcp login livepeer
 ```
 
-Codex identifies itself with a ChatGPT-hosted CIMD document (`https://chatgpt.com/oauth/codex/…/client.json`) and a loopback redirect (`http://127.0.0.1:<port>/callback/<id>`). The AS accepts RFC 8252 variable ports and `127.0.0.1` ↔ `localhost`. Complete the Console Auth0 browser login. Do not invent API keys. Do not call PymtHouse URLs.
+Codex probes `GET /api/mcp` first and treats a 200 as Protected Resource Metadata (RFC 9728), so that JSON includes `resource`. It then identifies itself with a ChatGPT-hosted CIMD document (`https://chatgpt.com/oauth/codex/…/client.json`) and a loopback redirect (`http://127.0.0.1:<port>/callback/<id>`). The AS accepts RFC 8252 variable ports and `127.0.0.1` ↔ `localhost`. Complete the Console Auth0 browser login. Do not invent API keys. Do not call PymtHouse URLs.
 
 ## ChatGPT
 
