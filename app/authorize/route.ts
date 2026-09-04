@@ -8,6 +8,7 @@ import {
   PKCE_COOKIE,
   pkceCookieOptions
 } from "@/lib/mcp/as";
+import { mcpPublicOrigin } from "@/lib/mcp/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,7 +86,8 @@ export async function GET(req: NextRequest) {
       clientId,
       clientState,
       redirectUri,
-      codeChallenge
+      codeChallenge,
+      issuer: mcpPublicOrigin(req)
     });
   } catch {
     return json(req, 503, { error: "temporarily_unavailable" });

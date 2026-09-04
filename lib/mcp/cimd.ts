@@ -5,6 +5,8 @@ const CIMD_HOST = "chatgpt.com";
 const CIMD_TIMEOUT_MS = 3000;
 const CIMD_MAX_BYTES = 16_384;
 const CIMD_CACHE_TTL_MS = 60_000;
+const CIMD_CACHE_MAX_ENTRIES = 128;
+const CIMD_MAX_CONCURRENT_FETCHES = 8;
 const CIMD_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
 
 export type OAuthClient = {
@@ -17,10 +19,11 @@ export type ResolveClientResult =
 
 type CacheEntry = {
   exp: number;
-  result: Exclude<ResolveClientResult, { error: "temporarily_unavailable" }>;
+  client: OAuthClient;
 };
 
 const cache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, Promise<ResolveClientResult>>();
 
 export function clearCimdCache(): void {
   cache.clear();
@@ -44,6 +47,7 @@ export function isAllowedCimdClientId(clientId: string): boolean {
   if (parsed.hostname !== CIMD_HOST) return false;
   if (parsed.port) return false;
   if (parsed.search || parsed.hash) return false;
+  if (parsed.href !== clientId) return false;
   const parts = parsed.pathname.split("/").filter(Boolean);
   if (parts.length < 3 || parts.length > 4) return false;
   if (parts[0] !== "oauth") return false;
@@ -72,9 +76,7 @@ function parseCimdDocument(
 ): OAuthClient | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const doc = raw as Record<string, unknown>;
-  if (typeof doc.client_id === "string" && doc.client_id !== clientId) {
-    return null;
-  }
+  if (doc.client_id !== clientId) return null;
   if (!supportsPublicClient(doc)) return null;
   const redirectUris = normalizeRedirectUris(doc.redirect_uris);
   if (!redirectUris) return null;
@@ -82,10 +84,36 @@ function parseCimdDocument(
 }
 
 async function readLimitedJson(res: Response): Promise<object | null> {
-  const buf = await res.arrayBuffer();
-  if (buf.byteLength === 0 || buf.byteLength > CIMD_MAX_BYTES) return null;
+  const contentLength = Number(res.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > CIMD_MAX_BYTES) {
+    await res.body?.cancel();
+    return null;
+  }
+  if (!res.body) return null;
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > CIMD_MAX_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  if (size === 0) return null;
+
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   try {
-    const parsed: unknown = JSON.parse(new TextDecoder().decode(buf));
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(body));
     if (!parsed || typeof parsed !== "object") return null;
     return parsed;
   } catch {
@@ -93,17 +121,21 @@ async function readLimitedJson(res: Response): Promise<object | null> {
   }
 }
 
-export async function resolveCimdClient(
-  clientId: string,
-  fetchImpl: typeof fetch = fetch
-): Promise<ResolveClientResult> {
-  if (!isAllowedCimdClientId(clientId)) {
-    return { ok: false, error: "invalid_client" };
+function cacheClient(clientId: string, client: OAuthClient): void {
+  if (cache.size >= CIMD_CACHE_MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
   }
+  cache.set(clientId, {
+    exp: Date.now() + CIMD_CACHE_TTL_MS,
+    client
+  });
+}
 
-  const hit = cache.get(clientId);
-  if (hit && hit.exp > Date.now()) return hit.result;
-
+async function fetchCimdClient(
+  clientId: string,
+  fetchImpl: typeof fetch
+): Promise<ResolveClientResult> {
   let res: Response;
   try {
     res = await fetchImpl(clientId, {
@@ -120,19 +152,46 @@ export async function resolveCimdClient(
     return { ok: false, error: "temporarily_unavailable" };
   }
   if (!res.ok) {
-    const result: ResolveClientResult = { ok: false, error: "invalid_client" };
-    cache.set(clientId, { exp: Date.now() + CIMD_CACHE_TTL_MS, result });
-    return result;
+    return { ok: false, error: "invalid_client" };
   }
 
-  const parsed = parseCimdDocument(clientId, await readLimitedJson(res));
-  const result: ResolveClientResult = parsed
-    ? { ok: true, client: parsed }
-    : { ok: false, error: "invalid_client" };
-  if (result.ok || result.error === "invalid_client") {
-    cache.set(clientId, { exp: Date.now() + CIMD_CACHE_TTL_MS, result });
+  let document: object | null;
+  try {
+    document = await readLimitedJson(res);
+  } catch {
+    return { ok: false, error: "temporarily_unavailable" };
   }
-  return result;
+  const parsed = parseCimdDocument(clientId, document);
+  if (!parsed) return { ok: false, error: "invalid_client" };
+  cacheClient(clientId, parsed);
+  return { ok: true, client: parsed };
+}
+
+export async function resolveCimdClient(
+  clientId: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<ResolveClientResult> {
+  if (!isAllowedCimdClientId(clientId)) {
+    return { ok: false, error: "invalid_client" };
+  }
+
+  const hit = cache.get(clientId);
+  if (hit && hit.exp > Date.now()) {
+    return { ok: true, client: hit.client };
+  }
+  if (hit) cache.delete(clientId);
+
+  const pending = inFlight.get(clientId);
+  if (pending !== undefined) return pending;
+  if (inFlight.size >= CIMD_MAX_CONCURRENT_FETCHES) {
+    return { ok: false, error: "temporarily_unavailable" };
+  }
+
+  const request = fetchCimdClient(clientId, fetchImpl).finally(() => {
+    inFlight.delete(clientId);
+  });
+  inFlight.set(clientId, request);
+  return request;
 }
 
 export async function resolveOAuthClient(

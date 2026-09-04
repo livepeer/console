@@ -62,6 +62,7 @@ export type PkcePending = {
   clientState: string;
   redirectUri: string;
   codeChallenge: string;
+  issuer: string;
   exp: number;
 };
 
@@ -108,6 +109,7 @@ export function issuePending(input: {
   clientState: string;
   redirectUri: string;
   codeChallenge: string;
+  issuer: string;
 }): string {
   const pending: PkcePending = {
     ...input,
@@ -126,6 +128,7 @@ export function parsePending(value: string | undefined): PkcePending | null {
     typeof parsed.clientState !== "string" ||
     typeof parsed.redirectUri !== "string" ||
     typeof parsed.codeChallenge !== "string" ||
+    typeof parsed.issuer !== "string" ||
     typeof parsed.exp !== "number" ||
     parsed.exp < Date.now()
   ) {

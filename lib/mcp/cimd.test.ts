@@ -43,6 +43,16 @@ test("Codex and ChatGPT CIMD URLs are allowed", () => {
     isAllowedCimdClientId("https://chatgpt.com/oauth/codex/client.json?x=1"),
     false
   );
+  assert.equal(
+    isAllowedCimdClientId(
+      "https://user@chatgpt.com/oauth/codex/client.json"
+    ),
+    false
+  );
+  assert.equal(
+    isAllowedCimdClientId("https://CHATGPT.com/oauth/codex/client.json"),
+    false
+  );
 });
 
 test("resolveCimdClient accepts Codex loopback metadata", async () => {
@@ -106,6 +116,14 @@ test("resolveCimdClient refuses client_id mismatches and fetch failures", async 
   assert.deepEqual(mismatch, { ok: false, error: "invalid_client" });
 
   clearCimdCache();
+  const missing = await resolveCimdClient(CODEX_STABLE, async () =>
+    jsonResponse({
+      redirect_uris: ["http://127.0.0.1/callback"]
+    })
+  );
+  assert.deepEqual(missing, { ok: false, error: "invalid_client" });
+
+  clearCimdCache();
   const down = await resolveCimdClient(CODEX_STABLE, async () => {
     throw new Error("network");
   });
@@ -119,6 +137,80 @@ test("resolveCimdClient refuses client_id mismatches and fetch failures", async 
     ok: false,
     error: "temporarily_unavailable"
   });
+});
+
+test("resolveCimdClient does not cache 4xx responses", async () => {
+  clearCimdCache();
+  let calls = 0;
+  const fetchImpl: typeof fetch = async () => {
+    calls += 1;
+    if (calls === 1) return jsonResponse({ error: "not ready" }, 404);
+    return jsonResponse({
+      client_id: CODEX_STABLE,
+      redirect_uris: ["http://127.0.0.1/callback"]
+    });
+  };
+  assert.deepEqual(await resolveCimdClient(CODEX_STABLE, fetchImpl), {
+    ok: false,
+    error: "invalid_client"
+  });
+  assert.equal((await resolveCimdClient(CODEX_STABLE, fetchImpl)).ok, true);
+  assert.equal(calls, 2);
+});
+
+test("resolveCimdClient cancels a body once it exceeds the byte limit", async () => {
+  clearCimdCache();
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      controller.enqueue(new Uint8Array(9000));
+    },
+    cancel() {
+      cancelled = true;
+    }
+  });
+  const result = await resolveCimdClient(
+    CODEX_STABLE,
+    async () => new Response(body, { status: 200 })
+  );
+  assert.deepEqual(result, { ok: false, error: "invalid_client" });
+  assert.equal(cancelled, true);
+});
+
+test("resolveCimdClient bounds concurrent metadata fetches", async () => {
+  clearCimdCache();
+  const releases: Array<(response: Response) => void> = [];
+  const fetchImpl: typeof fetch = async () =>
+    new Promise<Response>((resolve) => {
+      releases.push((response) => resolve(response));
+    });
+
+  const requests = Array.from({ length: 8 }, (_, index) =>
+    resolveCimdClient(
+      `https://chatgpt.com/oauth/codex/id${index}/client.json`,
+      fetchImpl
+    )
+  );
+  await Promise.resolve();
+  assert.deepEqual(
+    await resolveCimdClient(
+      "https://chatgpt.com/oauth/codex/overflow/client.json",
+      fetchImpl
+    ),
+    { ok: false, error: "temporarily_unavailable" }
+  );
+
+  releases.forEach((release, index) => {
+    const clientId = `https://chatgpt.com/oauth/codex/id${index}/client.json`;
+    release(
+      jsonResponse({
+        client_id: clientId,
+        redirect_uris: [`http://127.0.0.1/callback/id${index}`]
+      })
+    );
+  });
+  const results = await Promise.all(requests);
+  assert.equal(results.every((result) => result.ok), true);
 });
 
 test("resolveCimdClient caches a successful document", async () => {
