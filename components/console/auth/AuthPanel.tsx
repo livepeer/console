@@ -7,6 +7,11 @@ import { LivepeerLockup } from "@/components/design-system/LivepeerLogo";
 
 export type AuthMode = "signin" | "signup";
 
+interface AuthPanelProps {
+  mode: AuthMode;
+  onContinue?: () => void;
+}
+
 const COPY = {
   signin: {
     submit: "Sign in",
@@ -52,7 +57,7 @@ function GoogleIcon({ className }: { className?: string }) {
   );
 }
 
-export function AuthPanel({ mode }: { mode: AuthMode }) {
+export function AuthPanel({ mode, onContinue }: AuthPanelProps) {
   const copy = COPY[mode];
   const providerButtonClass =
     "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-sm border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/35";
@@ -61,8 +66,9 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
   const inputClass =
     "h-11 w-full rounded-sm border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-muted-foreground";
 
-  function keepPreviewLocal(event: FormEvent<HTMLFormElement>) {
+  function continuePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    onContinue?.();
   }
 
   return (
@@ -77,7 +83,7 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
         <div className="flex justify-center py-5">
           <LivepeerLockup className="h-auto w-[184px] text-foreground" />
         </div>
-        <form className="mt-7 space-y-3" onSubmit={keepPreviewLocal}>
+        <form className="mt-7 space-y-3" onSubmit={continuePreview}>
           <label className="block">
             <span className="sr-only">Email address</span>
             <input
@@ -108,7 +114,11 @@ export function AuthPanel({ mode }: { mode: AuthMode }) {
           <span className="text-xs text-muted-foreground">or</span>
           <div className="h-px flex-1 bg-border" />
         </div>
-        <button type="button" className={providerButtonClass}>
+        <button
+          type="button"
+          className={providerButtonClass}
+          onClick={onContinue}
+        >
           <GoogleIcon className="h-4 w-4" />
           {copy.google}
         </button>
