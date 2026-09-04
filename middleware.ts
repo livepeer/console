@@ -48,6 +48,13 @@ export async function middleware(request: NextRequest) {
   const redirectTo = (path: string) =>
     copyAuthCookies(authRes, NextResponse.redirect(new URL(path, request.url)));
 
+  const legacyReferralCode = request.nextUrl.searchParams.get("ref")?.trim();
+  if (pathname === "/" && legacyReferralCode) {
+    const waitlistUrl = new URL("/waitlist", request.url);
+    waitlistUrl.searchParams.set("ref", legacyReferralCode);
+    return copyAuthCookies(authRes, NextResponse.redirect(waitlistUrl));
+  }
+
   try {
     const session = await auth0.getSession(request);
     // The dev mock has no real session cookie but is always "signed in" —
