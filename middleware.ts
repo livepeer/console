@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { AUTH_SIGNIN_HREF } from "@/lib/console/auth-login";
 import { devMockResponse } from "@/lib/console/dev-mock";
 import {
   isAllowlistExemptPath,
@@ -17,7 +18,7 @@ function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
 // Routes that exist only for a signed-in user. Signed-out requests are
 // redirected here, in middleware, rather than by the page: a client-side
 // redirect runs after the console chrome has already painted, so a cold
-// signed-out load flashed the sidebar for a frame before landing on /login.
+// signed-out load flashed the sidebar for a frame before landing on Auth0.
 // Home keeps the in-shell sign-in wall; Install redirects before the shell.
 function isSessionOnlyPath(pathname: string): boolean {
   return pathname === "/" || pathname === "/install";
@@ -54,7 +55,7 @@ export async function middleware(request: NextRequest) {
     const signedIn = devMock || !!session?.user;
 
     if (!signedIn) {
-      return isSessionOnlyPath(pathname) ? redirectTo("/login") : authRes;
+      return isSessionOnlyPath(pathname) ? redirectTo(AUTH_SIGNIN_HREF) : authRes;
     }
     if (!devMock && !isEmailAllowlisted(session?.user?.email)) {
       return redirectTo("/waitlist");

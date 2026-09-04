@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { EllipsisVertical } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { LivepeerLockup } from "@/components/design-system/LivepeerLogo";
 import { PORTAL_NAV_ITEMS } from "@/lib/constants";
+import { AUTH_SIGNIN_HREF, AUTH_SIGNUP_HREF } from "@/lib/console/auth-login";
 import { useAuth, type ConsoleUser } from "@/components/console/AuthContext";
 import Drawer from "@/components/design-system/Drawer";
 import NavLink from "@/components/console/NavLink";
@@ -278,7 +279,6 @@ function SidebarNav({
 }
 
 function SignedOutSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const router = useRouter();
   const publicItems = PORTAL_NAV_ITEMS.filter((i) => i.zone === "network");
 
   return (
@@ -319,26 +319,20 @@ function SignedOutSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               No credit card. Spin up in 30 seconds with an API key.
             </p>
             <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  router.push("/signup");
-                  onNavigate?.();
-                }}
+              <a
+                href={AUTH_SIGNUP_HREF}
+                onClick={() => onNavigate?.()}
                 className="btn-primary flex h-7 w-full items-center justify-center rounded-sm px-2.5 text-[12.5px] font-medium transition-colors"
               >
                 Get an API key
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  router.push("/login");
-                  onNavigate?.();
-                }}
+              </a>
+              <a
+                href={AUTH_SIGNIN_HREF}
+                onClick={() => onNavigate?.()}
                 className="flex h-[26px] w-full items-center justify-center rounded-sm text-ui-caption font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 Sign in
-              </button>
+              </a>
             </div>
           </div>
         </div>
@@ -377,17 +371,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 function MobileSidebarContent({ onNavigate }: { onNavigate: () => void }) {
   const { isConnected, isLoading, user, disconnect } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   const isSignedOut = !isLoading && !isConnected;
   const items = PORTAL_NAV_ITEMS.filter((i) =>
     isSignedOut ? i.zone === "network" : i.zone !== "network"
   );
-
-  const navigateTo = (href: string) => {
-    router.push(href);
-    onNavigate();
-  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 sm:px-6">
@@ -415,20 +403,20 @@ function MobileSidebarContent({ onNavigate }: { onNavigate: () => void }) {
       {isSignedOut ? (
         <div className="-mx-4 border-t border-border px-4 py-4 sm:-mx-6 sm:px-6">
           <div className="flex flex-col items-start gap-1">
-            <button
-              type="button"
-              onClick={() => navigateTo("/signup")}
+            <a
+              href={AUTH_SIGNUP_HREF}
+              onClick={onNavigate}
               className="inline-flex w-auto items-center rounded-sm px-1 py-1.5 text-4xl font-light leading-none tracking-tight text-foreground transition-colors hover:bg-foreground/3 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               Get an API key
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo("/login")}
+            </a>
+            <a
+              href={AUTH_SIGNIN_HREF}
+              onClick={onNavigate}
               className="inline-flex w-auto items-center rounded-sm px-1 py-1.5 text-4xl font-light leading-none tracking-tight text-muted-foreground transition-colors hover:bg-foreground/3 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               Sign in
-            </button>
+            </a>
           </div>
         </div>
       ) : (

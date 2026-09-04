@@ -1,25 +1,25 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/console/AuthContext";
+import { AUTH_SIGNIN_HREF } from "@/lib/console/auth-login";
 
 // Root `/`:
 //   - signed in  → redirect to /home (the console default)
-//   - signed out → redirect to /login (the console default entry point)
-// Explore is still reachable at /explore for anyone who lands there directly;
-// it just isn't the default landing any more.
+//   - signed out → Auth0 Universal Login
 export default function RootPage() {
   const { isConnected, isLoading, user } = useAuth();
-  const router = useRouter();
 
   const signedIn = isConnected && !!user;
 
   useEffect(() => {
     if (isLoading) return;
-    router.replace(signedIn ? "/home" : "/login");
-  }, [isLoading, signedIn, router]);
+    if (signedIn) {
+      window.location.replace("/home");
+      return;
+    }
+    window.location.replace(AUTH_SIGNIN_HREF);
+  }, [isLoading, signedIn]);
 
-  // Nothing renders here — `/` is a pure redirect in both auth states.
   return null;
 }

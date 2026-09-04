@@ -41,6 +41,7 @@ test("configured allowlist is fail-closed", () => {
 test("device, login, and MCP OAuth paths are exempt; home is gated", () => {
   assert.equal(isAllowlistExemptPath("/device"), true);
   assert.equal(isAllowlistExemptPath("/login"), true);
+  assert.equal(isAllowlistExemptPath("/auth/login"), true);
   assert.equal(isAllowlistExemptPath("/api/mcp"), true);
   assert.equal(isAllowlistExemptPath("/authorize"), true);
   assert.equal(isAllowlistExemptPath("/token"), true);

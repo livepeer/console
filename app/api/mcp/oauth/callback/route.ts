@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   const session = await auth0.getSession();
   const sub = session?.user?.sub?.trim();
   if (!session || !sub) {
-    const login = new URL("/login", origin);
-    login.searchParams.set("mcp_oauth", "1");
+    const login = new URL("/auth/login", origin);
+    login.searchParams.set("returnTo", "/api/mcp/oauth/callback");
     return NextResponse.redirect(login);
   }
 

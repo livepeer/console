@@ -56,13 +56,11 @@ export function corsHeaders(req: Request): HeadersInit {
   };
 }
 
-export function consoleLoginUrl(req: Request, nonce: string): string {
+export function consoleLoginUrl(req: Request): string {
   const origin = mcpPublicOrigin(req);
   const callback = `${origin}/api/mcp/oauth/callback`;
-  const url = new URL("/login", origin);
-  url.searchParams.set("mcp_oauth", "1");
-  url.searchParams.set("state", nonce);
-  url.searchParams.set("redirect_uri", callback);
+  const url = new URL("/auth/login", origin);
+  url.searchParams.set("returnTo", callback);
   return url.toString();
 }
 

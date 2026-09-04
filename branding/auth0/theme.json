@@ -1,0 +1,57 @@
+{
+  "displayName": "Livepeer Console",
+  "colors": {
+    "primary_button": "#111111",
+    "primary_button_label": "#FFFFFF",
+    "secondary_button_border": "#E4E4E4",
+    "secondary_button_label": "#111111",
+    "base_focus_color": "#40BF86",
+    "base_hover_color": "#F5F5F5",
+    "links_focused_components": "#40BF86",
+    "header": "#111111",
+    "body_text": "#111111",
+    "widget_background": "#FFFFFF",
+    "widget_border": "#E4E4E4",
+    "input_labels_placeholders": "#9CA3AF",
+    "input_filled_text": "#111111",
+    "input_border": "#E4E4E4",
+    "input_background": "#FFFFFF",
+    "icons": "#9CA3AF",
+    "error": "#EF4444",
+    "success": "#40BF86"
+  },
+  "fonts": {
+    "font_url": "https://rsms.me/inter/font-files/InterVariable.woff2",
+    "links_style": "normal",
+    "reference_text_size": 16,
+    "title": { "size": 112.5, "bold": false },
+    "subtitle": { "size": 87.5, "bold": false },
+    "body_text": { "size": 87.5, "bold": false },
+    "buttons_text": { "size": 87.5, "bold": false },
+    "input_labels": { "size": 87.5, "bold": false },
+    "links": { "size": 75, "bold": false }
+  },
+  "borders": {
+    "button_border_weight": 0,
+    "buttons_style": "rounded",
+    "button_border_radius": 4,
+    "input_border_weight": 1,
+    "inputs_style": "rounded",
+    "input_border_radius": 4,
+    "widget_corner_radius": 4,
+    "widget_border_weight": 1,
+    "show_widget_shadow": true
+  },
+  "widget": {
+    "logo_position": "center",
+    "logo_url": "https://earlyaccess.livepeer.org/icon.svg",
+    "logo_height": 36,
+    "header_text_alignment": "center",
+    "social_buttons_layout": "bottom"
+  },
+  "page_background": {
+    "background_color": "#FFFFFF",
+    "background_image_url": "",
+    "page_layout": "center"
+  }
+}

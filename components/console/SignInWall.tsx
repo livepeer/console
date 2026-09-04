@@ -11,6 +11,7 @@ import {
   Key,
   type LucideIcon,
 } from "lucide-react";
+import { AUTH_SIGNIN_HREF, AUTH_SIGNUP_HREF } from "@/lib/console/auth-login";
 
 /**
  * SignInWall — what a logged-out user sees when they hit a private organization
@@ -113,19 +114,19 @@ export default function SignInWall({ route }: { route: SignInWallRoute }) {
 
         {/* CTA pair — theme-aware primary Sign in + bordered Create organization */}
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
-          <Link
-            href="/login"
+          <a
+            href={AUTH_SIGNIN_HREF}
             className="btn-primary inline-flex h-9 min-w-[140px] items-center justify-center gap-1.5 rounded-[6px] px-4 text-[13px] font-medium transition-colors"
           >
             Sign in
             <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-          <Link
-            href="/signup"
+          </a>
+          <a
+            href={AUTH_SIGNUP_HREF}
             className="btn-outline inline-flex h-9 items-center justify-center rounded-[6px] px-4 text-[13px] transition-colors"
           >
             Create organization
-          </Link>
+          </a>
         </div>
 
         {/* Divider — "or browse without an account" with hairline rules */}

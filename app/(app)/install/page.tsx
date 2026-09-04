@@ -9,8 +9,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/console/AuthContext";
+import { AUTH_SIGNIN_HREF } from "@/lib/console/auth-login";
 import CopyButton from "@/components/console/CopyButton";
 import HarnessLogo from "@/components/console/HarnessLogo";
 import SectionHeader from "@/components/console/SectionHeader";
@@ -545,16 +545,15 @@ function McpServerUrl() {
 
 export default function InstallPage() {
   const { isConnected, isLoading } = useAuth();
-  const router = useRouter();
 
-  // Middleware already sends signed-out requests to /login before this page
+  // Middleware already sends signed-out requests to Auth0 before this page
   // is served (see middleware.ts). This client-side fallback only fires if
   // the session lapses while the console is open.
   useEffect(() => {
     if (!isLoading && !isConnected) {
-      router.replace("/login");
+      window.location.replace(AUTH_SIGNIN_HREF);
     }
-  }, [isLoading, isConnected, router]);
+  }, [isLoading, isConnected]);
 
   if (isLoading) return null;
 
