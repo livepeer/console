@@ -83,26 +83,42 @@ export async function reconcileManifest(
         await tx`select pg_advisory_xact_lock(hashtextextended(${`identity:${row.authority}:${row.issuer}:${row.subject}`}, 0))`;
         // Identity and scope are authenticated provenance, never matched by email.
         const identities = await tx`
-          SELECT i.id, i.user_id, i.issuer, i.external_user_id, u.status
-          FROM auth_identities i JOIN users u ON u.id = i.user_id
+          SELECT i.id, i.user_id FROM auth_identities i
           WHERE i.authority = ${row.authority} AND i.provider_subject = ${row.subject}
             AND (i.issuer = ${row.issuer} OR i.issuer IS NULL)
-          FOR UPDATE OF i, u
         `;
-        if (
-          identities.length > 1 ||
-          identities[0]?.status === "disabled" ||
-          (identities[0]?.external_user_id != null &&
-            identities[0].external_user_id !== row.externalUserId) ||
-          (identities[0]?.issuer === null &&
-            identities[0]?.external_user_id !== row.externalUserId)
-        ) {
+        if (identities.length > 1) {
           result.blockers++;
           continue;
         }
         let identity = identities[0];
         if (identity) {
+          // Runtime identity/account services take the user advisory lock before
+          // touching user rows. Discover ownership without locks, then follow
+          // the same order and revalidate the discovery under row locks.
           await tx`select pg_advisory_xact_lock(hashtextextended(${`user:${identity.user_id}`}, 0))`;
+          const lockedIdentities = await tx`
+            SELECT i.id, i.user_id, i.issuer, i.external_user_id, u.status
+            FROM auth_identities i JOIN users u ON u.id = i.user_id
+            WHERE i.authority = ${row.authority} AND i.provider_subject = ${row.subject}
+              AND (i.issuer = ${row.issuer} OR i.issuer IS NULL)
+            FOR UPDATE OF i, u
+          `;
+          const lockedIdentity = lockedIdentities[0];
+          if (
+            lockedIdentities.length !== 1 ||
+            lockedIdentity.id !== identity.id ||
+            lockedIdentity.user_id !== identity.user_id ||
+            lockedIdentity.status === "disabled" ||
+            (lockedIdentity.external_user_id != null &&
+              lockedIdentity.external_user_id !== row.externalUserId) ||
+            (lockedIdentity.issuer === null &&
+              lockedIdentity.external_user_id !== row.externalUserId)
+          ) {
+            result.blockers++;
+            continue;
+          }
+          identity = lockedIdentity;
           const bindings = await tx`SELECT a.id, a.user_id, a.external_user_id
             FROM identity_external_accounts b JOIN external_accounts a ON a.id = b.external_account_id
             WHERE b.identity_id = ${identity.id} AND a.service = ${scope.service}

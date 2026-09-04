@@ -14,7 +14,10 @@ import {
   legacyExternalId,
   manifestSummary,
 } from "../../scripts/early-access/manifest";
-import { assertReviewedManifest } from "../../scripts/early-access/reconcile";
+import {
+  assertReviewedManifest,
+  reconcileManifest,
+} from "../../scripts/early-access/reconcile";
 
 const sql = readFileSync(
   resolve(process.cwd(), "drizzle/0007_early_access_domains.sql"),
@@ -64,6 +67,76 @@ const uniqueColumns = (table: Parameters<typeof getTableConfig>[0]) =>
     );
 
 describe("early-access migration and grandfather planning", () => {
+  it.each([false, true])(
+    "locks user advisory before rows and revalidates changed ownership=%s",
+    async (changedOwner) => {
+      const manifest = buildGrandfatherManifest(input());
+      const calls: Array<{ query: string; values: unknown[] }> = [];
+      const tx = async (
+        strings: TemplateStringsArray,
+        ...values: unknown[]
+      ) => {
+        const query = strings.join("?").replace(/\s+/g, " ").trim();
+        calls.push({ query, values });
+        if (query.includes("FROM auth_identities")) {
+          return [
+            {
+              id: "identity",
+              user_id:
+                changedOwner && query.includes("FOR UPDATE")
+                  ? "new-owner"
+                  : "original-owner",
+              issuer,
+              external_user_id: legacyExternalId(subject),
+              status: "active",
+            },
+          ];
+        }
+        if (query.startsWith("SELECT id, user_id FROM external_accounts"))
+          return [{ id: "account", user_id: "original-owner" }];
+        if (
+          query.startsWith(
+            "SELECT id, user_id, signup_id, status FROM access_grants"
+          )
+        )
+          return [
+            { id: "grant", user_id: "original-owner", status: "approved" },
+          ];
+        return [];
+      };
+      const client = {
+        begin: (callback: (executor: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      } as unknown as Parameters<typeof reconcileManifest>[0];
+      const result = await reconcileManifest(client, manifest, {
+        reviewedChecksum: manifest.manifestChecksum,
+        apply: true,
+      });
+      const identityLock = calls.findIndex((call) =>
+        call.values.some(
+          (value) => typeof value === "string" && value.startsWith("identity:")
+        )
+      );
+      const lookup = calls.findIndex((call) =>
+        call.query.includes("FROM auth_identities")
+      );
+      const userLock = calls.findIndex((call) =>
+        call.values.includes("user:original-owner")
+      );
+      const rowLock = calls.findIndex((call) =>
+        call.query.includes("FOR UPDATE")
+      );
+      expect(identityLock).toBeGreaterThan(-1);
+      expect(lookup).toBeGreaterThan(identityLock);
+      expect(userLock).toBeGreaterThan(lookup);
+      expect(rowLock).toBeGreaterThan(userLock);
+      expect(result.blockers).toBe(changedOwner ? 1 : 0);
+      if (changedOwner)
+        expect(calls.some((call) => /^(INSERT|UPDATE)/.test(call.query))).toBe(
+          false
+        );
+    }
+  );
   it("keeps journal history and appends domain and single-use code migrations", () => {
     const journal = JSON.parse(
       readFileSync(resolve(process.cwd(), "drizzle/meta/_journal.json"), "utf8")
