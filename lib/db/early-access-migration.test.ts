@@ -67,6 +67,81 @@ const uniqueColumns = (table: Parameters<typeof getTableConfig>[0]) =>
     );
 
 describe("early-access migration and grandfather planning", () => {
+  it("prelocks all identities in sorted order before any shared-user lock", async () => {
+    const fixture = input();
+    const secondSubject = "auth0|another-provider-identity-same-user";
+    fixture.inventory.users.push({
+      ...fixture.inventory.users[0],
+      id: "second-record",
+      externalUserId: legacyExternalId(secondSubject),
+    });
+    fixture.evidence.push({ ...fixture.evidence[0], subject: secondSubject });
+    const manifest = buildGrandfatherManifest(fixture);
+    const calls: Array<{ query: string; values: unknown[] }> = [];
+    const tx = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = strings.join("?").replace(/\s+/g, " ").trim();
+      calls.push({ query, values });
+      if (query.includes("FROM auth_identities")) {
+        const currentSubject = values.includes(secondSubject)
+          ? secondSubject
+          : subject;
+        return [
+          {
+            id: currentSubject,
+            user_id: "shared-user",
+            issuer,
+            external_user_id: legacyExternalId(currentSubject),
+            status: "active",
+          },
+        ];
+      }
+      if (query.startsWith("SELECT id, user_id FROM external_accounts"))
+        return [{ id: `account-${values.at(-1)}`, user_id: "shared-user" }];
+      if (
+        query.startsWith(
+          "SELECT id, user_id, signup_id, status FROM access_grants"
+        )
+      )
+        return [{ id: "grant", user_id: "shared-user", status: "approved" }];
+      return [];
+    };
+    const client = {
+      begin: (callback: (executor: typeof tx) => Promise<unknown>) =>
+        callback(tx),
+    } as unknown as Parameters<typeof reconcileManifest>[0];
+    const result = await reconcileManifest(client, manifest, {
+      reviewedChecksum: manifest.manifestChecksum,
+      apply: true,
+    });
+    const identityLocks = calls.flatMap((call, index) =>
+      call.values
+        .filter(
+          (value): value is string =>
+            typeof value === "string" && value.startsWith("identity:")
+        )
+        .map((key) => ({ key, index }))
+    );
+    expect(identityLocks.map((lock) => lock.key)).toEqual(
+      [subject, secondSubject]
+        .map((value) => `identity:auth0:${issuer}:${value}`)
+        .sort()
+    );
+    const firstUserLock = calls.findIndex((call) =>
+      call.values.includes("user:shared-user")
+    );
+    expect(firstUserLock).toBeGreaterThan(identityLocks[1].index);
+    expect(
+      calls.findIndex((call) => /^(INSERT|UPDATE)/.test(call.query))
+    ).toBeGreaterThan(identityLocks[1].index);
+    expect(
+      calls.findIndex((call) => call.query.includes("FOR UPDATE"))
+    ).toBeGreaterThan(firstUserLock);
+    expect(result).toMatchObject({
+      inspected: 2,
+      blockers: 0,
+      grantsCreated: 0,
+    });
+  });
   it.each([false, true])(
     "locks user advisory before rows and revalidates changed ownership=%s",
     async (changedOwner) => {

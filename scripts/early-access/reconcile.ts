@@ -78,9 +78,22 @@ export async function reconcileManifest(
     await client.begin(async (tx) => {
       await tx`select pg_advisory_xact_lock(hashtextextended('early-access-reviewed-backfill', 0))`;
       const scope = manifest.provenance.scope;
+      // Acquire every manifest identity first. Otherwise a later identity on an
+      // already-locked user can deadlock with a concurrent login holding that
+      // identity while waiting for the same user lock. Sorting also gives all
+      // reviewed batches the same identity acquisition order.
+      const identityKeys = [
+        ...new Set(
+          manifest.entries.map(
+            (row) => `identity:${row.authority}:${row.issuer}:${row.subject}`
+          )
+        ),
+      ].sort();
+      for (const key of identityKeys) {
+        await tx`select pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+      }
       for (const row of manifest.entries) {
         result.inspected++;
-        await tx`select pg_advisory_xact_lock(hashtextextended(${`identity:${row.authority}:${row.issuer}:${row.subject}`}, 0))`;
         // Identity and scope are authenticated provenance, never matched by email.
         const identities = await tx`
           SELECT i.id, i.user_id FROM auth_identities i
