@@ -306,64 +306,50 @@ describe.skipIf(!databaseUrl)(
     });
 
     it("retains both legacy account aliases with explicit identity bindings", async () => {
-      const first = await sync("legacy-one");
-      const linked = await linkProviderIdentityToUser(
-        providerInput("legacy-two"),
-        {
-          userId: first.userId,
-          existingIdentityId: first.identityId!,
-          evidenceReference: "synthetic-reviewed-link",
-        }
-      );
       const alias1 = await externalUserIdFromSub(subject("legacy-one"));
       const alias2 = await externalUserIdFromSub(subject("legacy-two"));
-      const [oldAccount] = await db
-        .select()
-        .from(schema.externalAccounts)
-        .where(
-          eq(schema.externalAccounts.externalUserId, first.externalUserId)
-        );
-      await db
-        .update(schema.externalAccounts)
-        .set({ externalUserId: alias1 })
-        .where(eq(schema.externalAccounts.id, oldAccount.id));
-      await db
-        .update(schema.authIdentities)
-        .set({ externalUserId: alias1 })
-        .where(eq(schema.authIdentities.id, first.identityId!));
-      await db
-        .delete(schema.identityExternalAccounts)
-        .where(
-          eq(schema.identityExternalAccounts.identityId, linked.identityId)
-        );
-      const [secondAccount] = await db
-        .insert(schema.externalAccounts)
-        .values({
-          userId: first.userId,
-          ...scope,
-          externalUserId: alias2,
-          source: "synthetic_legacy_backfill",
-        })
-        .returning();
-      await db
-        .insert(schema.identityExternalAccounts)
-        .values({
-          identityId: linked.identityId,
-          externalAccountId: secondAccount.id,
+      const [legacyUser] = await db.insert(schema.users).values({}).returning();
+      userIds.add(legacyUser.id);
+      // Model the reviewed legacy backfill: original aliases are inserted once,
+      // never obtained by rewriting a newly allocated immutable account.
+      for (const [name, alias] of [
+        ["legacy-one", alias1],
+        ["legacy-two", alias2],
+      ]) {
+        const [identity] = await db
+          .insert(schema.authIdentities)
+          .values({
+            userId: legacyUser.id,
+            authority: "auth0",
+            issuer: "https://auth.example.invalid",
+            provider: "auth0",
+            providerSubject: subject(name),
+            externalUserId: alias,
+          })
+          .returning();
+        const [account] = await db
+          .insert(schema.externalAccounts)
+          .values({
+            userId: legacyUser.id,
+            ...scope,
+            externalUserId: alias,
+            source: "synthetic_legacy_backfill",
+          })
+          .returning();
+        await db.insert(schema.identityExternalAccounts).values({
+          identityId: identity.id,
+          externalAccountId: account.id,
         });
-      await db
-        .update(schema.authIdentities)
-        .set({ externalUserId: alias2 })
-        .where(eq(schema.authIdentities.id, linked.identityId));
+      }
       expect((await sync("legacy-one")).externalUserId).toBe(alias1);
       expect((await sync("legacy-two")).externalUserId).toBe(alias2);
       await expect(
-        resolveExternalAccount({ ...scope, userId: first.userId })
+        resolveExternalAccount({ ...scope, userId: legacyUser.id })
       ).rejects.toMatchObject({ code: "external_account_ambiguous" });
       expect(
         (await findExternalAccountOwner({ ...scope, externalUserId: alias2 }))
           ?.userId
-      ).toBe(first.userId);
+      ).toBe(legacyUser.id);
       expect(
         await findExternalAccountOwner({
           ...scope,
