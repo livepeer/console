@@ -151,3 +151,18 @@ The previous nonproduction RS2 guard hardcoded the production app and is not an
 acceptable preview safety boundary. Preview minting must enforce the staging
 issuer and app together; never change preview credentials to production to satisfy
 the obsolete guard. Existing production identifiers and token formats stay intact.
+
+## Contract amendment 3 — single-use OAuth code redemption
+
+Independent review found inherited replayable authorization codes. Add migration
+0008 with `oauth_code_redemptions`: unique SHA-256 code digest, expiration and
+creation timestamps. No raw credentials are stored. After signature, PKCE and
+approval validation, `consumeAuthorizationCode(code, expiresAt)` atomically inserts
+the digest before token minting; duplicate redemption is invalid_grant and storage
+failure is unavailable. A failed upstream mint still consumes the code; restart
+authorization rather than risk duplicate issuance. Wire format remains unchanged.
+
+This is an actively used protocol-security table, not a speculative MCP-client
+or activity schema. Data owner alone authored the migration. Coordinator authored
+the consuming fix after the agent runtime rejected both original-author recall
+and replacement spawning at its thread limit. Security reviewer remains independent.

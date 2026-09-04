@@ -83,6 +83,17 @@ describe("MCP issuer-signed app-scoped identity", () => {
       await verifyMcpUserJwt(await token({ external_user_id: undefined }))
     ).toMatchObject({ externalUserId: "eu_legacy" });
   });
+  it("supports the SDK's signed usage_subject identity alias", async () => {
+    expect(
+      await verifyMcpUserJwt(
+        await token({
+          external_user_id: undefined,
+          usage_subject: "eu_usage",
+          usage_subject_type: "external_user_id",
+        })
+      )
+    ).toMatchObject({ externalUserId: "eu_usage" });
+  });
   it.each([
     ["wrong issuer", { iss: "https://attacker.example" }],
     ["wrong audience", { aud: "https://attacker.example" }],
@@ -93,6 +104,8 @@ describe("MCP issuer-signed app-scoped identity", () => {
     ["missing expiry", { exp: undefined }],
     ["missing subject", { sub: undefined }],
     ["missing scope", { scope: "openid" }],
+    ["conflicting external aliases", { usage_subject: "eu_other" }],
+    ["unsupported subject type", { usage_subject_type: "internal" }],
   ] as const)("rejects %s", async (_name, claims) => {
     await expect(verifyMcpUserJwt(await token(claims))).rejects.toBeDefined();
   });

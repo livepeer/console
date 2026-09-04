@@ -8,6 +8,7 @@ import {
 import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
 import { AccessError } from "@/lib/access/service";
 import { requireApprovedMcpAccount } from "@/lib/mcp/access";
+import { consumeAuthorizationCode } from "@/lib/mcp/code-redemption";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -127,6 +128,9 @@ export async function POST(req: NextRequest) {
 
   try {
     await requireApprovedMcpAccount(grant.externalUserId);
+    if (!(await consumeAuthorizationCode(code, grant.exp))) {
+      return json(req, 400, { error: "invalid_grant" });
+    }
     const minted = await mintMcpUserTokens({
       externalUserId: grant.externalUserId,
       email: grant.email,

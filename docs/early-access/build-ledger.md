@@ -83,3 +83,24 @@ Coordinator owns configuration, environment validation, credentials, Git/CI,
 integration, preview provisioning and release evidence. Shared signature amendment:
 AccessError has status/code; approved resolvers return AccessDecision including
 canonical userId. Specialists may not add alternate authorization policy.
+
+## Independent audit — changes required, fixes in progress
+
+- Data reviewer at `4d2c919`: P1 conflicting billing binding in grandfather
+  reconciliation; P2 unaudited signup-grant activation. Author fixed both in
+  `2874df8`; root reran migration/planning DB suite 10/10 including the new
+  regressions. Independent re-review still required.
+- Security reviewer at `4d2c919`: SEC-01 high, inherited authorization-code
+  replay. Data owner added 0008 receipt table in `2874df8`; coordinator implements
+  consumption without changing wire format. Original MCP-author recall and a
+  replacement spawn both hit runtime thread-limit errors; ownership explicitly
+  reassigned to coordinator, not the reviewer.
+- SEC-02 medium: inherited reusable, unbound refresh credentials. Compatibility
+  disposition requested from user; not silently accepted or declared fixed.
+- Backend self-review found stale newsletter retry risk. Author added shared
+  consent/delivery locking and current-state reread in `dbcbdc5`.
+- UI `0d759e3`: 22 local tests; MCP `4d2c919`: 48 local tests. Root integrated
+  UI/security/config contract run:115 tests passed. These do not substitute for
+  live staging issuer or protected preview evidence.
+- Read-only staging discovery/JWKS:200, advertised issuer matches staging,
+  one RS256 key. Actual user-token claim compatibility remains preview verification.

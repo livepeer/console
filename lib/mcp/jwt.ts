@@ -70,7 +70,18 @@ export async function verifyMcpUserJwt(token: string): Promise<McpPrincipal> {
 
   // The SDK supports sub as the legacy external-account alias. It is trusted
   // only after signature/issuer/audience/app checks and a scoped persisted lookup.
-  const externalUserId = asString(payload.external_user_id) || sub;
+  const explicitExternal = asString(payload.external_user_id);
+  const usageSubject = asString(payload.usage_subject);
+  const subjectType =
+    asString(payload.external_user_id_type) ||
+    asString(payload.usage_subject_type);
+  if (
+    (subjectType && subjectType !== "external_user_id") ||
+    (explicitExternal && usageSubject && explicitExternal !== usageSubject)
+  ) {
+    throw new Error("token has ambiguous external account claims");
+  }
+  const externalUserId = explicitExternal || usageSubject || sub;
 
   return {
     sub,

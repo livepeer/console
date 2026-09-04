@@ -32,9 +32,13 @@ const mocks = vi.hoisted(() => {
     refresh: vi.fn(),
     scope: vi.fn(),
     fetch: vi.fn(),
+    consumeCode: vi.fn(),
   };
 });
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/mcp/code-redemption", () => ({
+  consumeAuthorizationCode: mocks.consumeCode,
+}));
 vi.mock("@/lib/access/service", () => ({
   AccessError: mocks.AccessError,
   requireApprovedExternalAccount: mocks.approved,
@@ -77,6 +81,7 @@ vi.mock("@/lib/mcp/as", () => ({
     codeChallenge: "challenge",
     clientId: "client",
     externalUserId: "eu_legacy",
+    exp: Date.now() + 600_000,
   }),
   parseClientId: () => ({ redirectUris: ["https://client.example/cb"] }),
   verifyPkceS256: () => true,
@@ -158,6 +163,7 @@ function keyRequest() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.consumeCode.mockReset().mockResolvedValue(true);
   vi.stubEnv("MCP_PUBLIC_ORIGIN", "https://console.example");
   vi.stubGlobal("fetch", mocks.fetch);
   mocks.scope.mockReturnValue(configuredScope);
@@ -193,6 +199,26 @@ beforeEach(() => {
 });
 
 describe("revocation enforced at every credential and request boundary", () => {
+  it("rejects sequential and concurrent authorization-code replay before mint", async () => {
+    const used = new Set<string>();
+    mocks.consumeCode.mockImplementation(async (code: string) => {
+      if (used.has(code)) return false;
+      used.add(code);
+      return true;
+    });
+    const responses = await Promise.all([
+      redeem(tokenRequest("authorization_code")),
+      redeem(tokenRequest("authorization_code")),
+    ]);
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 400]);
+    expect((await redeem(tokenRequest("authorization_code"))).status).toBe(400);
+    expect(mocks.mint).toHaveBeenCalledTimes(1);
+  });
+  it("does not mint if the durable code receipt cannot be recorded", async () => {
+    mocks.consumeCode.mockRejectedValue(new mocks.AccessError("unavailable"));
+    expect((await redeem(tokenRequest("authorization_code"))).status).toBe(503);
+    expect(mocks.mint).not.toHaveBeenCalled();
+  });
   it.each(["pending", "revoked", "disabled", "unavailable"])(
     "blocks %s authorization-code and refresh redemption before mint",
     async (state) => {
