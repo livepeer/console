@@ -1,0 +1,135 @@
+# ADR: application-owned identity and early access
+
+Status: frozen v1 for parallel implementation. Base: PR46 / `44aa3a9`.
+Changes require coordinator approval and an entry in the build ledger.
+
+## Boundaries
+
+Auth0 remains credential authority. Provider adapters produce `ProviderIdentity`
+only after authenticated server-session verification. Provider identities are
+unique by authority + normalized issuer + subject. Emails alone never join a new
+identity to another canonical user. Explicit trusted linking is a server-only
+migration operation, not a public endpoint. UUIDs remain application identity.
+
+External PymtHouse accounts are unique by service + normalized issuer + app ID +
+external ID. Identity bindings preserve multiple historical billing identities
+on one canonical user. Existing aliases are immutable. Resolve an existing
+identity binding first; otherwise use the sole user account in that scope;
+multiple unbound accounts fail with `external_account_ambiguous`. A new account
+gets `eu_` plus a UUID with hyphens removed, persisted exactly once. Never assign
+a replacement account when an existing mapping is unresolved. The existing
+Auth0-sub hash remains only for explicit legacy reconciliation.
+
+Current identities gain authority and nullable issuer in the additive migration.
+The separate legacy backfill requires an explicit original Auth0 issuer and
+PymtHouse app scope. A null-issuer identity is not automatically adopted by a
+login from an arbitrary provider. Backfill is coordinator-run only.
+
+Waitlist signup is not approval; approval is not admin; neither implies marketing
+consent. Verified authenticated users are enrolled once with source console_auth
+and no marketing consent if absent. Pending matching waitlist entries may be
+confirmed by the verified authentication; preserve their original referral and
+consent data. Do not revive unsubscribed/suppressed contacts or revoked grants.
+Unverified emails cannot claim a waitlist entry. Conflicting links are logged
+without PII and never stolen.
+
+## Data ownership
+
+The schema compatibility barrel remains `lib/db/schema.ts`; domain definitions
+move below `lib/db/schema/`. Append migration0007, never rewrite0000–0006.
+
+- Identity: users/authIdentities/userEmails; externalUserId becomes nullable
+  legacy compatibility data. No new identity rows need a subject-derived alias.
+- Accounts: externalAccounts + identityExternalAccounts, scoped uniqueness and
+  foreign keys, no user+scope uniqueness that would erase historical accounts.
+- Approval: accessGrants targeting signup and/or user; one grant per nonnull
+  signup and user. approved/revoked status, version and activation timestamps.
+  accessEvents are append-only with actor, operation, source and state change.
+- Admin: adminRoleGrants attached to verified waitlist signup, source and
+  revocation timestamp. Backfill current admins, retain magic-link sessions.
+- Bulk actions: accessOperations (admin actor + requestId unique, action and
+  canonical payload hash), accessOperationItems unique operation+signup.
+- Subscriptions: emailSubscriptions unique normalized address+purpose, nullable
+  user/signup, subscribed/unsubscribed state, source and timestamps. Existing
+  consentEvents gains subscription reference; preserve historical events.
+  Conflicting historical consent fails closed to unsubscribed and is reported.
+
+Migration backfills subscriptions/admin grants only. It must not grant product
+access or create users from waitlist-only contacts. External alias and existing
+Console-user grant backfills require explicit reviewed input, support dry-run,
+are idempotent, and detect ambiguity. Production invocation is forbidden here.
+
+## Frozen interfaces and ownership
+
+`lib/platform/contracts.ts` is the shared DTO contract.
+
+- Identity owner: `lib/authentication/session.ts:getAuthenticatedIdentity()`;
+  `lib/identity/provider-user.ts:resolveProviderIdentity(input)` returns
+  CanonicalIdentity; `linkProviderIdentityToUser` requires explicit trusted proof
+  of an existing identity/user binding and has no public route.
+- Identity owner: `lib/external-accounts/service.ts:resolveExternalAccount({
+userId,identityId?,...scope})` and `findExternalAccountOwner({...scope,
+externalUserId})`. Scope comes from server configuration, never request input.
+- Access owner: `lib/access/service.ts:getAccessDecision(userId)`,
+  `requireApprovedUser(userId)`, and `requireApprovedExternalAccount(scope,id)`.
+  Throws typed errors with status/code, shared by Console and MCP.
+- Access owner: `lib/access/enrollment.ts:enrollAuthenticatedUser(identity,
+canonical)`; `lib/admin/auth.ts:getAdminPrincipal()`; `lib/subscriptions/service.ts`
+  owns transactional subscription history + legacy projections + email events.
+- Session orchestrator `requireConsoleSession` becomes the shared approval gate
+  for existing protected BFF routes, returning the persisted external account ID.
+  Authenticated-only status/onboarding use the identity adapter without this gate.
+
+401 means no authentication; 403 means pending/revoked/disabled; 503 means access
+could not be verified. Fail-open authentication does not grant fail-open product
+access. No positive authorization cache in v1; check each protected request.
+Unknown external account is denied, wrong issuer/app rejected, disabled overrides
+approved. Public auth, waitlist, legal, discovery and explicit public catalog
+routes remain public. Every backend route gets an explicit classification.
+
+## UI and endpoints
+
+- GET /api/access/status: 401 signed out, otherwise {state,userId,grantId?};
+  unavailable uses503. Do not return email/provider details.
+- GET /api/admin/access: admin only, search/state/page/pageSize (default50,max100),
+  returns AdminAccessList with stable joinedAt+id ordering. state accepts
+  waiting/approved/revoked/all; waiting means confirmed and not approved/revoked.
+- GET /api/admin/access/selection: same filters, returns {signupIds,total}; this
+  freezes explicit eligible IDs for all-matching selection, never a live query.
+- POST /api/admin/access: BulkAccessRequest; returns {requestId,outcomes}.
+  Maximum100 IDs per request; UI splits any larger frozen selection into chunks
+  with stable per-chunk request IDs. Bind idempotency to admin+action+sorted IDs;
+  changed payload with reused key returns409. Each item commits independently;
+  failed items can retry under same key, completed items never reapply. No-op
+  approval sends no duplicate invitation. Serialize concurrent grant mutations.
+- Mutations require same-origin Origin plus authenticated admin; never trust
+  forwarded Origin or body-supplied actor. Existing consent mutations get the
+  same explicit cross-site protection.
+- /access-pending: waiting/verify-email/revoked/unavailable variants; public auth
+  remains accessible. Browser admission redirects here; API consumers get errors.
+
+MCP callback, authorization-code redemption, refresh redemption, bearer request
+handling, and device approval must use shared gates. Key exchange verifies the
+issuer-signed exchanged JWT and app-bound owner before releasing any credentials.
+Opaque responses without verifiable ownership fail closed; do not decode an
+unverified JWT and treat its claims as authority. Existing token formats stay.
+
+## Environment and release policy
+
+Default production behavior after this feature ships is enforced access; no empty
+allowlist bypass. Dev fixtures are permitted only under existing nonproduction
+dev-mock switch. No production runtime changes, migrations, grants, emails,
+secret rotation, merges or domain changes during this build.
+
+Preview uses a new dedicated database branch, never the prior user-test preview.
+Automated destructive tests use a separate disposable DB identity checked by the
+coordinator and a database marker. Specialists have no remote credentials.
+Preview email/subscription providers default to capture/no external dispatch;
+dedicated preview test emails are retrievable only by administrators. Real
+Resend contact writes require an independently isolated account, not merely a
+segment within the production audience. PymtHouse tests remain RS2-only.
+
+Grandfather dry-run sources are the production PymtHouse app user inventory plus
+trusted app-specific identity evidence, with explicit cutoff and checksums. Do
+not use every Auth0 tenant account or approve uncertain mappings. Unresolved
+records are reported as production blockers, not guessed into the manifest.
