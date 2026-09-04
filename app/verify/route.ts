@@ -7,15 +7,12 @@ import { after } from "next/server";
 import { captureEmailVerified } from "@/lib/analytics-server";
 import { getDb } from "@/lib/db";
 import {
-  consentEvents,
-  emailOutbox,
   pointEvents,
   sessions,
   verificationTokens,
   waitlistSignups,
 } from "@/lib/db/schema";
-import { NEWSLETTER_CONSENT_VERSION } from "@/lib/waitlist/contracts";
-import { newsletterConsentOutboxValues } from "@/lib/email/outbox";
+import { changeNewsletterConsentInTransaction } from "@/lib/subscriptions/service";
 import {
   analyticsMemberId,
   hashToken,
@@ -51,21 +48,31 @@ export async function GET(request: Request) {
           gt(verificationTokens.expiresAt, now)
         )
       )
-      .for("update")
       .limit(1);
     if (!verification) return null;
 
     const [signup] = await tx
-      .select({
-        id: waitlistSignups.id,
-        email: waitlistSignups.email,
-        marketingConsent: waitlistSignups.marketingConsent,
-        referredBy: waitlistSignups.referredBy,
-      })
+      .select()
       .from(waitlistSignups)
       .where(eq(waitlistSignups.id, verification.signupId))
+      .for("update")
       .limit(1);
-    if (!signup) return null;
+    if (!signup || !["pending", "confirmed"].includes(signup.status))
+      return null;
+    // Signup-first lock order matches token issuance and preference mutations.
+    const [validToken] = await tx
+      .select()
+      .from(verificationTokens)
+      .where(
+        and(
+          eq(verificationTokens.id, verification.id),
+          isNull(verificationTokens.consumedAt),
+          gt(verificationTokens.expiresAt, now)
+        )
+      )
+      .for("update")
+      .limit(1);
+    if (!validToken) return null;
 
     await tx
       .update(verificationTokens)
@@ -83,32 +90,13 @@ export async function GET(request: Request) {
           eq(waitlistSignups.status, "pending")
         )
       );
-    await tx
-      .update(waitlistSignups)
-      .set({ marketingConsent: verification.requestedMarketingConsent })
-      .where(eq(waitlistSignups.id, signup.id));
-    const [consentEvent] = await tx
-      .insert(consentEvents)
-      .values({
-        signupId: signup.id,
-        purpose: "product_marketing",
-        granted: verification.requestedMarketingConsent,
-        disclosureVersion: NEWSLETTER_CONSENT_VERSION,
+    // A sign-in link must not restore stale consent captured before a preference change.
+    if (signup.status === "pending")
+      await changeNewsletterConsentInTransaction(tx, {
+        signup,
+        subscribed: verification.requestedMarketingConsent,
         source: "email_verification",
-        occurredAt: now,
-      })
-      .returning({ id: consentEvents.id });
-    await tx
-      .insert(emailOutbox)
-      .values(
-        newsletterConsentOutboxValues({
-          signupId: signup.id,
-          consentEventId: consentEvent.id,
-          email: signup.email,
-          subscribed: verification.requestedMarketingConsent,
-        })
-      )
-      .onConflictDoNothing({ target: emailOutbox.idempotencyKey });
+      });
 
     if (signup.referredBy && signup.referredBy !== signup.id) {
       await tx

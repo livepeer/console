@@ -2,6 +2,7 @@ export type UpdateAudienceContactInput = {
   email: string;
   subscribed: boolean;
   idempotencyKey: string;
+  signal?: AbortSignal;
 };
 
 export interface AudienceProvider {

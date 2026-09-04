@@ -1,135 +1,104 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
-
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/auth0", () => ({ auth0: { getSession: vi.fn() } }));
-vi.mock("@/lib/identity/canonical-user", () => ({
-  syncCanonicalUser: vi.fn(),
-  syncCanonicalUserBestEffort: vi.fn(),
+vi.mock("@/lib/authentication/session", () => ({
+  getAuthenticatedIdentity: vi.fn(),
 }));
-vi.mock("@/lib/mcp/as", () => ({
-  parsePending: vi.fn(() => ({
-    redirectUri: "https://client.example/callback",
-    codeChallenge: "test-pkce-challenge",
-    clientId: "test-client",
-    clientState: "original-client-state",
-  })),
-  issueAuthCode: vi.fn(() => "test-authorization-code"),
-  PKCE_COOKIE: "test-pkce",
-  pkceCookieOptions: () => ({ httpOnly: true, path: "/" }),
+vi.mock("@/lib/identity/provider-user", () => ({
+  resolveProviderIdentity: vi.fn(),
 }));
-
-import { auth0 } from "@/lib/auth0";
-import {
-  syncCanonicalUser,
-  syncCanonicalUserBestEffort,
-} from "./canonical-user";
-import {
-  requireCanonicalUser,
-  requireConsoleSession,
-} from "@/lib/console/session-user";
-import { externalUserIdFromSub } from "@/lib/console/external-user-id";
-import { issueAuthCode } from "@/lib/mcp/as";
-import { GET as mcpCallback } from "@/app/api/mcp/oauth/callback/route";
-
-const session = {
-  user: {
-    sub: "auth0|existing-billing-user",
-    email: "test@example.invalid",
-    email_verified: true,
-  },
-  tokenSet: { accessToken: "test", expiresAt: 0 },
-  internal: { sid: "test", createdAt: 0 },
+vi.mock("@/lib/access/enrollment", () => ({
+  enrollAuthenticatedUser: vi.fn(),
+}));
+vi.mock("@/lib/access/service", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@/lib/access/service")>();
+  return { ...original, requireApprovedUser: vi.fn() };
+});
+vi.mock("@/lib/external-accounts/service", () => ({
+  configuredPymthouseScope: () => ({
+    service: "pymthouse",
+    issuer: "https://issuer.example.invalid",
+    appId: "test",
+  }),
+  resolveExternalAccount: vi.fn(),
+}));
+import { getAuthenticatedIdentity } from "@/lib/authentication/session";
+import { resolveProviderIdentity } from "@/lib/identity/provider-user";
+import { requireApprovedUser, AccessError } from "@/lib/access/service";
+import { resolveExternalAccount } from "@/lib/external-accounts/service";
+import { requireConsoleSession } from "@/lib/console/session-user";
+const identity = {
+  authority: "auth0",
+  issuer: "https://auth.example.invalid",
+  subject: "existing-sub",
+  email: "test@example.invalid",
+  emailVerified: true,
 };
-
-describe("authenticated server compatibility", () => {
+describe("shared server admission", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(auth0.getSession).mockResolvedValue(session);
-    vi.mocked(syncCanonicalUserBestEffort).mockResolvedValue(null);
-  });
-
-  it("keeps the legacy session usable when identity storage is unavailable", async () => {
-    const result = await requireConsoleSession();
-    expect(result).toEqual({
-      externalUserId: await externalUserIdFromSub(session.user.sub),
-      email: session.user.email,
+    vi.resetAllMocks();
+    vi.mocked(getAuthenticatedIdentity).mockResolvedValue(identity);
+    vi.mocked(resolveProviderIdentity).mockResolvedValue({
+      userId: "user",
+      identityId: "identity",
+      accountStatus: "active",
+      conflicts: [],
+      identityCreated: false,
     });
-    expect(syncCanonicalUserBestEffort).toHaveBeenCalledWith({
-      sub: session.user.sub,
-      email: session.user.email,
-      emailVerified: true,
+    vi.mocked(requireApprovedUser).mockResolvedValue({
+      state: "approved",
+      userId: "user",
+    });
+    vi.mocked(resolveExternalAccount).mockResolvedValue({
+      id: "account",
+      userId: "user",
+      externalUserId: "persisted-legacy-id",
     });
   });
-
-  it("retries synchronization on subsequent authenticated server requests", async () => {
-    await requireConsoleSession();
-    await requireConsoleSession();
-    expect(syncCanonicalUserBestEffort).toHaveBeenCalledTimes(2);
+  it("returns the persisted billing alias, never a provider-subject hash", async () => {
+    expect(await requireConsoleSession()).toMatchObject({
+      externalUserId: "persisted-legacy-id",
+      canonicalUserId: "user",
+    });
   });
-
-  it("rejects unauthenticated callers without creating a canonical user", async () => {
-    vi.mocked(auth0.getSession).mockResolvedValue(null);
+  it("returns401 for an unauthenticated caller without enrollment", async () => {
+    vi.mocked(getAuthenticatedIdentity).mockResolvedValue(null);
     await expect(requireConsoleSession()).rejects.toMatchObject({
       status: 401,
     });
-    await expect(requireCanonicalUser()).rejects.toMatchObject({ status: 401 });
-    expect(syncCanonicalUser).not.toHaveBeenCalled();
-    expect(syncCanonicalUserBestEffort).not.toHaveBeenCalled();
+    expect(resolveProviderIdentity).not.toHaveBeenCalled();
   });
-
-  it("fails closed only for features requiring a canonical record", async () => {
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    try {
-      vi.mocked(syncCanonicalUser).mockRejectedValue(
-        new Error("database unavailable")
-      );
-      await expect(requireCanonicalUser()).rejects.toMatchObject({
-        status: 503,
-        code: "canonical_user_unavailable",
+  it.each(["pending", "revoked", "disabled"] as const)(
+    "denies %s before account resolution",
+    async (state) => {
+      vi.mocked(requireApprovedUser).mockRejectedValue(new AccessError(state));
+      await expect(requireConsoleSession()).rejects.toMatchObject({
+        status: 403,
+        state,
       });
-      await expect(requireConsoleSession()).resolves.toHaveProperty(
-        "externalUserId"
-      );
-    } finally {
-      log.mockRestore();
+      expect(resolveExternalAccount).not.toHaveBeenCalled();
     }
-  });
-
-  it("still issues the same MCP authorization payload during a database outage", async () => {
-    const response = await mcpCallback(
-      new NextRequest("https://console.example/api/mcp/oauth/callback")
+  );
+  it("keeps the authenticated session but denies product operations during DB failure and retries", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(resolveProviderIdentity).mockRejectedValueOnce(
+      new Error("database unavailable")
     );
-    expect(response.status).toBe(302);
-    const target = new URL(response.headers.get("location")!);
-    expect(target.origin).toBe("https://client.example");
-    expect(target.searchParams.get("state")).toBe("original-client-state");
-    expect(target.searchParams.get("code")).toBe("test-authorization-code");
-    expect(issueAuthCode).toHaveBeenCalledWith({
-      redirectUri: "https://client.example/callback",
-      codeChallenge: "test-pkce-challenge",
-      clientId: "test-client",
-      externalUserId: await externalUserIdFromSub(session.user.sub),
-      email: session.user.email,
-    });
-    expect(syncCanonicalUserBestEffort).toHaveBeenCalledOnce();
-  });
-
-  it("denies disabled profiles only at the canonical-only boundary", async () => {
-    vi.mocked(syncCanonicalUser).mockResolvedValue({
-      userId: "test-user",
-      accountStatus: "disabled",
-      externalUserId: "eu_test",
-      identityCreated: false,
-      waitlistLinked: false,
-      conflicts: [],
-    });
-    await expect(requireCanonicalUser()).rejects.toMatchObject({
-      status: 403,
-      code: "canonical_user_disabled",
+    await expect(requireConsoleSession()).rejects.toMatchObject({
+      status: 503,
     });
     await expect(requireConsoleSession()).resolves.toHaveProperty(
       "externalUserId"
     );
+    expect(resolveProviderIdentity).toHaveBeenCalledTimes(2);
+    log.mockRestore();
+  });
+  it("fails closed for ambiguous external account mapping", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(resolveExternalAccount).mockRejectedValue(new Error("ambiguous"));
+    await expect(requireConsoleSession()).rejects.toMatchObject({
+      status: 503,
+    });
+    log.mockRestore();
   });
 });

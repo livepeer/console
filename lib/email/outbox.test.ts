@@ -50,11 +50,69 @@ function dependencies(events: OutboxEvent[]) {
     store,
     sendVerificationEmail,
     updateContact,
+    newsletterSync: vi.fn(
+      async ({
+        email,
+        provider,
+      }: {
+        email: string;
+        provider: AudienceProvider;
+      }) =>
+        provider.updateContact({
+          email,
+          subscribed: false,
+          idempotencyKey: "latest-consent",
+        })
+    ),
   };
 }
 
 describe("outbox dispatch", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("captures preview email and consent without contacting either provider", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "capture");
+    const deps = dependencies([
+      fixture(),
+      fixture({
+        id: "consent",
+        eventType: NEWSLETTER_CONSENT_EVENT,
+        payload: {
+          email: "fixture@example.invalid",
+          subscribed: true,
+          consentEventId: "34cdd9d3-a720-4a62-b2b1-e5996a1c3b82",
+        },
+      }),
+      fixture({
+        id: "approval",
+        eventType: "access.approved",
+        payload: {
+          to: "fixture@example.invalid",
+          loginUrl: "https://preview.example.invalid/login",
+        },
+      }),
+    ]);
+    expect(await dispatchPendingOutbox(deps)).toMatchObject({ delivered: 3 });
+    expect(deps.sendVerificationEmail).not.toHaveBeenCalled();
+    expect(deps.updateContact).not.toHaveBeenCalled();
+  });
+
+  it("refuses misconfigured preview delivery before calling providers", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "send");
+    const deps = dependencies([fixture()]);
+    expect(await dispatchPendingOutbox(deps)).toMatchObject({ terminal: 1 });
+    expect(deps.sendVerificationEmail).not.toHaveBeenCalled();
+    expect(deps.store.markTerminal).toHaveBeenCalledWith(
+      "event-id",
+      expect.any(Date),
+      "preview_delivery_unconfigured"
+    );
+  });
 
   it("delivers verification events and marks them processed", async () => {
     const deps = dependencies([fixture()]);
@@ -92,7 +150,7 @@ describe("outbox dispatch", () => {
     expect(deps.updateContact).toHaveBeenCalledWith({
       email: "person@example.com",
       subscribed: false,
-      idempotencyKey: "newsletter-consent:34cdd9d3-a720-4a62-b2b1-e5996a1c3b82",
+      idempotencyKey: "latest-consent",
     });
   });
 

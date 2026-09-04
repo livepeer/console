@@ -10,6 +10,7 @@ import {
   waitlistSignups,
 } from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
+import { getNewsletterConsent } from "@/lib/subscriptions/service";
 import {
   dispatchOutboxEvent,
   VERIFICATION_EMAIL_EVENT,
@@ -115,6 +116,9 @@ export async function POST(request: Request) {
     const db = getDb();
     const env = getEnv();
     const rawToken = randomToken();
+    const existingConsent = parsed.authOnly
+      ? await getNewsletterConsent(normalizedEmail)
+      : false;
     const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
     const touch = {
       ...parsed.attribution,
@@ -226,7 +230,7 @@ export async function POST(request: Request) {
         signupId: signup.id,
         tokenHash: hashToken(rawToken),
         requestedMarketingConsent: parsed.authOnly
-          ? signup.marketingConsent
+          ? existingConsent
           : parsed.newsletterOptIn,
         expiresAt,
       });

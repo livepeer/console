@@ -10,9 +10,15 @@ import {
 import { EmailProviderError, type EmailProvider } from "@/lib/email/provider";
 import { getAudienceProviderFromEnv } from "@/lib/email/resend-audience";
 import { getEmailProviderFromEnv } from "@/lib/email/resend";
+import { isCaptureDelivery } from "@/lib/email/delivery-mode";
+import {
+  synchronizeNewsletterConsent,
+  type NewsletterSynchronizer,
+} from "@/lib/subscriptions/delivery";
 
 export const VERIFICATION_EMAIL_EVENT = "waitlist.verification_requested";
 export const NEWSLETTER_CONSENT_EVENT = "newsletter.consent_changed";
+export const APPROVAL_EMAIL_EVENT = "access.approved";
 export const MAX_OUTBOX_ATTEMPTS = 8;
 export const OUTBOX_LEASE_MS = 5 * 60_000;
 const BASE_BACKOFF_MS = 30_000;
@@ -36,6 +42,10 @@ const newsletterPayloadSchema = z.object({
   email: z.string().email(),
   subscribed: z.boolean(),
   consentEventId: z.string().uuid(),
+});
+const approvalPayloadSchema = z.object({
+  to: z.string().email(),
+  loginUrl: webUrlSchema,
 });
 
 export function newsletterConsentOutboxValues(input: {
@@ -141,13 +151,14 @@ export function createDrizzleOutboxStore(): OutboxStore {
       return (await claim(1, now, id))[0] ?? null;
     },
     async markProcessed(id, processedAt) {
+      const captured = isCaptureDelivery();
       await db
         .update(emailOutbox)
         .set({
           processedAt,
-          payload: {},
+          ...(captured ? {} : { payload: {} }),
           lockedAt: null,
-          lastErrorCode: null,
+          lastErrorCode: captured ? "captured" : null,
         })
         .where(and(eq(emailOutbox.id, id), isNull(emailOutbox.processedAt)));
     },
@@ -193,6 +204,7 @@ function backoff(attemptCount: number) {
 type Providers = {
   email?: EmailProvider;
   audience?: AudienceProvider;
+  newsletterSync?: NewsletterSynchronizer;
 };
 
 async function deliver(
@@ -202,14 +214,17 @@ async function deliver(
   now: Date
 ): Promise<"delivered" | "failed" | "invalid" | "terminal"> {
   try {
+    const captured = isCaptureDelivery();
     if (event.eventType === VERIFICATION_EMAIL_EVENT) {
       const payload = verificationPayloadSchema.safeParse(event.payload);
       if (!payload.success) {
         await store.markTerminal(event.id, now, "invalid_payload");
         return "invalid";
       }
-      const provider = providers.email ?? getEmailProviderFromEnv();
-      await provider.sendVerificationEmail({
+      const provider = captured
+        ? undefined
+        : (providers.email ?? getEmailProviderFromEnv());
+      await provider?.sendVerificationEmail({
         ...payload.data,
         idempotencyKey: event.idempotencyKey,
       });
@@ -219,12 +234,33 @@ async function deliver(
         await store.markTerminal(event.id, now, "invalid_payload");
         return "invalid";
       }
-      const provider = providers.audience ?? getAudienceProviderFromEnv();
-      await provider.updateContact({
-        email: payload.data.email,
-        subscribed: payload.data.subscribed,
-        idempotencyKey: event.idempotencyKey,
-      });
+      const provider = captured
+        ? undefined
+        : (providers.audience ?? getAudienceProviderFromEnv());
+      if (provider)
+        await (providers.newsletterSync ?? synchronizeNewsletterConsent)({
+          email: payload.data.email,
+          provider,
+        });
+    } else if (event.eventType === APPROVAL_EMAIL_EVENT) {
+      const payload = approvalPayloadSchema.safeParse(event.payload);
+      if (!payload.success) {
+        await store.markTerminal(event.id, now, "invalid_payload");
+        return "invalid";
+      }
+      if (!captured) {
+        const provider = providers.email ?? getEmailProviderFromEnv();
+        if (!provider.sendApprovalEmail)
+          throw new EmailProviderError(
+            "Approval delivery unsupported",
+            true,
+            "approval_delivery_unsupported"
+          );
+        await provider.sendApprovalEmail({
+          ...payload.data,
+          idempotencyKey: event.idempotencyKey,
+        });
+      }
     } else {
       await store.markTerminal(event.id, now, "unsupported_event");
       return "invalid";
@@ -271,6 +307,7 @@ export async function dispatchPendingOutbox(options?: {
   limit?: number;
   emailProvider?: EmailProvider;
   audienceProvider?: AudienceProvider;
+  newsletterSync?: NewsletterSynchronizer;
   store?: OutboxStore;
   now?: Date;
 }): Promise<DispatchResult> {
@@ -293,6 +330,7 @@ export async function dispatchPendingOutbox(options?: {
         {
           email: options?.emailProvider,
           audience: options?.audienceProvider,
+          newsletterSync: options?.newsletterSync,
         },
         store,
         now
@@ -308,6 +346,7 @@ export async function dispatchOutboxEvent(
   options?: {
     emailProvider?: EmailProvider;
     audienceProvider?: AudienceProvider;
+    newsletterSync?: NewsletterSynchronizer;
     store?: OutboxStore;
     now?: Date;
   }
@@ -321,6 +360,7 @@ export async function dispatchOutboxEvent(
     {
       email: options?.emailProvider,
       audience: options?.audienceProvider,
+      newsletterSync: options?.newsletterSync,
     },
     store,
     now

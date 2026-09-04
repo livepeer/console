@@ -23,6 +23,7 @@ export class ResendAudienceProvider implements AudienceProvider {
     try {
       response = await this.request("https://api.resend.com/contacts", {
         method: "POST",
+        signal: input.signal,
         headers: {
           authorization: `Bearer ${this.options.apiKey}`,
           "content-type": "application/json",

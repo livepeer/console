@@ -21,6 +21,42 @@ export class ResendEmailProvider implements EmailProvider {
     this.request = options.fetch ?? fetch;
   }
 
+  async sendApprovalEmail(input: {
+    to: string;
+    loginUrl: string;
+    idempotencyKey: string;
+  }): Promise<EmailDelivery> {
+    const response = await this.request("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${this.options.apiKey}`,
+        "content-type": "application/json",
+        "idempotency-key": input.idempotencyKey,
+      },
+      body: JSON.stringify({
+        from: this.options.from,
+        to: [input.to],
+        reply_to: this.options.replyTo,
+        subject: "Your Livepeer Console access is ready",
+        text: `You have been approved for Livepeer Console early access. Sign in using the email address you joined with: ${input.loginUrl}\n\nThis access invitation does not change your newsletter preferences.`,
+      }),
+    });
+    if (!response.ok)
+      throw new EmailProviderError(
+        "Approval delivery failed",
+        response.status === 429 || response.status >= 500,
+        `http_${response.status}`
+      );
+    const body = (await response.json()) as { id?: unknown };
+    if (typeof body.id !== "string")
+      throw new EmailProviderError(
+        "Invalid delivery response",
+        true,
+        "invalid_response"
+      );
+    return { providerMessageId: body.id };
+  }
+
   async sendVerificationEmail(
     input: SendVerificationEmailInput
   ): Promise<EmailDelivery> {

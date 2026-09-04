@@ -13,8 +13,14 @@ import {
 } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
-import { pointEvents, sessions, waitlistSignups } from "@/lib/db/schema";
+import {
+  adminRoleGrants,
+  pointEvents,
+  sessions,
+  waitlistSignups,
+} from "@/lib/db/schema";
 import { getEnv } from "@/lib/env";
+import { getNewsletterConsent } from "@/lib/subscriptions/service";
 import type {
   WaitlistLeaderboardEntry,
   WaitlistMember,
@@ -106,12 +112,22 @@ export async function getMember(
       .where(eq(pointEvents.signupId, signup.id)),
   ]);
   const baseUrl = getEnv().NEXT_PUBLIC_SITE_URL;
+  const [adminGrant] = await db
+    .select({ id: adminRoleGrants.id })
+    .from(adminRoleGrants)
+    .where(
+      and(
+        eq(adminRoleGrants.signupId, signup.id),
+        isNull(adminRoleGrants.revokedAt)
+      )
+    )
+    .limit(1);
   return {
-    accountRole: signup.accountRole,
+    accountRole: adminGrant ? "admin" : "member",
     analyticsId: analyticsMemberId(signup.id),
     displayName: maskEmail(signup.email),
     email: signup.email,
-    newsletterOptIn: signup.marketingConsent,
+    newsletterOptIn: await getNewsletterConsent(signup.normalizedEmail),
     points: points.value,
     position: position.value,
     referralCode: signup.referralCode,

@@ -135,6 +135,24 @@ describe.skipIf(!databaseUrl)(
         .from(schema.waitlistSignups)
         .where(like(schema.waitlistSignups.normalizedEmail, `${prefix}%`));
       if (rows.length) {
+        await db.delete(schema.adminRoleGrants).where(
+          inArray(
+            schema.adminRoleGrants.signupId,
+            rows.map((r) => r.id)
+          )
+        );
+        await db.delete(schema.consentEvents).where(
+          inArray(
+            schema.consentEvents.signupId,
+            rows.map((r) => r.id)
+          )
+        );
+        await db.delete(schema.emailSubscriptions).where(
+          inArray(
+            schema.emailSubscriptions.signupId,
+            rows.map((r) => r.id)
+          )
+        );
         await db.delete(schema.emailOutbox).where(
           inArray(
             schema.emailOutbox.signupId,
@@ -213,9 +231,8 @@ describe.skipIf(!databaseUrl)(
 
       expect((await csv()).status).toBe(404);
       await db
-        .update(schema.waitlistSignups)
-        .set({ accountRole: "admin" })
-        .where(eq(schema.waitlistSignups.id, confirmed.id));
+        .insert(schema.adminRoleGrants)
+        .values({ signupId: confirmed.id, source: "synthetic_fixture" });
       const exported = await csv();
       expect(exported.status).toBe(200);
       expect(exported.headers.get("cache-control")).toBe("private, no-store");

@@ -10,6 +10,11 @@ export type EmailDelivery = {
 };
 
 export interface EmailProvider {
+  sendApprovalEmail?(input: {
+    to: string;
+    loginUrl: string;
+    idempotencyKey: string;
+  }): Promise<EmailDelivery>;
   sendVerificationEmail(
     input: SendVerificationEmailInput
   ): Promise<EmailDelivery>;

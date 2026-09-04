@@ -35,7 +35,7 @@ export async function getAdminWaitlistSummary(): Promise<AdminWaitlistSummary> {
           and ${waitlistSignups.status} = 'confirmed'
       )::int`,
       newsletterSubscribers: sql<number>`count(*) filter (
-        where ${waitlistSignups.marketingConsent} = true
+        where exists (select 1 from email_subscriptions subscription where subscription.normalized_email = ${waitlistSignups.normalizedEmail} and subscription.purpose = 'product_marketing' and subscription.status = 'subscribed')
           and ${waitlistSignups.status} = 'confirmed'
       )::int`,
     })
@@ -60,7 +60,7 @@ export async function getAdminWaitlistRows(
     .select({
       email: waitlistSignups.email,
       status: waitlistSignups.status,
-      marketingConsent: waitlistSignups.marketingConsent,
+      marketingConsent: sql<boolean>`exists (select 1 from email_subscriptions subscription where subscription.normalized_email = ${waitlistSignups.normalizedEmail} and subscription.purpose = 'product_marketing' and subscription.status = 'subscribed')`,
       referralCode: waitlistSignups.referralCode,
       firstSeenAt: waitlistSignups.firstSeenAt,
       confirmedAt: waitlistSignups.confirmedAt,
