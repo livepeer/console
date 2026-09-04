@@ -3,19 +3,21 @@ import { isKnownClientId } from "./cimd";
 
 export type AuthorizationCodeGrant = AuthCodeGrant & { externalUserId: string };
 
+export type TokenGrantError =
+  | "invalid_request"
+  | "invalid_grant"
+  | "invalid_client";
+
 export type TokenGrantResult =
   | { ok: true; grant: AuthorizationCodeGrant }
   | {
       ok: false;
-      error: "invalid_request" | "invalid_grant" | "invalid_client";
+      error: TokenGrantError;
       /** Server-side only. The token endpoint never returns this to the client. */
       reason: string;
     };
 
-function fail(
-  error: "invalid_request" | "invalid_grant" | "invalid_client",
-  reason: string
-): TokenGrantResult {
+function fail(error: TokenGrantError, reason: string): TokenGrantResult {
   return { ok: false, error, reason };
 }
 
