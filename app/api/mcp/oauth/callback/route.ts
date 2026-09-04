@@ -8,6 +8,7 @@ import {
   PKCE_COOKIE,
   pkceCookieOptions
 } from "@/lib/mcp/as";
+import { mcpPublicOrigin } from "@/lib/mcp/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
   const target = new URL(pending.redirectUri);
   target.searchParams.set("code", code);
   target.searchParams.set("state", pending.clientState);
+  target.searchParams.set("iss", mcpPublicOrigin(req));
   const response = NextResponse.redirect(target.toString(), 302);
   response.cookies.set(PKCE_COOKIE, "", { ...pkceCookieOptions(), maxAge: 0 });
   return response;

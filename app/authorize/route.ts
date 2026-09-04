@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { consoleLoginUrl, corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
+import { resolveOAuthClient } from "@/lib/mcp/cimd";
+import { clientAllowsRedirect } from "@/lib/mcp/dcr";
 import {
   issuePending,
   newNonce,
-  parseClientId,
   PKCE_COOKIE,
   pkceCookieOptions
 } from "@/lib/mcp/as";
@@ -60,14 +61,16 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const client = parseClientId(clientId);
-  if (!client) {
-    return json(req, 400, {
-      error: "invalid_client",
-      error_description: "unknown client_id — register first"
+  const resolved = await resolveOAuthClient(clientId);
+  if (!resolved.ok) {
+    return json(req, resolved.error === "temporarily_unavailable" ? 503 : 400, {
+      error: resolved.error,
+      ...(resolved.error === "invalid_client"
+        ? { error_description: "unknown or invalid client_id" }
+        : {})
     });
   }
-  if (!client.redirectUris.includes(redirectUri)) {
+  if (!clientAllowsRedirect(resolved.client.redirectUris, redirectUri)) {
     return json(req, 400, {
       error: "invalid_request",
       error_description: "redirect_uri does not match client registration"

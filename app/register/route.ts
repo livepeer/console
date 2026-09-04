@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     return json(req, 400, {
       error: "invalid_redirect_uri",
       error_description:
-        "redirect_uris must be Claude, Cursor, or loopback (RFC 8252) URLs"
+        "redirect_uris must be Claude, Cursor, ChatGPT, or loopback (RFC 8252) URLs"
     });
   }
   if (redirectUris.some((uri) => !isAllowedClientRedirectUri(uri))) {

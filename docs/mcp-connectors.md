@@ -6,7 +6,7 @@ Paste **only** this URL. Do not add headers, API keys, or a Vercel bypass query 
 https://<APP_BASE_URL>/api/mcp
 ```
 
-The server is Streamable HTTP. OAuth is DCR + PKCE on this origin. Browser login is Console Auth0. Access tokens are PymtHouse user JWTs (`sign:job`); refresh is Console-wrapped (`mcp_rt_*`).
+The server is Streamable HTTP. OAuth is CIMD + DCR + PKCE on this origin. Browser login is Console Auth0. Access tokens are PymtHouse user JWTs (`sign:job`); refresh is Console-wrapped (`mcp_rt_*`). Codex and ChatGPT prefer CIMD when the AS advertises `client_id_metadata_document_supported`.
 
 ## Claude
 
@@ -39,7 +39,9 @@ Cursor DCR registers `cursor://anysphere.cursor-mcp/oauth/callback` (desktop) an
 
 ## Codex
 
-Add a Streamable HTTP MCP server in `~/.codex/config.toml` and log in:
+In Codex Desktop: Settings → MCP servers → Add server. Transport **Streamable HTTP**, URL `https://<APP_BASE_URL>/api/mcp`, then Authenticate.
+
+Or add it in `~/.codex/config.toml` (shared with Desktop / CLI / the IDE extension) and log in:
 
 ```toml
 [mcp_servers.livepeer]
@@ -50,7 +52,11 @@ url = "https://<APP_BASE_URL>/api/mcp"
 codex mcp login livepeer
 ```
 
-Codex uses a loopback redirect (`http://127.0.0.1:<port>/…`). Complete the Console Auth0 browser login. Do not invent API keys. Do not call PymtHouse URLs.
+Codex identifies itself with a ChatGPT-hosted CIMD document (`https://chatgpt.com/oauth/codex/…/client.json`) and a loopback redirect (`http://127.0.0.1:<port>/callback/<id>`). The AS accepts RFC 8252 variable ports and `127.0.0.1` ↔ `localhost`. Complete the Console Auth0 browser login. Do not invent API keys. Do not call PymtHouse URLs.
+
+## ChatGPT
+
+ChatGPT connectors use the same CIMD host. Allowlisted callbacks are `https://chatgpt.com/connector/oauth/<callback_id>` and the legacy `https://chatgpt.com/connector_platform_oauth_redirect`. Paste the MCP URL as a custom connector; sign in when the browser opens.
 
 ## Hermes
 
@@ -59,7 +65,7 @@ hermes mcp add livepeer --url https://<APP_BASE_URL>/api/mcp --auth oauth
 hermes mcp login livepeer
 ```
 
-Hermes opens a browser and waits on a loopback callback. If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path — the Console AS accepts RFC 8252 loopback, Claude HTTPS callbacks, and Cursor's documented MCP callbacks.
+Hermes opens a browser and waits on a loopback callback. If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path — the Console AS accepts RFC 8252 loopback, Claude and Cursor callbacks, and ChatGPT / Codex CIMD callbacks.
 
 ## After login
 

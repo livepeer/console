@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { isAllowedClientRedirectUri, normalizeRedirectUris } from "./dcr";
+import {
+  clientAllowsRedirect,
+  isAllowedClientRedirectUri,
+  normalizeRedirectUris,
+  redirectUrisMatch
+} from "./dcr";
 
 test("Claude MCP callbacks are allowed", () => {
   assert.equal(
@@ -52,6 +57,71 @@ test("Cursor MCP callbacks are allowed", () => {
   );
   assert.equal(
     isAllowedClientRedirectUri("https://www.cursor.com/oauth/callback"),
+    false
+  );
+});
+
+test("ChatGPT connector callbacks are allowed", () => {
+  assert.equal(
+    isAllowedClientRedirectUri(
+      "https://chatgpt.com/connector/oauth/BKj9umzr4ef_"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedClientRedirectUri(
+      "https://chatgpt.com/connector_platform_oauth_redirect"
+    ),
+    true
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("https://chatgpt.com/connector/oauth/"),
+    false
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("https://www.chatgpt.com/connector/oauth/abc"),
+    false
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("https://chatgpt.com.evil.example/connector/oauth/abc"),
+    false
+  );
+});
+
+test("loopback registered URI matches Codex port and host swaps", () => {
+  assert.equal(
+    redirectUrisMatch(
+      "http://127.0.0.1/callback/BKj9umzr4ef_",
+      "http://127.0.0.1:39053/callback/BKj9umzr4ef_"
+    ),
+    true
+  );
+  assert.equal(
+    redirectUrisMatch(
+      "http://127.0.0.1:39053/callback/BKj9umzr4ef_",
+      "http://localhost:39053/callback/BKj9umzr4ef_"
+    ),
+    true
+  );
+  assert.equal(
+    clientAllowsRedirect(
+      ["http://127.0.0.1/callback/abc"],
+      "http://localhost:5555/callback/abc"
+    ),
+    true
+  );
+  assert.equal(
+    redirectUrisMatch(
+      "http://127.0.0.1/callback/abc",
+      "http://127.0.0.1/callback/other"
+    ),
+    false
+  );
+  assert.equal(
+    redirectUrisMatch(
+      "https://chatgpt.com/connector/oauth/abc",
+      "https://chatgpt.com/connector/oauth/def"
+    ),
     false
   );
 });

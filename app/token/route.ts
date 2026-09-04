@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
-import { parseAuthCode, parseClientId, verifyPkceS256 } from "@/lib/mcp/as";
+import { parseAuthCode, verifyPkceS256 } from "@/lib/mcp/as";
+import { isKnownClientId } from "@/lib/mcp/cimd";
+import { redirectUrisMatch } from "@/lib/mcp/dcr";
 import { mintMcpUserTokens, BillingAppMismatchError } from "@/lib/console/mcp-internal-mint";
 import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
 
@@ -96,12 +98,11 @@ export async function POST(req: NextRequest) {
   if (!grant) {
     return json(req, 400, { error: "invalid_grant" });
   }
-  if (grant.redirectUri !== redirectUri) {
+  if (!redirectUrisMatch(grant.redirectUri, redirectUri)) {
     return json(req, 400, { error: "invalid_grant" });
   }
   if (clientId) {
-    const client = parseClientId(clientId);
-    if (!client || grant.clientId !== clientId) {
+    if (grant.clientId !== clientId || !isKnownClientId(clientId)) {
       return json(req, 400, { error: "invalid_client" });
     }
   }
