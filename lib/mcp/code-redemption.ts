@@ -9,6 +9,7 @@ export async function consumeAuthorizationCode(
   code: string,
   expiresAt: number
 ) {
+  code = code.trim();
   if (!code || !Number.isFinite(expiresAt) || expiresAt <= Date.now())
     return false;
   try {

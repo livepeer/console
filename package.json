@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "test:console": "tsx --test lib/console/*.test.ts lib/mcp/*.test.ts",
+    "test:console": "node --conditions=react-server --import tsx --test lib/console/*.test.ts lib/mcp/*.test.ts",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit --incremental false",
     "db:generate": "drizzle-kit generate",

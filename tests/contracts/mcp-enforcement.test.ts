@@ -161,6 +161,19 @@ function keyRequest() {
   });
 }
 
+function codeRequest(code: string) {
+  return new NextRequest("https://console.example/token", {
+    method: "POST",
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      client_id: "client",
+      redirect_uri: "https://client.example/cb",
+      code_verifier: "verifier",
+    }),
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.consumeCode.mockReset().mockResolvedValue(true);
@@ -199,6 +212,19 @@ beforeEach(() => {
 });
 
 describe("revocation enforced at every credential and request boundary", () => {
+  it("uses one receipt for whitespace variants accepted by the code parser", async () => {
+    const used = new Set<string>();
+    mocks.consumeCode.mockImplementation(async (code: string) => {
+      if (used.has(code)) return false;
+      used.add(code);
+      return true;
+    });
+    const statuses = [];
+    for (const code of ["code", " code", "code ", "\tcode\n"])
+      statuses.push((await redeem(codeRequest(code))).status);
+    expect(statuses).toEqual([200, 400, 400, 400]);
+    expect(mocks.mint).toHaveBeenCalledTimes(1);
+  });
   it("rejects sequential and concurrent authorization-code replay before mint", async () => {
     const used = new Set<string>();
     mocks.consumeCode.mockImplementation(async (code: string) => {
@@ -333,7 +359,10 @@ describe("revocation enforced at every credential and request boundary", () => {
       const response = await callback(
         new NextRequest("https://console.example/api/mcp/oauth/callback")
       );
-      expect(response.status).toBe(state === "unavailable" ? 503 : 403);
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(
+        "https://console.example/access-pending?from=mcp"
+      );
       expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
       expect(mocks.issueCode).not.toHaveBeenCalled();
     }

@@ -85,6 +85,7 @@ describe("waiting states", () => {
     ["access_revoked", true, "revoked"],
     ["access_disabled", true, "disabled"],
     ["access_unavailable", true, "unavailable"],
+    ["enrollment_attention_required", true, "enrollment-attention"],
   ] as const)(
     "renders authoritative %s state with verified email %s",
     async (code, verified, expectedState) => {

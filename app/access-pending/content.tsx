@@ -3,12 +3,18 @@ export type WaitingState =
   | "verify-email"
   | "revoked"
   | "disabled"
+  | "enrollment-attention"
   | "unavailable";
 
 export const waitingCopy: Record<
   WaitingState,
   { title: string; description: string }
 > = {
+  "enrollment-attention": {
+    title: "We couldn’t finish connecting your waitlist entry.",
+    description:
+      "Your sign-in worked, but we can’t confirm waitlist enrollment for this account. Please contact the Livepeer team for help. We haven’t changed your email preferences.",
+  },
   pending: {
     title: "You’re on the waitlist.",
     description:
@@ -39,9 +45,11 @@ export const waitingCopy: Record<
 export function WaitingContent({
   state,
   retryHref,
+  fromMcp = false,
 }: {
   state: WaitingState;
   retryHref: string;
+  fromMcp?: boolean;
 }) {
   const copy = waitingCopy[state];
   return (
@@ -62,6 +70,12 @@ export function WaitingContent({
         <p className="mt-5 text-base leading-relaxed text-white/65">
           {copy.description}
         </p>
+        {fromMcp ? (
+          <p className="mt-4 text-sm text-white/65">
+            Your agent connection has not been authorized. Once your access is
+            ready, restart the connection from your agent.
+          </p>
+        ) : null}
         <div className="mt-8 flex flex-wrap items-center gap-5 text-sm">
           <a
             className="rounded-md bg-white px-4 py-2 text-black"

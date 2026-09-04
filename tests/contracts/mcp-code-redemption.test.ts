@@ -46,4 +46,11 @@ describe("durable authorization-code receipt", () => {
       code: "code_redemption_unavailable",
     });
   });
+  it("canonicalizes code whitespace to the same digest", async () => {
+    await consumeAuthorizationCode("code", Date.now() + 60_000);
+    await consumeAuthorizationCode(" code\n", Date.now() + 60_000);
+    expect(mocks.values.mock.calls[0][0].codeHash).toBe(
+      mocks.values.mock.calls[1][0].codeHash
+    );
+  });
 });

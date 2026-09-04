@@ -4,7 +4,6 @@ import {
   requireConsoleSession,
   SessionRequiredError,
 } from "@/lib/console/session-user";
-import { AccessError } from "@/lib/access/service";
 import {
   issueAuthCode,
   parsePending,
@@ -34,15 +33,13 @@ export async function GET(req: NextRequest) {
       login.searchParams.set("returnTo", "/api/mcp/oauth/callback");
       return NextResponse.redirect(login);
     }
-    const failure =
-      error instanceof AccessError ? error : new AccessError("unavailable");
-    const response = NextResponse.json(
-      { error: failure.code },
-      {
-        status: failure.status,
-        headers: { "Cache-Control": "no-store" },
-      }
+    // This endpoint is a browser handoff, not a token API. Explain admission
+    // failure on the waiting page, and terminate rather than issue a code.
+    const response = NextResponse.redirect(
+      new URL("/access-pending?from=mcp", origin),
+      302
     );
+    response.headers.set("Cache-Control", "no-store");
     response.cookies.set(PKCE_COOKIE, "", {
       ...pkceCookieOptions(),
       maxAge: 0,

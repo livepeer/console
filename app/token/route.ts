@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     return json(req, 400, { error: "unsupported_grant_type" });
   }
 
-  const code = params.get("code") ?? "";
+  const code = (params.get("code") ?? "").trim();
   const redirectUri = params.get("redirect_uri") ?? "";
   const codeVerifier = params.get("code_verifier") ?? "";
   const clientId = params.get("client_id") ?? "";

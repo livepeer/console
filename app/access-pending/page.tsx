@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function AccessPendingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; from?: string }>;
 }) {
   const params = await searchParams;
   const requested = safeReturnTo(params.returnTo);
@@ -34,7 +34,9 @@ export default async function AccessPendingPage({
       } catch {
         state = "unavailable";
       }
-    } else if (failure?.code === "access_revoked") state = "revoked";
+    } else if (failure?.code === "enrollment_attention_required")
+      state = "enrollment-attention";
+    else if (failure?.code === "access_revoked") state = "revoked";
     else if (
       failure?.code === "access_disabled" ||
       failure?.code === "canonical_user_disabled"
@@ -46,7 +48,8 @@ export default async function AccessPendingPage({
   return (
     <WaitingContent
       state={state}
-      retryHref={`/access-pending?returnTo=${encodeURIComponent(returnTo)}`}
+      fromMcp={params.from === "mcp"}
+      retryHref={`/access-pending?returnTo=${encodeURIComponent(returnTo)}${params.from === "mcp" ? "&from=mcp" : ""}`}
     />
   );
 }
