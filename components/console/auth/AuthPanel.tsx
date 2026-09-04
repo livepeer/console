@@ -5,7 +5,11 @@ import type { FormEvent } from "react";
 import { useRef } from "react";
 import { motion } from "framer-motion";
 import { LivepeerLockup } from "@/components/design-system/LivepeerLogo";
-import { AUTH_LOGIN_PATH } from "@/lib/console/auth-login";
+import {
+  authLoginHref,
+  consoleSignInHref,
+  consoleSignUpHref,
+} from "@/lib/console/auth-login";
 
 export type AuthMode = "signin" | "signup";
 
@@ -16,16 +20,14 @@ interface AuthPanelProps {
 
 const COPY = {
   signin: {
-    submit: "Sign in",
+    submit: "Continue with email",
     footer: "Don't have an account?",
     footerAction: "Sign up",
-    footerHref: "/signup",
   },
   signup: {
-    submit: "Sign up",
+    submit: "Continue with email",
     footer: "Already have an account?",
     footerAction: "Log in",
-    footerHref: "/login",
   },
 } as const;
 
@@ -57,35 +59,38 @@ function GoogleIcon({ className }: { className?: string }) {
   );
 }
 
-
 export function AuthPanel({ mode, returnTo = "/home" }: AuthPanelProps) {
   const emailRef = useRef<HTMLInputElement>(null);
   const copy = COPY[mode];
   const isSignup = mode === "signup";
+  const footerHref = isSignup
+    ? consoleSignInHref({ returnTo })
+    : consoleSignUpHref({ returnTo });
 
   const providerButtonClass =
     "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-sm border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/35";
   const primaryButtonClass =
     "inline-flex h-11 w-full items-center justify-center rounded-sm bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/35";
   const inputClass =
-    "h-11 w-full rounded-sm border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-muted-foreground";
-
-  function buildHref(extra?: Record<string, string>) {
-    const params = new URLSearchParams({ returnTo });
-    if (isSignup) params.set("screen_hint", "signup");
-    if (extra) Object.entries(extra).forEach(([k, v]) => params.set(k, v));
-    return `${AUTH_LOGIN_PATH}?${params.toString()}`;
-  }
+    "h-11 w-full rounded-sm border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-muted-foreground focus-visible:ring-1 focus-visible:ring-green-bright/30";
 
   function handleEmailSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const email = emailRef.current?.value.trim();
-    const extra: Record<string, string> = {};
-    if (email) extra["login_hint"] = email;
-    window.location.assign(buildHref(extra));
+    window.location.assign(
+      authLoginHref({
+        signup: isSignup,
+        returnTo,
+        loginHint: email || undefined,
+      })
+    );
   }
 
-  const googleHref = buildHref({ connection: "google-oauth2" });
+  const googleHref = authLoginHref({
+    signup: isSignup,
+    returnTo,
+    connection: "google-oauth2",
+  });
 
   return (
     <motion.section
@@ -106,19 +111,11 @@ export function AuthPanel({ mode, returnTo = "/home" }: AuthPanelProps) {
             <input
               ref={emailRef}
               type="email"
+              name="email"
               autoComplete="email"
               inputMode="email"
               className={inputClass}
               placeholder="Email address"
-            />
-          </label>
-          <label className="block">
-            <span className="sr-only">Password</span>
-            <input
-              type="password"
-              autoComplete={isSignup ? "new-password" : "current-password"}
-              className={inputClass}
-              placeholder="Password"
             />
           </label>
           <button type="submit" className={primaryButtonClass}>
@@ -142,12 +139,36 @@ export function AuthPanel({ mode, returnTo = "/home" }: AuthPanelProps) {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           {copy.footer}{" "}
           <Link
-            href={copy.footerHref}
+            href={footerHref}
             className="font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:decoration-foreground"
           >
             {copy.footerAction}
           </Link>
         </p>
+
+        {isSignup ? (
+          <p className="mt-3 text-balance text-center text-[11px] leading-relaxed text-muted-foreground">
+            By creating an account, you agree to our{" "}
+            <a
+              href="https://livepeer.org/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground"
+            >
+              Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://livepeer.org/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-border underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground"
+            >
+              Privacy Policy
+            </a>
+            .
+          </p>
+        ) : null}
       </div>
     </motion.section>
   );

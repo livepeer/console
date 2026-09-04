@@ -3,7 +3,11 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/console/AuthContext";
-import { AUTH_SIGNIN_HREF, AUTH_SIGNUP_HREF } from "@/lib/console/auth-login";
+import {
+  AUTH_SIGNIN_HREF,
+  AUTH_SIGNUP_HREF,
+  isConsoleAuthPath,
+} from "@/lib/console/auth-login";
 import ScopeChip, { type PageScope } from "@/components/console/ScopeChip";
 
 interface ConsolePageHeaderProps {
@@ -34,8 +38,8 @@ interface ConsolePageHeaderProps {
  * and right-aligned actions. Information density comes from the content; this
  * bar is pure chrome and stays out of the way.
  *
- * When the user is signed out (and not already starting an Auth0
- * login), a `Sign in` / `Sign up` pair is appended to the right
+ * When the user is signed out (and not already on /login or /signup),
+ * a `Sign in` / `Sign up` pair is appended to the right
  * actions cluster — mirrors the design prototype's `PageHead` injection
  * (`auth.authed === false && !auth.isAuthRoute`). A faint divider sits
  * between the page's own actions and the auth CTAs when both exist.
@@ -49,7 +53,7 @@ export default function ConsolePageHeader({
 }: ConsolePageHeaderProps) {
   const { isConnected, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
-  const isAuthRoute = pathname.startsWith("/auth/");
+  const isAuthRoute = isConsoleAuthPath(pathname);
   // Hide auth CTAs while auth state is still resolving (one frame on first
   // paint) to avoid flashing them in for connected users.
   const showAuthCTAs = !isLoading && !isConnected && !isAuthRoute;

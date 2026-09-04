@@ -6,7 +6,7 @@ import { AUTH_SIGNIN_HREF } from "@/lib/console/auth-login";
 
 // Root `/`:
 //   - signed in  → redirect to /home (the console default)
-//   - signed out → Auth0 Universal Login
+//   - signed out → /login
 export default function RootPage() {
   const { isConnected, isLoading, user } = useAuth();
 

@@ -18,7 +18,7 @@ function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
 // Routes that exist only for a signed-in user. Signed-out requests are
 // redirected here, in middleware, rather than by the page: a client-side
 // redirect runs after the console chrome has already painted, so a cold
-// signed-out load flashed the sidebar for a frame before landing on Auth0.
+// signed-out load flashed the sidebar for a frame before landing on /login.
 // Home keeps the in-shell sign-in wall; Install redirects before the shell.
 function isSessionOnlyPath(pathname: string): boolean {
   return pathname === "/" || pathname === "/install";

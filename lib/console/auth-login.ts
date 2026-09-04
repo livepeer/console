@@ -4,15 +4,49 @@ export const AUTH_LOGIN_PATH = "/auth/login";
 
 const DEFAULT_RETURN_TO = "/home";
 
+/** Same-origin relative path only. Rejects protocol-relative and absolute URLs. */
+export function safeReturnTo(
+  value: string | null | undefined,
+  fallback = DEFAULT_RETURN_TO
+): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return fallback;
+  return trimmed;
+}
+
+export function isConsoleAuthPath(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname.startsWith("/auth/")
+  );
+}
+
 export function authLoginHref(options?: {
   signup?: boolean;
   returnTo?: string;
+  loginHint?: string;
+  connection?: string;
 }): string {
   const params = new URLSearchParams();
   if (options?.signup) params.set("screen_hint", "signup");
-  params.set("returnTo", options?.returnTo ?? DEFAULT_RETURN_TO);
+  params.set("returnTo", safeReturnTo(options?.returnTo));
+  if (options?.loginHint) params.set("login_hint", options.loginHint);
+  if (options?.connection) params.set("connection", options.connection);
   return `${AUTH_LOGIN_PATH}?${params.toString()}`;
 }
 
-export const AUTH_SIGNIN_HREF = authLoginHref();
-export const AUTH_SIGNUP_HREF = authLoginHref({ signup: true });
+export function consoleSignInHref(options?: { returnTo?: string }): string {
+  const returnTo = safeReturnTo(options?.returnTo);
+  if (returnTo === DEFAULT_RETURN_TO) return "/login";
+  return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export function consoleSignUpHref(options?: { returnTo?: string }): string {
+  const returnTo = safeReturnTo(options?.returnTo);
+  if (returnTo === DEFAULT_RETURN_TO) return "/signup";
+  return `/signup?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export const AUTH_SIGNIN_HREF = consoleSignInHref();
+export const AUTH_SIGNUP_HREF = consoleSignUpHref();
