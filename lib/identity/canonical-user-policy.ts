@@ -14,7 +14,8 @@ export function chooseCanonicalUserId(input: {
   identityUserId?: string;
   verifiedEmailUserId?: string;
 }): string | null {
-  return input.identityUserId ?? input.verifiedEmailUserId ?? null;
+  // Kept for compatibility; email ownership is never identity-link proof.
+  return input.identityUserId ?? null;
 }
 
 export function waitlistLinkDecision(input: {

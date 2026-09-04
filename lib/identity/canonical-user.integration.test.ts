@@ -11,9 +11,18 @@ import {
 import { and, eq, inArray, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { openIntegrationDatabase } from "@/tests/support/isolated-db";
 
 import * as schema from "@/lib/db/schema";
 import { externalUserIdFromSub } from "@/lib/console/external-user-id";
+import {
+  resolveProviderIdentity,
+  linkProviderIdentityToUser,
+} from "./provider-user";
+import {
+  resolveExternalAccount,
+  findExternalAccountOwner,
+} from "@/lib/external-accounts/service";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ getDb: vi.fn() }));
@@ -32,6 +41,18 @@ const email = (name: string) => `${prefix}-${name}@example.invalid`;
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof getDb>;
 const userIds = new Set<string>();
+const scope = {
+  service: "pymthouse" as const,
+  issuer: "https://issuer.example.invalid",
+  appId: "isolated-test-app",
+};
+const providerInput = (name: string) => ({
+  authority: "auth0",
+  issuer: "https://auth.example.invalid",
+  subject: subject(name),
+  email: email(name),
+  emailVerified: true,
+});
 
 async function sync(name: string, address = email(name), verified = true) {
   const result = await syncCanonicalUser({
@@ -67,21 +88,15 @@ describe.skipIf(!databaseUrl)(
   "canonical identities against isolated Postgres",
   () => {
     beforeAll(async () => {
-      const hostname = new URL(databaseUrl!).hostname;
-      if (
-        !process.env.TEST_DATABASE_HOST ||
-        hostname !== process.env.TEST_DATABASE_HOST ||
-        hostname === "ep-mute-dust-au81hdx5-pooler.c-10.us-east-1.aws.neon.tech"
-      ) {
-        throw new Error(
-          "An explicitly approved, isolated test database is required"
-        );
-      }
-      client = postgres(databaseUrl!, {
-        max: 4,
-        prepare: false,
-        connect_timeout: 10,
+      vi.stubEnv("AUTH0_DOMAIN", "auth.example.invalid");
+      vi.stubEnv("PYMTHOUSE_ISSUER_URL", scope.issuer);
+      vi.stubEnv("PYMTHOUSE_PUBLIC_CLIENT_ID", scope.appId);
+      const isolated = await openIntegrationDatabase({
+        TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
+        TEST_DATABASE_HOST: process.env.TEST_DATABASE_HOST,
+        TEST_DATABASE_BRANCH_ID: process.env.TEST_DATABASE_BRANCH_ID,
       });
+      client = isolated.client;
       db = drizzle(client, { schema });
       vi.mocked(getDb).mockImplementation(() => db);
       await client`select 1`;
@@ -99,19 +114,35 @@ describe.skipIf(!databaseUrl)(
       await db
         .delete(schema.waitlistSignups)
         .where(like(schema.waitlistSignups.normalizedEmail, `${prefix}%`));
-      if (userIds.size)
+      if (userIds.size) {
+        const ownedIdentities = await db
+          .select({ id: schema.authIdentities.id })
+          .from(schema.authIdentities)
+          .where(inArray(schema.authIdentities.userId, [...userIds]));
+        if (ownedIdentities.length)
+          await db.delete(schema.identityExternalAccounts).where(
+            inArray(
+              schema.identityExternalAccounts.identityId,
+              ownedIdentities.map((row) => row.id)
+            )
+          );
+        await db
+          .delete(schema.externalAccounts)
+          .where(inArray(schema.externalAccounts.userId, [...userIds]));
         await db
           .delete(schema.users)
           .where(inArray(schema.users.id, [...userIds]));
+      }
       userIds.clear();
       vi.restoreAllMocks();
     });
 
     afterAll(async () => {
       await client?.end();
+      vi.unstubAllEnvs();
     });
 
-    it("creates UUID identities and preserves the exact legacy external ID", async () => {
+    it("creates UUID identities with a newly allocated provider-independent external ID", async () => {
       const result = await sync("new", email("new").toUpperCase());
       expect(result.userId).toMatch(/^[a-f0-9-]{36}$/);
       expect(result.identityCreated).toBe(true);
@@ -124,9 +155,8 @@ describe.skipIf(!databaseUrl)(
         authority: "auth0",
         strategy: "auth0",
       });
-      expect(result.externalUserId).toBe(
-        await externalUserIdFromSub(subject("new"))
-      );
+      expect(result.externalUserId).toMatch(/^eu_[a-f0-9]{32}$/);
+      expect(identity.externalUserId).toBeNull();
       const [record] = await db
         .select()
         .from(schema.userEmails)
@@ -250,14 +280,13 @@ describe.skipIf(!databaseUrl)(
       expect(record.userId).toBe(owner.userId);
     });
 
-    it("links another verified Auth0 identity without changing either external ID", async () => {
+    it("never links another identity by verified email alone", async () => {
       const first = await sync("provider-one");
       const second = await sync("provider-two", email("provider-one"));
-      expect(second.userId).toBe(first.userId);
+      expect(second.userId).not.toBe(first.userId);
+      expect(second.conflicts).toContain("verified_email");
       expect(second.externalUserId).not.toBe(first.externalUserId);
-      expect(second.externalUserId).toBe(
-        await externalUserIdFromSub(subject("provider-two"))
-      );
+      expect(second.externalUserId).toMatch(/^eu_[a-f0-9]{32}$/);
     });
 
     it("fails open during database outage and reconciles on retry", async () => {
@@ -273,14 +302,155 @@ describe.skipIf(!databaseUrl)(
       expect(await syncCanonicalUserBestEffort(input)).toBeNull();
       const retried = await syncCanonicalUserBestEffort(input);
       expect(retried?.identityCreated).toBe(true);
-      expect(retried?.externalUserId).toBe(
-        await externalUserIdFromSub(input.sub)
+      expect(retried?.externalUserId).toMatch(/^eu_[a-f0-9]{32}$/);
+    });
+
+    it("retains both legacy account aliases with explicit identity bindings", async () => {
+      const first = await sync("legacy-one");
+      const linked = await linkProviderIdentityToUser(
+        providerInput("legacy-two"),
+        {
+          userId: first.userId,
+          existingIdentityId: first.identityId!,
+          evidenceReference: "synthetic-reviewed-link",
+        }
       );
+      const alias1 = await externalUserIdFromSub(subject("legacy-one"));
+      const alias2 = await externalUserIdFromSub(subject("legacy-two"));
+      const [oldAccount] = await db
+        .select()
+        .from(schema.externalAccounts)
+        .where(
+          eq(schema.externalAccounts.externalUserId, first.externalUserId)
+        );
+      await db
+        .update(schema.externalAccounts)
+        .set({ externalUserId: alias1 })
+        .where(eq(schema.externalAccounts.id, oldAccount.id));
+      await db
+        .update(schema.authIdentities)
+        .set({ externalUserId: alias1 })
+        .where(eq(schema.authIdentities.id, first.identityId!));
+      await db
+        .delete(schema.identityExternalAccounts)
+        .where(
+          eq(schema.identityExternalAccounts.identityId, linked.identityId)
+        );
+      const [secondAccount] = await db
+        .insert(schema.externalAccounts)
+        .values({
+          userId: first.userId,
+          ...scope,
+          externalUserId: alias2,
+          source: "synthetic_legacy_backfill",
+        })
+        .returning();
+      await db
+        .insert(schema.identityExternalAccounts)
+        .values({
+          identityId: linked.identityId,
+          externalAccountId: secondAccount.id,
+        });
+      await db
+        .update(schema.authIdentities)
+        .set({ externalUserId: alias2 })
+        .where(eq(schema.authIdentities.id, linked.identityId));
+      expect((await sync("legacy-one")).externalUserId).toBe(alias1);
+      expect((await sync("legacy-two")).externalUserId).toBe(alias2);
+      await expect(
+        resolveExternalAccount({ ...scope, userId: first.userId })
+      ).rejects.toMatchObject({ code: "external_account_ambiguous" });
+      expect(
+        (await findExternalAccountOwner({ ...scope, externalUserId: alias2 }))
+          ?.userId
+      ).toBe(first.userId);
+      expect(
+        await findExternalAccountOwner({
+          ...scope,
+          appId: "foreign-app",
+          externalUserId: alias2,
+        })
+      ).toBeNull();
+    });
+
+    it("explicit alternate-provider linking preserves user and external account", async () => {
+      const first = await sync("portable");
+      const alternate = {
+        ...providerInput("portable-new"),
+        authority: "test-alternate",
+        issuer: "https://alternate.example.invalid",
+        email: email("portable"),
+      };
+      const linked = await linkProviderIdentityToUser(alternate, {
+        userId: first.userId,
+        existingIdentityId: first.identityId!,
+        evidenceReference: "synthetic-migration-proof",
+      });
+      expect(linked.userId).toBe(first.userId);
+      expect(linked.conflicts).toEqual([]);
+      const account = await resolveExternalAccount({
+        ...scope,
+        userId: linked.userId,
+        identityId: linked.identityId,
+      });
+      expect(account.externalUserId).toBe(first.externalUserId);
+      expect((await resolveProviderIdentity(alternate)).userId).toBe(
+        first.userId
+      );
+      await expect(
+        linkProviderIdentityToUser(
+          { ...alternate, subject: subject("bad-proof") },
+          {
+            userId: randomUUID(),
+            existingIdentityId: first.identityId!,
+            evidenceReference: "invalid-owner",
+          }
+        )
+      ).rejects.toMatchObject({ code: "identity_link_conflict" });
+    });
+
+    it("rejects unresolved legacy issuer and never allocates a replacement alias", async () => {
+      const first = await sync("unresolved");
+      await db
+        .update(schema.authIdentities)
+        .set({ issuer: null })
+        .where(eq(schema.authIdentities.id, first.identityId!));
+      await expect(
+        resolveProviderIdentity(providerInput("unresolved"))
+      ).rejects.toMatchObject({ code: "identity_legacy_issuer_unresolved" });
+      await db
+        .update(schema.authIdentities)
+        .set({
+          issuer: "https://auth.example.invalid",
+          externalUserId: "eu_unresolved_legacy",
+        })
+        .where(eq(schema.authIdentities.id, first.identityId!));
+      await expect(
+        resolveExternalAccount({
+          ...scope,
+          userId: first.userId,
+          identityId: first.identityId!,
+        })
+      ).rejects.toMatchObject({ code: "external_account_legacy_unresolved" });
+      const accounts = await db
+        .select()
+        .from(schema.externalAccounts)
+        .where(eq(schema.externalAccounts.userId, first.userId));
+      expect(accounts).toHaveLength(1);
+      expect(accounts[0].externalUserId).toBe(first.externalUserId);
     });
 
     it("preserves waitlist membership when its canonical user is deleted", async () => {
       const entry = await signup("deleted");
       const result = await sync("deleted");
+      await db
+        .delete(schema.identityExternalAccounts)
+        .where(
+          eq(schema.identityExternalAccounts.identityId, result.identityId!)
+        );
+      await db
+        .delete(schema.externalAccounts)
+        .where(eq(schema.externalAccounts.userId, result.userId));
       await db.delete(schema.users).where(eq(schema.users.id, result.userId));
       const [retained] = await db
         .select()

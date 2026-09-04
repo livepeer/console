@@ -16,7 +16,7 @@ describe("canonical user policy", () => {
     );
   });
 
-  it("reuses an identity before a verified-email owner", () => {
+  it("uses an existing identity but never an email match alone", () => {
     expect(
       chooseCanonicalUserId({
         identityUserId: "identity-user",
@@ -24,7 +24,7 @@ describe("canonical user policy", () => {
       })
     ).toBe("identity-user");
     expect(chooseCanonicalUserId({ verifiedEmailUserId: "email-user" })).toBe(
-      "email-user"
+      null
     );
     expect(chooseCanonicalUserId({})).toBeNull();
   });
