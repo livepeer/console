@@ -8,10 +8,16 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const identity = await getAuthenticatedIdentity();
-    if (!identity) return Response.json({ error: "unauthorized" }, { status: 401 });
+    if (!identity)
+      return Response.json({ error: "unauthorized" }, { status: 401 });
     const canonical = await resolveProviderIdentity(identity);
     await enrollAuthenticatedUser(identity, canonical);
     const decision = await getAccessDecision(canonical.userId);
-    return Response.json(decision, { status: decision.state === "unavailable" ? 503 : 200, headers: { "cache-control": "no-store" } });
-  } catch (error) { return apiError(error); }
+    return Response.json(decision, {
+      status: decision.state === "unavailable" ? 503 : 200,
+      headers: { "cache-control": "no-store" },
+    });
+  } catch (error) {
+    return apiError(error);
+  }
 }

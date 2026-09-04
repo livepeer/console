@@ -8,7 +8,7 @@ export async function getAdminSession() {
   try {
     const rawToken = (await cookies()).get(SESSION_COOKIE)?.value;
     const current = await getSignupForSession(rawToken);
-    return current && await getAdminPrincipal() ? current : null;
+    return current && (await getAdminPrincipal()) ? current : null;
   } catch (error) {
     console.error("waitlist_admin_session_lookup_failed", {
       errorType: error instanceof Error ? error.name : "unknown",
