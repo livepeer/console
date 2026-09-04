@@ -63,10 +63,22 @@ export function getEnv(
 ): AppEnv {
   if (source === process.env && cachedEnv) return cachedEnv;
 
+  // Preview capture cannot contact a real email provider. Supply inert values
+  // only in that explicit non-production mode; production remains strict.
+  const validationSource =
+    source.VERCEL_ENV === "preview" && source.EMAIL_DELIVERY_MODE === "capture"
+      ? {
+          ...source,
+          RESEND_API_KEY: "re_preview_capture_not_a_credential",
+          EMAIL_FROM:
+            source.EMAIL_FROM || "Console Preview <preview@example.invalid>",
+        }
+      : source;
+
   const parsed =
     nodeEnv === "production"
-      ? productionEnvSchema.safeParse(source)
-      : developmentEnvSchema.safeParse(source);
+      ? productionEnvSchema.safeParse(validationSource)
+      : developmentEnvSchema.safeParse(validationSource);
 
   if (!parsed.success) {
     const fields = parsed.error.issues

@@ -127,7 +127,8 @@ coordinator and a database marker. Specialists have no remote credentials.
 Preview email/subscription providers default to capture/no external dispatch;
 dedicated preview test emails are retrievable only by administrators. Real
 Resend contact writes require an independently isolated account, not merely a
-segment within the production audience. PymtHouse tests remain RS2-only.
+segment within the production audience. Credentialed PymtHouse preview tests use
+only the explicitly verified staging issuer/app scope (amendment 2 below).
 
 Grandfather dry-run sources are the production PymtHouse app user inventory plus
 trusted app-specific identity evidence, with explicit cutoff and checksums. Do
@@ -140,3 +141,13 @@ records are reported as production blockers, not guessed into the manifest.
 `ConsoleSessionProfile`. The browser consumes its persisted external account ID;
 it must not hash an Auth0 subject. Provider display labels are presentation only.
 The endpoint uses the same 401/403/503 authorization semantics as protected APIs.
+
+## Contract amendment 2 — verified preview PymtHouse scope
+
+Read-only Vercel environment export verified production is
+`https://pymthouse.com/api/v1/oidc` / `app_98575870d7ae33589a3f0660`, whereas preview
+is `https://staging.pymthouse.com/api/v1/oidc` / `app_088f2082a8f1161d60179431`.
+The previous nonproduction RS2 guard hardcoded the production app and is not an
+acceptable preview safety boundary. Preview minting must enforce the staging
+issuer and app together; never change preview credentials to production to satisfy
+the obsolete guard. Existing production identifiers and token formats stay intact.

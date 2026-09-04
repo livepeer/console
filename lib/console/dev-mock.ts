@@ -225,7 +225,8 @@ function buildUsage(
 }
 
 function devRedirect(path: string | null, requestUrl: string): Response {
-  const safePath = path?.startsWith("/") && !path.startsWith("//") ? path : "/home";
+  const safePath =
+    path?.startsWith("/") && !path.startsWith("//") ? path : "/home";
   const baseUrl = process.env.APP_BASE_URL || requestUrl;
 
   return new Response(null, {
@@ -275,7 +276,10 @@ function buildWallet() {
         },
         // builder-sdk 0.6.x omits this from BillingState; the API sends it.
         includedUsage: {
-          total: { usdMicros: usd(INCLUDED_TOTAL_USD), usd: INCLUDED_TOTAL_USD.toFixed(2) },
+          total: {
+            usdMicros: usd(INCLUDED_TOTAL_USD),
+            usd: INCLUDED_TOTAL_USD.toFixed(2),
+          },
           remaining: { usdMicros: usd(remaining), usd: remaining.toFixed(2) },
           consumed: { usdMicros: usd(consumed), usd: consumed.toFixed(2) },
           resetsAt: resetsAt.toISOString(),
@@ -464,6 +468,15 @@ export function devMockResponse(
   search: URLSearchParams,
   requestUrl: string
 ): Response | null {
+  if (pathname === "/api/console/session") {
+    return json({
+      userId: "00000000-0000-4000-8000-000000000001",
+      externalUserId: "eu_devmock",
+      name: "Design Preview",
+      email: MOCK_EMAIL,
+      provider: "google",
+    });
+  }
   // Auth0's client `useUser()` reads this; a body here makes the app "signed in".
   if (pathname === "/auth/profile") {
     return json({

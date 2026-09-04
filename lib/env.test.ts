@@ -13,6 +13,24 @@ const validProductionEnv = {
 };
 
 describe("server environment validation", () => {
+  it("allows inert email config only in explicitly capture-only previews", () => {
+    const source = {
+      ...validProductionEnv,
+      RESEND_API_KEY: undefined,
+      EMAIL_FROM: undefined,
+      VERCEL_ENV: "preview",
+      EMAIL_DELIVERY_MODE: "capture",
+    };
+    expect(getEnv(source, "production").RESEND_API_KEY).toBe(
+      "re_preview_capture_not_a_credential"
+    );
+    expect(() =>
+      getEnv({ ...source, VERCEL_ENV: "production" }, "production")
+    ).toThrow("RESEND_API_KEY");
+    expect(() =>
+      getEnv({ ...source, EMAIL_DELIVERY_MODE: undefined }, "production")
+    ).toThrow("RESEND_API_KEY");
+  });
   it("allows identity database access without email configuration", () => {
     expect(
       getDatabaseUrl({

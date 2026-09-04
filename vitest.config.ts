@@ -28,6 +28,7 @@ export default defineConfig({
       "lib/subscriptions/**/*.test.ts",
       "lib/platform/**/*.test.ts",
       "tests/contracts/**/*.test.ts",
+      "tests/contracts/**/*.test.tsx",
       "tests/support/**/*.test.ts",
       "tests/integration/**/*.test.ts",
       "lib/waitlist/**/*.test.ts",
