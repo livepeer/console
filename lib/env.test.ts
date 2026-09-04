@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getDatabaseUrl, getEnv } from "./env";
 
 const validProductionEnv = {
-  NODE_ENV: "production",
+  NODE_ENV: "production" as const,
   DATABASE_URL: "postgresql://user:password@db.example.com/waitlist",
   ATTRIBUTION_HASH_SECRET: "a".repeat(32),
   NEXT_PUBLIC_SITE_URL: "https://waitlist.example.com",
