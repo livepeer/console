@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
   const target = new URL(pending.redirectUri);
   target.searchParams.set("code", code);
   target.searchParams.set("state", pending.clientState);
+  target.searchParams.set("iss", pending.issuer);
   const response = NextResponse.redirect(target.toString(), 302);
   response.cookies.set(PKCE_COOKIE, "", { ...pkceCookieOptions(), maxAge: 0 });
   return response;

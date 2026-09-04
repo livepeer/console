@@ -1,8 +1,8 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { buildRawMcpServer } from "./mcp-server";
 import { extractBearer, verifyMcpUserJwt } from "./jwt";
-import { corsHeaders, wwwAuthenticate } from "./oauth";
-import { mcpPublicOrigin, mcpResourceUrl } from "./env";
+import { corsHeaders, mcpIdentityBody, wwwAuthenticate } from "./oauth";
+import { mcpPublicOrigin } from "./env";
 import { clientClassFromHeaders, hashPrincipal, logToolCall } from "./log";
 import { AccessError } from "@/lib/access/service";
 import { requireApprovedMcpAccount } from "./access";
@@ -30,20 +30,7 @@ export function optionsResponse(req: Request): Response {
 }
 
 export function identityResponse(req: Request): Response {
-  const origin = mcpPublicOrigin(req);
-  return Response.json(
-    {
-      name: "Livepeer Agent MCP",
-      profile: "raw",
-      statement:
-        "Deterministic passthrough: name a capability, pass its exact inputs, get exactly that capability.",
-      transport: "streamable-http",
-      mcp_url: mcpResourceUrl(req),
-      authorization_servers: [origin],
-      docs: `${origin}/`,
-    },
-    { headers: corsHeaders(req) }
-  );
+  return Response.json(mcpIdentityBody(req), { headers: corsHeaders(req) });
 }
 
 function unauthorized(req: Request, rpcId: unknown): Response {
