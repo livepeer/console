@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
 import { parseAuthCode, parseClientId, verifyPkceS256 } from "@/lib/mcp/as";
-import { mintMcpUserTokens, BillingAppMismatchError } from "@/lib/console/mcp-internal-mint";
+import {
+  mintMcpUserTokens,
+  BillingAppMismatchError,
+} from "@/lib/console/mcp-internal-mint";
 import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
+import { AccessError } from "@/lib/access/service";
+import { requireApprovedMcpAccount } from "@/lib/mcp/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +15,7 @@ export const dynamic = "force-dynamic";
 function json(req: Request, status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, {
     status,
-    headers: { ...corsHeaders(req), "Cache-Control": "no-store" }
+    headers: { ...corsHeaders(req), "Cache-Control": "no-store" },
   });
 }
 
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
   if (!isAllowedMcpResource(req, params.get("resource"))) {
     return json(req, 400, {
       error: "invalid_target",
-      error_description: "resource does not match this MCP"
+      error_description: "resource does not match this MCP",
     });
   }
 
@@ -53,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (!refreshToken) {
       return json(req, 400, {
         error: "invalid_request",
-        error_description: "refresh_token required"
+        error_description: "refresh_token required",
       });
     }
     const eu = redeemMcpRefreshToken(refreshToken);
@@ -61,19 +66,26 @@ export async function POST(req: NextRequest) {
       return json(req, 400, { error: "invalid_grant" });
     }
     try {
+      await requireApprovedMcpAccount(eu);
       const minted = await mintMcpUserTokens({ externalUserId: eu });
       return json(req, 200, {
         access_token: minted.access_token,
         refresh_token: minted.refresh_token,
         token_type: minted.token_type ?? "Bearer",
         expires_in: minted.expires_in,
-        ...(minted.scope ? { scope: minted.scope } : {})
+        ...(minted.scope ? { scope: minted.scope } : {}),
       });
     } catch (error) {
+      if (error instanceof AccessError) {
+        return json(req, error.status, {
+          error: error.code,
+          error_description: error.message,
+        });
+      }
       if (error instanceof BillingAppMismatchError) {
         return json(req, 503, {
           error: error.code,
-          error_description: error.message
+          error_description: error.message,
         });
       }
       return json(req, 400, { error: "invalid_grant" });
@@ -114,22 +126,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await requireApprovedMcpAccount(grant.externalUserId);
     const minted = await mintMcpUserTokens({
       externalUserId: grant.externalUserId,
-      email: grant.email
+      email: grant.email,
     });
     return json(req, 200, {
       access_token: minted.access_token,
       refresh_token: minted.refresh_token,
       token_type: minted.token_type ?? "Bearer",
       expires_in: minted.expires_in,
-      ...(minted.scope ? { scope: minted.scope } : {})
+      ...(minted.scope ? { scope: minted.scope } : {}),
     });
   } catch (error) {
+    if (error instanceof AccessError) {
+      return json(req, error.status, {
+        error: error.code,
+        error_description: error.message,
+      });
+    }
     if (error instanceof BillingAppMismatchError) {
       return json(req, 503, {
         error: error.code,
-        error_description: error.message
+        error_description: error.message,
       });
     }
     return json(req, 400, { error: "invalid_grant" });

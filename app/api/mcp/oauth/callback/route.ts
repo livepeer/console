@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { auth0 } from "@/lib/auth0";
-import { externalUserIdFromSub } from "@/lib/console/external-user-id";
-import { syncCanonicalUserBestEffort } from "@/lib/identity/canonical-user";
+import {
+  requireConsoleSession,
+  SessionRequiredError,
+} from "@/lib/console/session-user";
+import { AccessError } from "@/lib/access/service";
 import {
   issueAuthCode,
   parsePending,
@@ -23,31 +25,38 @@ export async function GET(req: NextRequest) {
     return clear;
   }
 
-  const session = await auth0.getSession();
-  const sub = session?.user?.sub?.trim();
-  if (!session || !sub) {
-    const login = new URL("/auth/login", origin);
-    login.searchParams.set("returnTo", "/api/mcp/oauth/callback");
-    return NextResponse.redirect(login);
+  let session;
+  try {
+    session = await requireConsoleSession();
+  } catch (error) {
+    if (error instanceof SessionRequiredError) {
+      const login = new URL("/auth/login", origin);
+      login.searchParams.set("returnTo", "/api/mcp/oauth/callback");
+      return NextResponse.redirect(login);
+    }
+    const failure =
+      error instanceof AccessError ? error : new AccessError("unavailable");
+    const response = NextResponse.json(
+      { error: failure.code },
+      {
+        status: failure.status,
+        headers: { "Cache-Control": "no-store" },
+      }
+    );
+    response.cookies.set(PKCE_COOKIE, "", {
+      ...pkceCookieOptions(),
+      maxAge: 0,
+    });
+    return response;
   }
-
-  const externalUserId = await externalUserIdFromSub(sub);
-  const email = session.user.email?.trim();
-  // MCP starts Auth0 directly, bypassing the UI login's reconciliation return.
-  // This must never gate the existing external-ID authorization-code flow.
-  await syncCanonicalUserBestEffort({
-    sub,
-    email: email || undefined,
-    emailVerified: session.user.email_verified === true,
-  });
   let code: string;
   try {
     code = issueAuthCode({
       redirectUri: pending.redirectUri,
       codeChallenge: pending.codeChallenge,
       clientId: pending.clientId,
-      externalUserId,
-      email: email || undefined,
+      externalUserId: session.externalUserId,
+      email: session.email,
     });
   } catch {
     return clear;
