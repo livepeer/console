@@ -1,0 +1,8 @@
+{
+  "logo_url": "https://livepeer-console.vercel.app/icon.svg",
+  "favicon_url": "https://livepeer-console.vercel.app/icon.svg",
+  "colors": {
+    "primary": "#111111",
+    "page_background": "#FFFFFF"
+  }
+}

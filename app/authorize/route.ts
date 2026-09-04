@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     return json(req, 503, { error: "temporarily_unavailable" });
   }
 
-  const login = consoleLoginUrl(req, nonce);
+  const login = consoleLoginUrl(req);
   const response = NextResponse.redirect(login, 302);
   response.cookies.set(PKCE_COOKIE, pending, pkceCookieOptions());
   for (const [k, v] of Object.entries(corsHeaders(req))) {

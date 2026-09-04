@@ -1,6 +1,7 @@
 import { auth0 } from "@/lib/auth0";
 import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import SectionHeader from "@/components/console/SectionHeader";
+import { consoleSignInHref } from "@/lib/console/auth-login";
 import { isEmailAllowlisted } from "@/lib/console/email-allowlist";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function WaitlistPage() {
           <p className="font-mono text-xs text-fg-muted">{email}</p>
         ) : (
           <p className="text-sm text-fg-muted">
-            <a className="text-green-bright underline" href="/login">
+            <a className="text-green-bright underline" href={consoleSignInHref({ returnTo: "/waitlist" })}>
               Sign in
             </a>{" "}
             to join the waitlist with your account email.

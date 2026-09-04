@@ -32,7 +32,7 @@ app/
 │   ├── home, calls, usage, keys, settings          # auth-gated
 │   ├── device, waitlist                            # device-approval + early-access
 │   └── error.tsx
-├── (auth)/                 # /login, /signup — no sidebar
+├── (auth)/                 # /login, /signup — branded pages; hand off to Auth0; no sidebar
 ├── api/
 │   ├── pymthouse/          # BFF: account-usage, keys, plans, subscribe, wallet, invoices
 │   ├── mcp/                # Streamable HTTP MCP resource server

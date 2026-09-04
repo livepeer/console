@@ -1,9 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/console/AuthContext";
+import {
+  AUTH_SIGNIN_HREF,
+  AUTH_SIGNUP_HREF,
+  isConsoleAuthPath,
+} from "@/lib/console/auth-login";
 import ScopeChip, { type PageScope } from "@/components/console/ScopeChip";
 
 interface ConsolePageHeaderProps {
@@ -34,8 +38,8 @@ interface ConsolePageHeaderProps {
  * and right-aligned actions. Information density comes from the content; this
  * bar is pure chrome and stays out of the way.
  *
- * When the user is signed out (and not already on the `/login`
- * auth route), a `Sign in` / `Sign up` pair is appended to the right
+ * When the user is signed out (and not already on /login or /signup),
+ * a `Sign in` / `Sign up` pair is appended to the right
  * actions cluster — mirrors the design prototype's `PageHead` injection
  * (`auth.authed === false && !auth.isAuthRoute`). A faint divider sits
  * between the page's own actions and the auth CTAs when both exist.
@@ -49,8 +53,7 @@ export default function ConsolePageHeader({
 }: ConsolePageHeaderProps) {
   const { isConnected, isLoading } = useAuth();
   const pathname = usePathname() ?? "";
-  const isAuthRoute =
-    pathname.startsWith("/login") || pathname.startsWith("/signup");
+  const isAuthRoute = isConsoleAuthPath(pathname);
   // Hide auth CTAs while auth state is still resolving (one frame on first
   // paint) to avoid flashing them in for connected users.
   const showAuthCTAs = !isLoading && !isConnected && !isAuthRoute;
@@ -84,18 +87,18 @@ export default function ConsolePageHeader({
           )}
           {showAuthCTAs && (
             <>
-              <Link
-                href="/login"
+              <a
+                href={AUTH_SIGNIN_HREF}
                 className="inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] text-fg-strong transition-colors hover:bg-hover hover:text-fg"
               >
                 Sign in
-              </Link>
-              <Link
-                href="/signup"
+              </a>
+              <a
+                href={AUTH_SIGNUP_HREF}
                 className="btn-primary inline-flex h-[26px] items-center rounded-[4px] px-2.5 text-[12.5px] font-medium transition-colors"
               >
                 Sign up
-              </Link>
+              </a>
             </>
           )}
         </div>

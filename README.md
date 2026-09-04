@@ -69,7 +69,7 @@ lib/
 | `/apps/[id]`   | public   | App detail + playground                       |
 | `/orgs/[slug]` | public   | Organization's published apps                 |
 | `/network`     | public   | Network stats (sidebar: "Stats")              |
-| `/login`       | public   | Sign in                                       |
-| `/signup`      | public   | Sign up                                       |
+| `/login`       | public   | Sign in (hands off to Auth0)                  |
+| `/signup`      | public   | Sign up (hands off to Auth0)                  |
 
 See `CLAUDE.md` for console conventions (KPI rows, tables, motion tokens, color rules).

@@ -13,7 +13,7 @@ export default function ConsoleAuthLayout({
 }) {
   return (
     <AuthProvider>
-      <div className="min-h-screen overflow-x-clip overscroll-none bg-dark font-sans">
+      <div className="min-h-screen overflow-x-clip overscroll-none bg-background font-sans">
         {children}
       </div>
     </AuthProvider>
