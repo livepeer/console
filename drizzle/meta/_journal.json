@@ -50,6 +50,13 @@
       "when": 1788559405884,
       "tag": "0006_auth_identity_provider_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788564017686,
+      "tag": "0007_early_access_domains",
+      "breakpoints": true
     }
   ]
 }
