@@ -104,3 +104,30 @@ canonical userId. Specialists may not add alternate authorization policy.
   live staging issuer or protected preview evidence.
 - Read-only staging discovery/JWKS:200, advertised issuer matches staging,
   one RS256 key. Actual user-token claim compatibility remains preview verification.
+
+## Reviewed code checkpoint and preview publication
+
+Code checkpoint: `48b45dda5dab9d0c417933b00b2c0859d7adb969`.
+Independent security reviewer closed SEC-01, SEC-03 and migration P1/P2; no
+unresolved high/critical finding in reviewed code. SEC-02 medium remains pending
+user compatibility disposition. Independent UI/MCP reviewer closed QA01–QA04 at
+`bd8572b` (later change is migration tooling only); 77 focused +85 Console tests.
+The latter reviewer authored migrations, so provided **no data self-signoff**;
+security reviewer independently reviewed the data fixes.
+
+Integrated evidence:220 unit tests and typecheck pass;85 Console/MCP tests pass;
+lint and production build pass (known Auth0 bundler warnings). Credentialed tests:
+identity16/16, access/enrollment/bulk/consent10/10, waitlist routes3/3. Migration
+regressions rerun separately after each author fix. Shared DB tests run serially;
+the waitlist guard rejects outstanding outbox work, not completed synthetic history.
+
+Remote stack: `codex/early-access-integration` remains at PR46's `44aa3a9`;
+`codex/early-access-foundation` is the feature/review head targeting that separate
+integration base. PR46 remains open and unchanged. Local specialist commits are
+preserved in feature history. GitHub-signed publication head is required before
+Vercel preview execution; verification policy is not weakened.
+
+New runtime preview uses isolated `br-holy-sound-auugm104`, migrations through0008,
+restricted runtime role, independent preview-only secrets, captured email, explicit
+staging PymtHouse scope and its own MCP origin. Configuration is branch-scoped.
+Preview acceptance and live token compatibility are **not yet claimed**.
