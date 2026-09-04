@@ -83,21 +83,39 @@ test("client_id is optional but must match the authorize request", () => {
   assert.equal(!swapped.ok && swapped.error, "invalid_client");
 });
 
-test("redirect_uri must be byte-identical to the authorize request", () => {
+test("loopback redirect_uri may vary by host and port", () => {
   const issued = code({
     clientId: CODEX_CLIENT_ID,
     redirectUri: "http://127.0.0.1:48004/callback",
   });
   for (const redirectUri of [
-    "http://127.0.0.1:48004/callback/",
     "http://127.0.0.1/callback",
-    "http://127.0.0.1:59999/callback",
     "http://localhost:48004/callback",
+    "http://127.0.0.1:59999/callback",
   ]) {
     const result = redeem({
       code: issued,
       redirectUri,
       clientId: CODEX_CLIENT_ID,
+    });
+    assert.equal(result.ok, true, `${redirectUri} should redeem`);
+  }
+});
+
+test("non-loopback redirect_uri still requires exact match", () => {
+  const issued = code({
+    clientId: CLAUDE_CLIENT_ID,
+    redirectUri: "https://claude.ai/api/mcp/auth_callback",
+  });
+  for (const redirectUri of [
+    "https://claude.ai/api/mcp/auth_callback/",
+    "https://claude.com/api/mcp/auth_callback",
+    "https://claude.ai/api/mcp/auth_callback?x=1",
+  ]) {
+    const result = redeem({
+      code: issued,
+      redirectUri,
+      clientId: CLAUDE_CLIENT_ID,
     });
     assert.equal(result.ok, false, `${redirectUri} must not redeem`);
     assert.equal(!result.ok && result.error, "invalid_grant");

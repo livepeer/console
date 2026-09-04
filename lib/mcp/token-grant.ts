@@ -1,5 +1,6 @@
 import { parseAuthCode, verifyPkceS256, type AuthCodeGrant } from "./as";
 import { isKnownClientId } from "./cimd";
+import { redirectUrisMatch } from "./dcr";
 
 export type AuthorizationCodeGrant = AuthCodeGrant & { externalUserId: string };
 
@@ -21,13 +22,7 @@ function fail(error: TokenGrantError, reason: string): TokenGrantResult {
   return { ok: false, error, reason };
 }
 
-/**
- * Validates an `authorization_code` redemption. `redirect_uri` is compared
- * byte-for-byte against the authorize request per RFC 6749 §4.1.3 — the
- * loopback/port normalization in `dcr.ts` applies to *registration* matching
- * only, and every client we support (Claude, Codex, Hermes) replays the exact
- * URI it authorized with.
- */
+/** Validates an `authorization_code` redemption for public MCP clients. */
 export function validateAuthorizationCodeGrant(input: {
   code: string;
   redirectUri: string;
@@ -45,7 +40,7 @@ export function validateAuthorizationCodeGrant(input: {
   if (!grant) {
     return fail("invalid_grant", "authorization code is unknown or expired");
   }
-  if (grant.redirectUri !== input.redirectUri) {
+  if (!redirectUrisMatch(grant.redirectUri, input.redirectUri)) {
     return fail(
       "invalid_grant",
       "redirect_uri differs from the authorize request"
