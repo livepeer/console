@@ -6,7 +6,7 @@ Paste **only** this URL. Do not add headers, API keys, or a Vercel bypass query 
 https://<APP_BASE_URL>/api/mcp
 ```
 
-The server is Streamable HTTP. OAuth is CIMD + DCR + PKCE on this origin. Browser login is Console Auth0. Access tokens are PymtHouse user JWTs (`sign:job`); refresh is Console-wrapped (`mcp_rt_*`). Codex and ChatGPT prefer CIMD when the AS advertises `client_id_metadata_document_supported`.
+The server is Streamable HTTP. OAuth is CIMD + DCR + PKCE on this origin. Browser login is Console Auth0. Access tokens are PymtHouse user JWTs (`sign:job`); refresh is Console-wrapped (`mcp_rt_*`). Codex, ChatGPT, and Hermes prefer CIMD when the AS advertises `client_id_metadata_document_supported`.
 
 ## Claude
 
@@ -65,7 +65,7 @@ hermes mcp add livepeer --url https://<APP_BASE_URL>/api/mcp --auth oauth
 hermes mcp login livepeer
 ```
 
-Hermes opens a browser and waits on a loopback callback. If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path — the Console AS accepts RFC 8252 loopback, Claude and Cursor callbacks, and ChatGPT / Codex CIMD callbacks.
+Hermes identifies itself with a GitHub Pages CIMD document (`https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json`) and a loopback callback (`http://127.0.0.1:<port>/callback`). If Hermes is a remote gateway, use its documented paste-back / desktop-relay OAuth path.
 
 ## After login
 

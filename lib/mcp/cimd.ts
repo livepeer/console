@@ -1,7 +1,9 @@
 import { parseClientId } from "./as";
 import { normalizeRedirectUris } from "./dcr";
 
-const CIMD_HOST = "chatgpt.com";
+const CHATGPT_CIMD_HOST = "chatgpt.com";
+const HERMES_CIMD_HOST = "nousresearch.github.io";
+const HERMES_CIMD_PATH = "/hermes-agent/docs/oauth/client-metadata.json";
 const CIMD_TIMEOUT_MS = 3000;
 const CIMD_MAX_BYTES = 16_384;
 const CIMD_CACHE_TTL_MS = 60_000;
@@ -30,10 +32,11 @@ export function clearCimdCache(): void {
 }
 
 /**
- * Codex / ChatGPT CIMD documents live on chatgpt.com:
+ * CIMD documents we fetch:
  *   https://chatgpt.com/oauth/codex/client.json
  *   https://chatgpt.com/oauth/codex/<callback_id>/client.json
  *   https://chatgpt.com/oauth/<callback_id>/client.json
+ *   https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json
  */
 export function isAllowedCimdClientId(clientId: string): boolean {
   let parsed: URL;
@@ -44,10 +47,13 @@ export function isAllowedCimdClientId(clientId: string): boolean {
   }
   if (parsed.protocol !== "https:") return false;
   if (parsed.username || parsed.password) return false;
-  if (parsed.hostname !== CIMD_HOST) return false;
   if (parsed.port) return false;
   if (parsed.search || parsed.hash) return false;
   if (parsed.href !== clientId) return false;
+  if (parsed.hostname === HERMES_CIMD_HOST) {
+    return parsed.pathname === HERMES_CIMD_PATH;
+  }
+  if (parsed.hostname !== CHATGPT_CIMD_HOST) return false;
   const parts = parsed.pathname.split("/").filter(Boolean);
   if (parts.length < 3 || parts.length > 4) return false;
   if (parts[0] !== "oauth") return false;
@@ -70,10 +76,7 @@ function supportsPublicClient(doc: Record<string, unknown>): boolean {
   return single === "none";
 }
 
-function parseCimdDocument(
-  clientId: string,
-  raw: unknown
-): OAuthClient | null {
+function parseCimdDocument(clientId: string, raw: unknown): OAuthClient | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const doc = raw as Record<string, unknown>;
   if (doc.client_id !== clientId) return null;
@@ -128,7 +131,7 @@ function cacheClient(clientId: string, client: OAuthClient): void {
   }
   cache.set(clientId, {
     exp: Date.now() + CIMD_CACHE_TTL_MS,
-    client
+    client,
   });
 }
 
@@ -142,7 +145,7 @@ async function fetchCimdClient(
       method: "GET",
       redirect: "error",
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(CIMD_TIMEOUT_MS)
+      signal: AbortSignal.timeout(CIMD_TIMEOUT_MS),
     });
   } catch {
     return { ok: false, error: "temporarily_unavailable" };

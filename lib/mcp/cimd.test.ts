@@ -6,7 +6,7 @@ import {
   isAllowedCimdClientId,
   isKnownClientId,
   resolveCimdClient,
-  resolveOAuthClient
+  resolveOAuthClient,
 } from "./cimd";
 import { issueClientId } from "./as";
 
@@ -15,11 +15,25 @@ process.env.MCP_AS_SECRET = "test-as-secret";
 const CODEX_CIMD = "https://chatgpt.com/oauth/codex/BKj9umzr4ef_/client.json";
 const CODEX_STABLE = "https://chatgpt.com/oauth/codex/client.json";
 const CHATGPT_CIMD = "https://chatgpt.com/oauth/BKj9umzr4ef_/client.json";
+const HERMES_CIMD =
+  "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json";
+const HERMES_REDIRECTS = [
+  "http://127.0.0.1:27890/callback",
+  "http://localhost:27890/callback",
+  "http://127.0.0.1:27891/callback",
+  "http://localhost:27891/callback",
+  "http://127.0.0.1:27892/callback",
+  "http://localhost:27892/callback",
+  "http://127.0.0.1:27893/callback",
+  "http://localhost:27893/callback",
+  "http://127.0.0.1:27894/callback",
+  "http://localhost:27894/callback",
+];
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" }
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -44,13 +58,24 @@ test("Codex and ChatGPT CIMD URLs are allowed", () => {
     false
   );
   assert.equal(
-    isAllowedCimdClientId(
-      "https://user@chatgpt.com/oauth/codex/client.json"
-    ),
+    isAllowedCimdClientId("https://user@chatgpt.com/oauth/codex/client.json"),
     false
   );
   assert.equal(
     isAllowedCimdClientId("https://CHATGPT.com/oauth/codex/client.json"),
+    false
+  );
+  assert.equal(isAllowedCimdClientId(HERMES_CIMD), true);
+  assert.equal(
+    isAllowedCimdClientId(
+      "https://nousresearch.github.io/hermes-agent/docs/oauth/other.json"
+    ),
+    false
+  );
+  assert.equal(
+    isAllowedCimdClientId(
+      "https://evil.github.io/hermes-agent/docs/oauth/client-metadata.json"
+    ),
     false
   );
 });
@@ -61,14 +86,29 @@ test("resolveCimdClient accepts Codex loopback metadata", async () => {
     jsonResponse({
       client_id: CODEX_CIMD,
       redirect_uris: ["http://127.0.0.1/callback/BKj9umzr4ef_"],
-      token_endpoint_auth_methods_supported: ["none", "private_key_jwt"]
+      token_endpoint_auth_methods_supported: ["none", "private_key_jwt"],
     })
   );
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.deepEqual(result.client.redirectUris, [
-      "http://127.0.0.1/callback/BKj9umzr4ef_"
+      "http://127.0.0.1/callback/BKj9umzr4ef_",
     ]);
+  }
+});
+
+test("resolveCimdClient accepts Hermes loopback metadata", async () => {
+  clearCimdCache();
+  const result = await resolveCimdClient(HERMES_CIMD, async () =>
+    jsonResponse({
+      client_id: HERMES_CIMD,
+      redirect_uris: HERMES_REDIRECTS,
+      token_endpoint_auth_method: "none",
+    })
+  );
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.client.redirectUris, HERMES_REDIRECTS);
   }
 });
 
@@ -78,7 +118,7 @@ test("resolveCimdClient accepts ChatGPT connector redirects", async () => {
     jsonResponse({
       client_id: CHATGPT_CIMD,
       redirect_uris: ["https://chatgpt.com/connector/oauth/BKj9umzr4ef_"],
-      token_endpoint_auth_method: "none"
+      token_endpoint_auth_method: "none",
     })
   );
   assert.equal(result.ok, true);
@@ -90,7 +130,7 @@ test("resolveCimdClient refuses private-only clients and evil redirects", async 
     jsonResponse({
       client_id: CODEX_STABLE,
       redirect_uris: ["http://127.0.0.1/callback"],
-      token_endpoint_auth_methods_supported: ["private_key_jwt"]
+      token_endpoint_auth_methods_supported: ["private_key_jwt"],
     })
   );
   assert.deepEqual(jwtOnly, { ok: false, error: "invalid_client" });
@@ -99,7 +139,7 @@ test("resolveCimdClient refuses private-only clients and evil redirects", async 
   const evil = await resolveCimdClient(CODEX_STABLE, async () =>
     jsonResponse({
       client_id: CODEX_STABLE,
-      redirect_uris: ["https://evil.example/callback"]
+      redirect_uris: ["https://evil.example/callback"],
     })
   );
   assert.deepEqual(evil, { ok: false, error: "invalid_client" });
@@ -110,7 +150,7 @@ test("resolveCimdClient refuses client_id mismatches and fetch failures", async 
   const mismatch = await resolveCimdClient(CODEX_STABLE, async () =>
     jsonResponse({
       client_id: "https://chatgpt.com/oauth/other/client.json",
-      redirect_uris: ["http://127.0.0.1/callback"]
+      redirect_uris: ["http://127.0.0.1/callback"],
     })
   );
   assert.deepEqual(mismatch, { ok: false, error: "invalid_client" });
@@ -118,7 +158,7 @@ test("resolveCimdClient refuses client_id mismatches and fetch failures", async 
   clearCimdCache();
   const missing = await resolveCimdClient(CODEX_STABLE, async () =>
     jsonResponse({
-      redirect_uris: ["http://127.0.0.1/callback"]
+      redirect_uris: ["http://127.0.0.1/callback"],
     })
   );
   assert.deepEqual(missing, { ok: false, error: "invalid_client" });
@@ -135,7 +175,7 @@ test("resolveCimdClient refuses client_id mismatches and fetch failures", async 
   );
   assert.deepEqual(serverError, {
     ok: false,
-    error: "temporarily_unavailable"
+    error: "temporarily_unavailable",
   });
 });
 
@@ -147,12 +187,12 @@ test("resolveCimdClient does not cache 4xx responses", async () => {
     if (calls === 1) return jsonResponse({ error: "not ready" }, 404);
     return jsonResponse({
       client_id: CODEX_STABLE,
-      redirect_uris: ["http://127.0.0.1/callback"]
+      redirect_uris: ["http://127.0.0.1/callback"],
     });
   };
   assert.deepEqual(await resolveCimdClient(CODEX_STABLE, fetchImpl), {
     ok: false,
-    error: "invalid_client"
+    error: "invalid_client",
   });
   assert.equal((await resolveCimdClient(CODEX_STABLE, fetchImpl)).ok, true);
   assert.equal(calls, 2);
@@ -167,7 +207,7 @@ test("resolveCimdClient cancels a body once it exceeds the byte limit", async ()
     },
     cancel() {
       cancelled = true;
-    }
+    },
   });
   const result = await resolveCimdClient(
     CODEX_STABLE,
@@ -205,12 +245,15 @@ test("resolveCimdClient bounds concurrent metadata fetches", async () => {
     release(
       jsonResponse({
         client_id: clientId,
-        redirect_uris: [`http://127.0.0.1/callback/id${index}`]
+        redirect_uris: [`http://127.0.0.1/callback/id${index}`],
       })
     );
   });
   const results = await Promise.all(requests);
-  assert.equal(results.every((result) => result.ok), true);
+  assert.equal(
+    results.every((result) => result.ok),
+    true
+  );
 });
 
 test("resolveCimdClient caches a successful document", async () => {
@@ -220,7 +263,7 @@ test("resolveCimdClient caches a successful document", async () => {
     calls += 1;
     return jsonResponse({
       client_id: CODEX_STABLE,
-      redirect_uris: ["http://127.0.0.1/callback"]
+      redirect_uris: ["http://127.0.0.1/callback"],
     });
   };
   await resolveCimdClient(CODEX_STABLE, fetchImpl);
@@ -234,10 +277,11 @@ test("resolveOAuthClient still accepts DCR client ids", async () => {
   assert.equal(resolved.ok, true);
   if (resolved.ok) {
     assert.deepEqual(resolved.client.redirectUris, [
-      "https://claude.ai/api/mcp/auth_callback"
+      "https://claude.ai/api/mcp/auth_callback",
     ]);
   }
   assert.equal(isKnownClientId(id), true);
   assert.equal(isKnownClientId(CODEX_CIMD), true);
+  assert.equal(isKnownClientId(HERMES_CIMD), true);
   assert.equal(isKnownClientId("not-a-client"), false);
 });

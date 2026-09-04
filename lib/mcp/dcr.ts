@@ -58,7 +58,9 @@ export function isAllowedClientRedirectUri(redirectUri: string): boolean {
   // Cursor desktop DCR still registers the custom-scheme callback on some
   // builds. Web / Cursor Agents use the www.cursor.com HTTPS callback.
   if (parsed.protocol === "cursor:") {
-    return host === "anysphere.cursor-mcp" && parsed.pathname === "/oauth/callback";
+    return (
+      host === "anysphere.cursor-mcp" && parsed.pathname === "/oauth/callback"
+    );
   }
   if (parsed.protocol === "https:" && CURSOR_HTTPS_HOSTS.has(host)) {
     return parsed.pathname === "/agents/mcp/oauth/callback";
@@ -77,7 +79,10 @@ export function isAllowedClientRedirectUri(redirectUri: string): boolean {
  * Loopback follows RFC 8252 §7.3 (any port) and treats 127.0.0.1 / localhost
  * / ::1 as the same host so Codex DCR/authorize host swaps still match.
  */
-export function redirectUrisMatch(registered: string, requested: string): boolean {
+export function redirectUrisMatch(
+  registered: string,
+  requested: string
+): boolean {
   if (registered === requested) return true;
   const a = parseRedirectUri(registered);
   const b = parseRedirectUri(requested);
@@ -92,8 +97,16 @@ export function clientAllowsRedirect(
   return redirectUris.some((uri) => redirectUrisMatch(uri, requested));
 }
 
+const MAX_REDIRECT_URIS = 16;
+
 export function normalizeRedirectUris(raw: unknown): string[] | null {
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 8) return null;
+  if (
+    !Array.isArray(raw) ||
+    raw.length === 0 ||
+    raw.length > MAX_REDIRECT_URIS
+  ) {
+    return null;
+  }
   const uris: string[] = [];
   for (const item of raw) {
     if (typeof item !== "string" || item.length > 512) return null;

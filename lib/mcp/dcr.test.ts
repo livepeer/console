@@ -5,7 +5,7 @@ import {
   clientAllowsRedirect,
   isAllowedClientRedirectUri,
   normalizeRedirectUris,
-  redirectUrisMatch
+  redirectUrisMatch,
 } from "./dcr";
 
 test("Claude MCP callbacks are allowed", () => {
@@ -83,7 +83,9 @@ test("ChatGPT connector callbacks are allowed", () => {
     false
   );
   assert.equal(
-    isAllowedClientRedirectUri("https://chatgpt.com.evil.example/connector/oauth/abc"),
+    isAllowedClientRedirectUri(
+      "https://chatgpt.com.evil.example/connector/oauth/abc"
+    ),
     false
   );
 });
@@ -126,12 +128,42 @@ test("loopback registered URI matches Codex port and host swaps", () => {
   );
 });
 
-test("evil redirects are refused", () => {
-  assert.equal(isAllowedClientRedirectUri("https://evil.example/callback"), false);
+test("normalizeRedirectUris accepts Hermes CIMD loopback lists", () => {
+  const uris = [
+    "http://127.0.0.1:27890/callback",
+    "http://localhost:27890/callback",
+    "http://127.0.0.1:27891/callback",
+    "http://localhost:27891/callback",
+    "http://127.0.0.1:27892/callback",
+    "http://localhost:27892/callback",
+    "http://127.0.0.1:27893/callback",
+    "http://localhost:27893/callback",
+    "http://127.0.0.1:27894/callback",
+    "http://localhost:27894/callback",
+  ];
+  assert.deepEqual(normalizeRedirectUris(uris), uris);
   assert.equal(
-    isAllowedClientRedirectUri("https://claude.ai.evil.example/api/mcp/auth_callback"),
+    normalizeRedirectUris(
+      Array.from({ length: 17 }, () => "http://127.0.0.1/cb")
+    ),
+    null
+  );
+});
+
+test("evil redirects are refused", () => {
+  assert.equal(
+    isAllowedClientRedirectUri("https://evil.example/callback"),
     false
   );
-  assert.equal(isAllowedClientRedirectUri("http://192.168.1.4/callback"), false);
+  assert.equal(
+    isAllowedClientRedirectUri(
+      "https://claude.ai.evil.example/api/mcp/auth_callback"
+    ),
+    false
+  );
+  assert.equal(
+    isAllowedClientRedirectUri("http://192.168.1.4/callback"),
+    false
+  );
   assert.equal(normalizeRedirectUris(["https://evil.example/cb"]), null);
 });
