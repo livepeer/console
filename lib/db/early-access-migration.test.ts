@@ -64,12 +64,13 @@ const uniqueColumns = (table: Parameters<typeof getTableConfig>[0]) =>
     );
 
 describe("early-access migration and grandfather planning", () => {
-  it("keeps journal history and adds only0007", () => {
+  it("keeps journal history and appends domain and single-use code migrations", () => {
     const journal = JSON.parse(
       readFileSync(resolve(process.cwd(), "drizzle/meta/_journal.json"), "utf8")
     );
-    expect(journal.entries.at(-1).tag).toBe("0007_early_access_domains");
-    expect(journal.entries).toHaveLength(8);
+    expect(journal.entries.at(-2).tag).toBe("0007_early_access_domains");
+    expect(journal.entries.at(-1).tag).toBe("0008_oauth_code_redemptions");
+    expect(journal.entries).toHaveLength(9);
   });
   it("scopes identities/accounts and permits multiple accounts per user", () => {
     expect(authIdentities.externalUserId.notNull).toBe(false);

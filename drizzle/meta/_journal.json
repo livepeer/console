@@ -57,6 +57,13 @@
       "when": 1788564017686,
       "tag": "0007_early_access_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788565051000,
+      "tag": "0008_oauth_code_redemptions",
+      "breakpoints": true
     }
   ]
 }

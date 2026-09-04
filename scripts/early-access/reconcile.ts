@@ -80,6 +80,7 @@ export async function reconcileManifest(
       const scope = manifest.provenance.scope;
       for (const row of manifest.entries) {
         result.inspected++;
+        await tx`select pg_advisory_xact_lock(hashtextextended(${`identity:${row.authority}:${row.issuer}:${row.subject}`}, 0))`;
         // Identity and scope are authenticated provenance, never matched by email.
         const identities = await tx`
           SELECT i.id, i.user_id, i.issuer, i.external_user_id, u.status
@@ -91,6 +92,8 @@ export async function reconcileManifest(
         if (
           identities.length > 1 ||
           identities[0]?.status === "disabled" ||
+          (identities[0]?.external_user_id != null &&
+            identities[0].external_user_id !== row.externalUserId) ||
           (identities[0]?.issuer === null &&
             identities[0]?.external_user_id !== row.externalUserId)
         ) {
@@ -98,6 +101,25 @@ export async function reconcileManifest(
           continue;
         }
         let identity = identities[0];
+        if (identity) {
+          await tx`select pg_advisory_xact_lock(hashtextextended(${`user:${identity.user_id}`}, 0))`;
+          const bindings = await tx`SELECT a.id, a.user_id, a.external_user_id
+            FROM identity_external_accounts b JOIN external_accounts a ON a.id = b.external_account_id
+            WHERE b.identity_id = ${identity.id} AND a.service = ${scope.service}
+              AND a.issuer = ${scope.issuer} AND a.app_id = ${scope.appId}
+            FOR UPDATE OF b, a`;
+          if (
+            bindings.length > 1 ||
+            bindings.some(
+              (binding) =>
+                binding.user_id !== identity.user_id ||
+                binding.external_user_id !== row.externalUserId
+            )
+          ) {
+            result.blockers++;
+            continue;
+          }
+        }
         if (!identity) {
           const [user] =
             await tx`INSERT INTO users DEFAULT VALUES RETURNING id`;
@@ -148,7 +170,14 @@ export async function reconcileManifest(
             VALUES (${grant.id}, 'grandfather', 'existing_console_user', 'approved', 1)`;
           result.grantsCreated++;
         } else if (!grants[0].user_id) {
-          await tx`UPDATE access_grants SET user_id = ${identity.user_id}, updated_at = now() WHERE id = ${grants[0].id}`;
+          const [activated] = await tx`UPDATE access_grants
+            SET user_id = ${identity.user_id}, activated_at = coalesce(activated_at, now()),
+              version = version + 1, updated_at = now()
+            WHERE id = ${grants[0].id} RETURNING version`;
+          await tx`INSERT INTO access_events
+            (grant_id, action, source, previous_status, next_status, grant_version)
+            VALUES (${grants[0].id}, 'activate', ${`reviewed_grandfather_manifest:${manifest.manifestChecksum}`},
+              'approved', 'approved', ${activated.version})`;
         }
       }
       // Any conflict rolls back the entire reviewed batch, even in apply mode.

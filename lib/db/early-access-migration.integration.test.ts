@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { openIntegrationDatabase } from "@/tests/support/isolated-db";
 import {
   buildGrandfatherManifest,
+  checksum,
   legacyExternalId,
 } from "../../scripts/early-access/manifest";
 import { reconcileManifest } from "../../scripts/early-access/reconcile";
@@ -33,7 +34,7 @@ describe.skipIf(!databaseUrl)(
       await client?.end();
     });
 
-    it("upgrades production0004 through0007, preserving records and enforcing invariants", async () => {
+    it("upgrades production0004 through0008, preserving records and enforcing invariants", async () => {
       const schema = `migration_${randomUUID().replaceAll("-", "")}`;
       const rollback = new Error("rollback_synthetic_migration_schema");
       try {
@@ -74,6 +75,15 @@ describe.skipIf(!databaseUrl)(
             await tx`INSERT INTO auth_identities (user_id, provider, provider_subject, external_user_id)
           VALUES (${user.id}, 'auth0', 'auth0|legacy-fixture', 'eu_original') RETURNING id`;
           await apply(7);
+          await apply(8);
+          await tx`INSERT INTO oauth_code_redemptions (code_hash, expires_at)
+            VALUES ('synthetic-digest-only', now() + interval '1 minute')`;
+          await expect(
+            tx.savepoint(async (sp) => {
+              await sp`INSERT INTO oauth_code_redemptions (code_hash, expires_at)
+              VALUES ('synthetic-digest-only', now() + interval '1 minute')`;
+            })
+          ).rejects.toMatchObject({ code: "23505" });
           expect((await tx`SELECT count(*)::int AS n FROM users`)[0].n).toBe(1);
           expect(
             (await tx`SELECT count(*)::int AS n FROM waitlist_signups`)[0].n
@@ -252,6 +262,197 @@ describe.skipIf(!databaseUrl)(
               await tx`SELECT status FROM access_grants WHERE source = 'existing_console_user'`
             )[0].status
           ).toBe("revoked");
+
+          function manifestForSubjects(subjects: string[]) {
+            return buildGrandfatherManifest({
+              scope: {
+                service: "pymthouse",
+                issuer: "https://billing.example",
+                appId: "app",
+              },
+              auth0Issuer: "https://auth.example",
+              cutoff: "2026-09-04T00:00:00.000Z",
+              inventory: {
+                users: subjects.map((fixtureSubject) => ({
+                  id: `inventory-${fixtureSubject}`,
+                  clientId: "app",
+                  externalUserId: legacyExternalId(fixtureSubject),
+                  email: null,
+                  status: "active",
+                  role: "user",
+                  createdAt: "2026-09-01T00:00:00.000Z",
+                })),
+              },
+              evidence: subjects.map((fixtureSubject) => ({
+                subject: fixtureSubject,
+                issuer: "https://auth.example",
+                source: "console_authentication",
+                occurredAt: "2026-09-02T00:00:00.000Z",
+              })),
+            });
+          }
+          async function scopedIdentity(
+            fixtureSubject: string,
+            alias: string | null
+          ) {
+            const [fixtureUser] =
+              await tx`INSERT INTO users DEFAULT VALUES RETURNING id`;
+            const [fixtureIdentity] = await tx`INSERT INTO auth_identities
+              (user_id, authority, issuer, provider, provider_subject, external_user_id)
+              VALUES (${fixtureUser.id}, 'auth0', 'https://auth.example', 'auth0', ${fixtureSubject}, ${alias})
+              RETURNING id, user_id`;
+            return fixtureIdentity;
+          }
+          async function counts() {
+            return (
+              await tx`SELECT
+              (SELECT count(*)::int FROM users) AS users,
+              (SELECT count(*)::int FROM auth_identities) AS identities,
+              (SELECT count(*)::int FROM external_accounts) AS accounts,
+              (SELECT count(*)::int FROM identity_external_accounts) AS bindings,
+              (SELECT count(*)::int FROM access_grants) AS grants,
+              (SELECT count(*)::int FROM access_events) AS events`
+            )[0];
+          }
+          // P1: aliases remain authoritative even after their issuer was scoped.
+          const conflictingAliasSubject = "auth0|scoped-conflicting-alias";
+          await scopedIdentity(
+            conflictingAliasSubject,
+            "eu_conflicting_scoped_alias"
+          );
+          const conflictingAliasManifest = manifestForSubjects([
+            conflictingAliasSubject,
+          ]);
+          const aliasBefore = await counts();
+          const aliasResult = await reconcileManifest(
+            nested,
+            conflictingAliasManifest,
+            {
+              reviewedChecksum: conflictingAliasManifest.manifestChecksum,
+              apply: true,
+            }
+          );
+          expect(aliasResult).toMatchObject({
+            blockers: 1,
+            accountsCreated: 0,
+            grantsCreated: 0,
+          });
+          expect(await counts()).toEqual(aliasBefore);
+
+          // P1: never add accountA to an identity already bound to accountB,
+          // including corrupted bindings pointing at another canonical user.
+          for (const crossUser of [false, true]) {
+            const fixtureSubject = `auth0|alternative-binding-${crossUser}`;
+            const fixtureIdentity = await scopedIdentity(fixtureSubject, null);
+            const [otherUser] = crossUser
+              ? await tx`INSERT INTO users DEFAULT VALUES RETURNING id`
+              : [{ id: fixtureIdentity.user_id }];
+            const [alternative] = await tx`INSERT INTO external_accounts
+              (user_id, service, issuer, app_id, external_user_id, source)
+              VALUES (${otherUser.id}, 'pymthouse', 'https://billing.example', 'app', ${`eu_alternative_${crossUser}`}, 'fixture') RETURNING id`;
+            await tx`INSERT INTO identity_external_accounts (identity_id, external_account_id)
+              VALUES (${fixtureIdentity.id}, ${alternative.id})`;
+            const fixtureManifest = manifestForSubjects([fixtureSubject]);
+            const before = await counts();
+            const result = await reconcileManifest(nested, fixtureManifest, {
+              reviewedChecksum: fixtureManifest.manifestChecksum,
+              apply: true,
+            });
+            expect(result).toMatchObject({
+              blockers: 1,
+              accountsCreated: 0,
+              grantsCreated: 0,
+            });
+            expect(await counts()).toEqual(before);
+          }
+
+          // A later blocker rolls back earlier valid work, and retries are safe.
+          const newSubject = "auth0|valid-before-later-blocker";
+          const batch = manifestForSubjects([
+            newSubject,
+            conflictingAliasSubject,
+          ]);
+          batch.entries.sort((a) => (a.subject === newSubject ? -1 : 1));
+          batch.manifestChecksum = checksum({
+            provenance: batch.provenance,
+            entries: batch.entries,
+            unresolved: batch.unresolved,
+            excludedAfterCutoff: batch.excludedAfterCutoff,
+          });
+          const batchBefore = await counts();
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const result = await reconcileManifest(nested, batch, {
+              reviewedChecksum: batch.manifestChecksum,
+              apply: true,
+            });
+            expect(result).toMatchObject({
+              blockers: 1,
+              identitiesCreated: 1,
+              accountsCreated: 1,
+              grantsCreated: 1,
+            });
+            expect(await counts()).toEqual(batchBefore);
+          }
+
+          // P2: signup-only approval binding is an audited activation, once.
+          const activationSubject = "auth0|signup-only-activation";
+          const activationIdentity = await scopedIdentity(
+            activationSubject,
+            legacyExternalId(activationSubject)
+          );
+          const [activationSignup] = await tx`INSERT INTO waitlist_signups
+            (email, normalized_email, referral_code, status, user_id, first_touch, last_touch)
+            VALUES ('activation@example.invalid', 'activation@example.invalid', 'fixture-activation', 'confirmed', ${activationIdentity.user_id}, '{}', '{}') RETURNING id`;
+          const [signupGrant] =
+            await tx`INSERT INTO access_grants (signup_id, status, source, approved_at)
+            VALUES (${activationSignup.id}, 'approved', 'admin_promotion', now()) RETURNING id`;
+          await tx`INSERT INTO access_events (grant_id, action, source, next_status, grant_version)
+            VALUES (${signupGrant.id}, 'approve', 'admin_promotion', 'approved', 1)`;
+          const activationManifest = manifestForSubjects([activationSubject]);
+          const activatedResult = await reconcileManifest(
+            nested,
+            activationManifest,
+            {
+              reviewedChecksum: activationManifest.manifestChecksum,
+              apply: true,
+            }
+          );
+          expect(activatedResult).toMatchObject({
+            blockers: 0,
+            grantsCreated: 0,
+          });
+          const [activatedGrant] =
+            await tx`SELECT user_id, version, activated_at, source FROM access_grants WHERE id = ${signupGrant.id}`;
+          expect(activatedGrant).toMatchObject({
+            user_id: activationIdentity.user_id,
+            version: 2,
+            source: "admin_promotion",
+          });
+          expect(activatedGrant.activated_at).toBeInstanceOf(Date);
+          const activationEvents =
+            await tx`SELECT action, source, previous_status, next_status, grant_version FROM access_events WHERE grant_id = ${signupGrant.id} ORDER BY grant_version`;
+          expect(activationEvents).toHaveLength(2);
+          expect(activationEvents[1]).toMatchObject({
+            action: "activate",
+            source: `reviewed_grandfather_manifest:${activationManifest.manifestChecksum}`,
+            previous_status: "approved",
+            next_status: "approved",
+            grant_version: 2,
+          });
+          await reconcileManifest(nested, activationManifest, {
+            reviewedChecksum: activationManifest.manifestChecksum,
+            apply: true,
+          });
+          expect(
+            (
+              await tx`SELECT user_id, version, activated_at, source FROM access_grants WHERE id = ${signupGrant.id}`
+            )[0]
+          ).toEqual(activatedGrant);
+          expect(
+            (
+              await tx`SELECT count(*)::int AS n FROM access_events WHERE grant_id = ${signupGrant.id}`
+            )[0].n
+          ).toBe(2);
           throw rollback;
         });
       } catch (error) {
