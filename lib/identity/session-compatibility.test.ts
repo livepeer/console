@@ -27,6 +27,7 @@ import { resolveProviderIdentity } from "@/lib/identity/provider-user";
 import { requireApprovedUser, AccessError } from "@/lib/access/service";
 import { resolveExternalAccount } from "@/lib/external-accounts/service";
 import { requireConsoleSession } from "@/lib/console/session-user";
+import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
 const identity = {
   authority: "auth0",
   issuer: "https://auth.example.invalid",
@@ -44,6 +45,10 @@ describe("shared server admission", () => {
       accountStatus: "active",
       conflicts: [],
       identityCreated: false,
+    });
+    vi.mocked(enrollAuthenticatedUser).mockResolvedValue({
+      enrolled: true,
+      signupId: "signup",
     });
     vi.mocked(requireApprovedUser).mockResolvedValue({
       state: "approved",
@@ -101,4 +106,61 @@ describe("shared server admission", () => {
     });
     log.mockRestore();
   });
+  it.each(["email_conflict", "waitlist_conflict", "inactive_contact"])(
+    "does not claim confirmed waitlist membership after %s",
+    async (reason) => {
+      vi.mocked(enrollAuthenticatedUser).mockResolvedValue({
+        enrolled: false,
+        reason,
+      });
+      vi.mocked(requireApprovedUser).mockRejectedValue(
+        new AccessError("pending")
+      );
+      await expect(requireConsoleSession()).rejects.toMatchObject({
+        status: 403,
+        state: "pending",
+        code: "enrollment_attention_required",
+      });
+      expect(resolveExternalAccount).not.toHaveBeenCalled();
+    }
+  );
+  it("retains verify-email behavior for unverified identities", async () => {
+    vi.mocked(getAuthenticatedIdentity).mockResolvedValue({
+      ...identity,
+      emailVerified: false,
+    });
+    vi.mocked(enrollAuthenticatedUser).mockResolvedValue({
+      enrolled: false,
+      reason: "unverified_or_disabled",
+    });
+    vi.mocked(requireApprovedUser).mockRejectedValue(
+      new AccessError("pending")
+    );
+    await expect(requireConsoleSession()).rejects.toMatchObject({
+      code: "access_pending",
+    });
+  });
+  it("honors existing approval even when a changed email cannot be enrolled", async () => {
+    vi.mocked(enrollAuthenticatedUser).mockResolvedValue({
+      enrolled: false,
+      reason: "waitlist_conflict",
+    });
+    await expect(requireConsoleSession()).resolves.toHaveProperty(
+      "externalUserId"
+    );
+  });
+  it.each(["revoked", "disabled", "unavailable"] as const)(
+    "preserves %s precedence over enrollment attention",
+    async (state) => {
+      vi.mocked(enrollAuthenticatedUser).mockResolvedValue({
+        enrolled: false,
+        reason: "inactive_contact",
+      });
+      vi.mocked(requireApprovedUser).mockRejectedValue(new AccessError(state));
+      await expect(requireConsoleSession()).rejects.toMatchObject({
+        state,
+        code: `access_${state}`,
+      });
+    }
+  );
 });

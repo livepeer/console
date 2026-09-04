@@ -9,7 +9,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, isNull, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import type postgres from "postgres";
 import * as schema from "@/lib/db/schema";
@@ -111,13 +111,22 @@ describe.skipIf(!databaseUrl)(
       client = isolated.client;
       db = drizzle(client, { schema });
       vi.mocked(getDb).mockImplementation(() => db);
-      // The worker scans all pending events: refuse to run on a populated branch.
+      // The worker scans pending events. Processed/terminal synthetic records
+      // from other suites are inert and need not be deleted with their audits.
       const existing = await db
         .select({ id: schema.emailOutbox.id })
         .from(schema.emailOutbox)
+        .where(
+          and(
+            isNull(schema.emailOutbox.processedAt),
+            isNull(schema.emailOutbox.terminalAt)
+          )
+        )
         .limit(1);
       if (existing.length)
-        throw new Error("Route tests require an empty isolated outbox");
+        throw new Error(
+          "Route tests require no outstanding isolated outbox events"
+        );
     });
 
     beforeEach(() => {

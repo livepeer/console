@@ -33,8 +33,22 @@ export async function requireConsoleSession() {
   if (!identity) throw new SessionRequiredError();
   try {
     const canonical = await resolveProviderIdentity(identity);
-    await enrollAuthenticatedUser(identity, canonical);
-    await requireApprovedUser(canonical.userId);
+    const enrollment = await enrollAuthenticatedUser(identity, canonical);
+    try {
+      await requireApprovedUser(canonical.userId);
+    } catch (error) {
+      // Preserve authoritative approval/revocation/disabled decisions. Only a
+      // genuinely pending account needs the neutral enrollment-attention screen.
+      if (
+        error instanceof AccessError &&
+        error.state === "pending" &&
+        identity.emailVerified &&
+        enrollment?.enrolled === false
+      ) {
+        throw new AccessError("pending", "enrollment_attention_required");
+      }
+      throw error;
+    }
     const account = await resolveExternalAccount({
       ...configuredPymthouseScope(),
       userId: canonical.userId,
