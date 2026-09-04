@@ -1,94 +1,39 @@
 import "server-only";
-
-import { auth0 } from "@/lib/auth0";
-import { externalUserIdFromSub } from "@/lib/console/external-user-id";
-import {
-  syncCanonicalUser,
-  syncCanonicalUserBestEffort,
-} from "@/lib/identity/canonical-user";
+import { getAuthenticatedIdentity } from "@/lib/authentication/session";
+import { resolveProviderIdentity } from "@/lib/identity/provider-user";
+import { configuredPymthouseScope, resolveExternalAccount } from "@/lib/external-accounts/service";
+import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
+import { AccessError, requireApprovedUser } from "@/lib/access/service";
 
 export class SessionRequiredError extends Error {
   readonly status = 401;
   readonly code = "unauthorized";
-
-  constructor(message = "Sign in required") {
-    super(message);
-    this.name = "SessionRequiredError";
-  }
+  constructor() { super("Sign in required"); this.name = "SessionRequiredError"; }
+}
+export class CanonicalUserUnavailableError extends AccessError {
+  constructor() { super("unavailable"); }
+}
+export class CanonicalUserDisabledError extends AccessError {
+  constructor() { super("disabled"); }
 }
 
-export class CanonicalUserUnavailableError extends Error {
-  readonly status = 503;
-  readonly code = "canonical_user_unavailable";
-
-  constructor(message = "User profile is temporarily unavailable") {
-    super(message);
-    this.name = "CanonicalUserUnavailableError";
-  }
-}
-
-export class CanonicalUserDisabledError extends Error {
-  readonly status = 403;
-  readonly code = "canonical_user_disabled";
-
-  constructor() {
-    super("User profile is disabled");
-    this.name = "CanonicalUserDisabledError";
-  }
-}
-
-export async function requireConsoleSession(): Promise<{
-  externalUserId: string;
-  canonicalUserId?: string;
-  email?: string;
-}> {
-  const session = await auth0.getSession();
-  const sub = session?.user?.sub?.trim();
-  if (!session || !sub) {
-    throw new SessionRequiredError();
-  }
-  const email = session.user.email?.trim();
-  const canonical = await syncCanonicalUserBestEffort({
-    sub,
-    email: email || undefined,
-    emailVerified: session.user.email_verified === true,
-  });
-  return {
-    externalUserId: await externalUserIdFromSub(sub),
-    ...(canonical ? { canonicalUserId: canonical.userId } : {}),
-    email: email || undefined,
-  };
-}
-
-export async function requireCanonicalUser(): Promise<{
-  userId: string;
-  externalUserId: string;
-  email?: string;
-}> {
-  const session = await auth0.getSession();
-  const sub = session?.user?.sub?.trim();
-  if (!session || !sub) throw new SessionRequiredError();
-
-  const email = session.user.email?.trim();
+/** Authentication can succeed independently. Admission always requires fresh DB truth. */
+export async function requireConsoleSession() {
+  const identity = await getAuthenticatedIdentity();
+  if (!identity) throw new SessionRequiredError();
   try {
-    const canonical = await syncCanonicalUser({
-      sub,
-      email: email || undefined,
-      emailVerified: session.user.email_verified === true,
-    });
-    if (canonical.accountStatus === "disabled") {
-      throw new CanonicalUserDisabledError();
-    }
-    return {
-      userId: canonical.userId,
-      externalUserId: canonical.externalUserId,
-      email: email || undefined,
-    };
+    const canonical = await resolveProviderIdentity(identity);
+    await enrollAuthenticatedUser(identity, canonical);
+    await requireApprovedUser(canonical.userId);
+    const account = await resolveExternalAccount({ ...configuredPymthouseScope(), userId: canonical.userId, identityId: canonical.identityId });
+    return { externalUserId: account.externalUserId, canonicalUserId: canonical.userId, email: identity.email, identity };
   } catch (error) {
-    if (error instanceof CanonicalUserDisabledError) throw error;
-    console.error("canonical_user_required_sync_failed", {
-      errorType: error instanceof Error ? error.name : "unknown",
-    });
-    throw new CanonicalUserUnavailableError();
+    if (error instanceof AccessError) throw error;
+    console.error("console_admission_unavailable", { errorType: error instanceof Error ? error.name : "unknown" });
+    throw new AccessError("unavailable");
   }
+}
+export async function requireCanonicalUser() {
+  const session = await requireConsoleSession();
+  return { userId: session.canonicalUserId, externalUserId: session.externalUserId, email: session.email };
 }
