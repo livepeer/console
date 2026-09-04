@@ -43,6 +43,10 @@ export const authIdentities = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
     providerSubject: text("provider_subject").notNull(),
+    providerMetadata: jsonb("provider_metadata")
+      .$type<Record<string, string>>()
+      .default({})
+      .notNull(),
     externalUserId: text("external_user_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

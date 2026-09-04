@@ -40,6 +40,21 @@ const developmentEnvSchema = productionEnvSchema.partial().extend({
 
 export type AppEnv = z.infer<typeof productionEnvSchema>;
 
+export function getDatabaseUrl(
+  source: NodeJS.ProcessEnv = process.env
+): string {
+  const value =
+    source.DATABASE_URL ??
+    (source.NODE_ENV === "production"
+      ? undefined
+      : "postgres://localhost:5432/waitlist");
+  const parsed = productionEnvSchema.shape.DATABASE_URL.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("Invalid server environment configuration: DATABASE_URL");
+  }
+  return parsed.data;
+}
+
 let cachedEnv: AppEnv | undefined;
 
 export function getEnv(

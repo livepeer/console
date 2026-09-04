@@ -27,6 +27,16 @@ export class CanonicalUserUnavailableError extends Error {
   }
 }
 
+export class CanonicalUserDisabledError extends Error {
+  readonly status = 403;
+  readonly code = "canonical_user_disabled";
+
+  constructor() {
+    super("User profile is disabled");
+    this.name = "CanonicalUserDisabledError";
+  }
+}
+
 export async function requireConsoleSession(): Promise<{
   externalUserId: string;
   canonicalUserId?: string;
@@ -66,12 +76,16 @@ export async function requireCanonicalUser(): Promise<{
       email: email || undefined,
       emailVerified: session.user.email_verified === true,
     });
+    if (canonical.accountStatus === "disabled") {
+      throw new CanonicalUserDisabledError();
+    }
     return {
       userId: canonical.userId,
       externalUserId: canonical.externalUserId,
       email: email || undefined,
     };
   } catch (error) {
+    if (error instanceof CanonicalUserDisabledError) throw error;
     console.error("canonical_user_required_sync_failed", {
       errorType: error instanceof Error ? error.name : "unknown",
     });

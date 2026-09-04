@@ -43,6 +43,13 @@
       "when": 1788556660490,
       "tag": "0005_canonical_user_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788559405884,
+      "tag": "0006_auth_identity_provider_metadata",
+      "breakpoints": true
     }
   ]
 }

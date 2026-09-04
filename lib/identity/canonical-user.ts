@@ -26,6 +26,7 @@ export type Auth0IdentityInput = {
 
 export type CanonicalUserSyncResult = {
   userId: string;
+  accountStatus: "active" | "disabled";
   externalUserId: string;
   identityCreated: boolean;
   waitlistLinked: boolean;
@@ -86,17 +87,21 @@ export async function syncCanonicalUser(
       verifiedEmailUserId,
     });
 
+    let accountStatus: "active" | "disabled";
     if (!userId) {
       const [createdUser] = await tx
         .insert(users)
         .values({ lastSeenAt: now, updatedAt: now })
-        .returning({ id: users.id });
+        .returning({ id: users.id, status: users.status });
       userId = createdUser.id;
+      accountStatus = createdUser.status;
     } else {
-      await tx
+      const [updatedUser] = await tx
         .update(users)
         .set({ lastSeenAt: now, updatedAt: now })
-        .where(eq(users.id, userId));
+        .where(eq(users.id, userId))
+        .returning({ status: users.status });
+      accountStatus = updatedUser.status;
     }
 
     const identityCreated = !existingIdentity;
@@ -105,13 +110,18 @@ export async function syncCanonicalUser(
         userId,
         provider,
         providerSubject,
+        providerMetadata: { authority: "auth0", strategy: provider },
         externalUserId,
         lastSeenAt: now,
       });
     } else {
       await tx
         .update(authIdentities)
-        .set({ externalUserId, lastSeenAt: now })
+        .set({
+          externalUserId,
+          providerMetadata: { authority: "auth0", strategy: provider },
+          lastSeenAt: now,
+        })
         .where(
           and(
             eq(authIdentities.provider, provider),
@@ -180,6 +190,13 @@ export async function syncCanonicalUser(
             eq(waitlistSignups.status, "confirmed")
           )
         )
+        .limit(1)
+        .for("update");
+
+      const [existingUserEntry] = await tx
+        .select({ id: waitlistSignups.id })
+        .from(waitlistSignups)
+        .where(eq(waitlistSignups.userId, userId))
         .limit(1);
 
       const linkDecision = waitlistLinkDecision({
@@ -189,7 +206,12 @@ export async function syncCanonicalUser(
         waitlistUserId: waitlistEntry?.userId,
         waitlistExists: Boolean(waitlistEntry),
       });
-      if (linkDecision === "conflict") {
+      if (
+        linkDecision === "conflict" ||
+        (linkDecision === "link" &&
+          existingUserEntry &&
+          existingUserEntry.id !== waitlistEntry?.id)
+      ) {
         conflicts.push("waitlist_link");
       } else if (linkDecision === "link" && waitlistEntry) {
         const linked = await tx
@@ -208,6 +230,7 @@ export async function syncCanonicalUser(
 
     return {
       userId,
+      accountStatus,
       externalUserId,
       identityCreated,
       waitlistLinked,

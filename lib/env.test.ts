@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getEnv } from "./env";
+import { getDatabaseUrl, getEnv } from "./env";
 
 const validProductionEnv = {
   NODE_ENV: "production",
@@ -13,6 +13,17 @@ const validProductionEnv = {
 };
 
 describe("server environment validation", () => {
+  it("allows identity database access without email configuration", () => {
+    expect(
+      getDatabaseUrl({
+        NODE_ENV: "production",
+        DATABASE_URL: validProductionEnv.DATABASE_URL,
+      })
+    ).toBe(validProductionEnv.DATABASE_URL);
+    expect(() => getDatabaseUrl({ NODE_ENV: "production" })).toThrow(
+      "DATABASE_URL"
+    );
+  });
   it("accepts a complete production configuration", () => {
     const expected: Record<string, string> = { ...validProductionEnv };
     delete expected.NODE_ENV;
