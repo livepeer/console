@@ -11,9 +11,10 @@ import {
 } from "vitest";
 import { eq, inArray, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import type postgres from "postgres";
 import * as schema from "@/lib/db/schema";
 import { EmailProviderError } from "@/lib/email/provider";
+import { openIntegrationDatabase } from "@/tests/support/isolated-db";
 
 const mocks = vi.hoisted(() => ({
   cookies: new Map<string, string>(),
@@ -74,7 +75,10 @@ function address(name: string) {
 function request(path: string, body?: object, method = "POST") {
   return new Request(`https://preview.example.invalid${path}`, {
     method,
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      origin: "https://preview.example.invalid",
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
 }
@@ -103,21 +107,8 @@ describe.skipIf(!databaseUrl)(
   "waitlist route parity against isolated Postgres",
   () => {
     beforeAll(async () => {
-      const hostname = new URL(databaseUrl!).hostname;
-      if (
-        !process.env.TEST_DATABASE_HOST ||
-        hostname !== process.env.TEST_DATABASE_HOST ||
-        hostname === "ep-mute-dust-au81hdx5-pooler.c-10.us-east-1.aws.neon.tech"
-      ) {
-        throw new Error(
-          "An explicitly approved, isolated test database is required"
-        );
-      }
-      client = postgres(databaseUrl!, {
-        max: 4,
-        prepare: false,
-        connect_timeout: 10,
-      });
+      const isolated = await openIntegrationDatabase(process.env);
+      client = isolated.client;
       db = drizzle(client, { schema });
       vi.mocked(getDb).mockImplementation(() => db);
       // The worker scans all pending events: refuse to run on a populated branch.

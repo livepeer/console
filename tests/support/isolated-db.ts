@@ -2,6 +2,7 @@ import postgres from "postgres";
 
 /** Never populate these values from DATABASE_URL or an application env file. */
 export type IntegrationDatabaseEnv = {
+  [key: string]: string | undefined;
   TEST_DATABASE_URL?: string;
   TEST_DATABASE_HOST?: string;
   TEST_DATABASE_BRANCH_ID?: string;
@@ -20,6 +21,7 @@ export type IntegrationDatabaseMarker = {
 const forbiddenEndpointNames = [
   "ep-mute-dust-au81hdx5", // production
   "ep-super-smoke-au3eh6hd", // original user-test preview
+  "ep-dry-smoke-au7l7dzw", // early-access runtime preview
 ];
 
 /** Validation output is deliberately credential-free and safe to log. */

@@ -62,6 +62,8 @@ describe("disposable database safety", () => {
     "ep-mute-dust-au81hdx5.c-10.us-east-1.aws.neon.tech",
     "ep-super-smoke-au3eh6hd-pooler.c-10.us-east-1.aws.neon.tech",
     "ep-super-smoke-au3eh6hd.c-10.us-east-1.aws.neon.tech",
+    "ep-dry-smoke-au7l7dzw-pooler.c-10.us-east-1.aws.neon.tech",
+    "ep-dry-smoke-au7l7dzw.c-10.us-east-1.aws.neon.tech",
   ])("forbids deployed data even with a matching host: %s", (hostname) => {
     expect(() =>
       readIntegrationDatabaseTarget({
