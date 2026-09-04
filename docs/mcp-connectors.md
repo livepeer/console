@@ -63,4 +63,4 @@ Hermes opens a browser and waits on a loopback callback. If Hermes is a remote g
 
 ## After login
 
-Use `list_capabilities` then `run_capability` with exact capability names. Spend is PymtHouse OpenMeter for the current UTC calendar day, 00:00–23:59 UTC (`get_cost_report` / `me_usage`); `run_capability` is refused when spendable (`hasAccess`) is exhausted.
+Use `list_capabilities` then `run_capability` with exact capability names. `run_capability` blocks until the runner finishes (up to 13 minutes) and polls fal `status_url` when a queue receipt comes back instead of media. If the queue URL is not pollable, the tool returns `status_url` / `request_id` rather than `url: null`. Spend is PymtHouse OpenMeter for the current UTC calendar day, 00:00–23:59 UTC (`get_cost_report` / `me_usage`); `run_capability` is refused when spendable (`hasAccess`) is exhausted.
