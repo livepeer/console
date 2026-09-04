@@ -339,7 +339,7 @@ export default function CapabilityLeaderboardPanel() {
           </p>
         </div>
         <Link
-          href="/usage"
+          href="/home"
           className="inline-flex items-center gap-1 text-[12px] text-fg-faint transition-colors hover:text-fg"
         >
           View usage <ArrowRight className="h-3 w-3" aria-hidden="true" />

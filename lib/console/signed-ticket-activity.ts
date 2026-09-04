@@ -37,6 +37,6 @@ export function mapSignedTicketToActivityRow(
     signerLabel: row.appName?.trim() || "PymtHouse",
     tokenId: "",
     tokenName: "",
-    costDisplay: `$${fee}`,
+    costDisplay: fee,
   };
 }

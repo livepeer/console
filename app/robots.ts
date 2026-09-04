@@ -5,8 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: ["/", "/explore", "/network", "/models", "/login", "/signup"],
-      disallow: ["/home", "/calls", "/usage", "/keys", "/settings"],
+      disallow: ["/home", "/install", "/calls", "/usage", "/keys"],
     },
-    sitemap: "https://dashboard.livepeer.org/sitemap.xml",
+    sitemap: "https://earlyaccess.livepeer.org/sitemap.xml",
   };
 }

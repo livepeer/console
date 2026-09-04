@@ -2630,7 +2630,7 @@ export const REMOTE_SIGNERS: RemoteSigner[] = [
   },
 ];
 
-// ─── Account Usage (per-account view under /settings?tab=usage) ─────
+// ─── Account Usage ───────────────────────────────────────────────────
 //
 // The monthly totals below are the canonical account usage figures for mocks.
 // They are derived from REMOTE_SIGNERS.monthlyUsage (Paymthouse + Livepeer Cloud)
@@ -2794,6 +2794,13 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
     "key-1": "env-production",
     "key-2": "env-development",
     "key-foundation": "env-development",
+  };
+  const formatExpenseDisplay = (display: string) => {
+    if (!display.startsWith("$")) return display;
+    const amount = Number(display.slice(1));
+    if (!Number.isFinite(amount)) return display;
+    if (amount < 0.01) return "<$0.01";
+    return `$${amount.toFixed(2)}`;
   };
 
   const specs: Spec[] = [
@@ -3153,7 +3160,7 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
       signerLabel: SIGNER_LABEL[s.signer],
       tokenId: s.tokenId,
       tokenName: TOKEN_LABEL[s.tokenId] ?? s.tokenId,
-      costDisplay: s.costDisplay,
+      costDisplay: formatExpenseDisplay(s.costDisplay),
     };
   });
 }

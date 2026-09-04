@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 
 interface CopyButtonProps {
   /** The string copied to the clipboard. */
@@ -22,6 +23,9 @@ interface CopyButtonProps {
   ariaLabel?: string;
   /** Override the timeout before reverting from "Copied" state. Default 1600ms. */
   timeoutMs?: number;
+  /** Feedback style after copying. Default `inline` changes the button; `toast` keeps the button stable. */
+  feedback?: "inline" | "toast";
+  toastMessage?: string;
   /** Optional className applied to the button (alignment, ml-auto, etc.). */
   className?: string;
   /** Optional callback after a successful copy (e.g. tracking). */
@@ -51,6 +55,8 @@ export default function CopyButton({
   size = "sm",
   ariaLabel,
   timeoutMs = 1600,
+  feedback = "inline",
+  toastMessage = "copied to clipboard",
   className = "",
   onCopy,
   children,
@@ -60,9 +66,13 @@ export default function CopyButton({
 
   const handleCopy = () => {
     navigator.clipboard.writeText(value).then(() => {
-      setCopied(true);
+      if (feedback === "toast") {
+        toast(toastMessage);
+      } else {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), timeoutMs);
+      }
       onCopy?.();
-      window.setTimeout(() => setCopied(false), timeoutMs);
     });
   };
 
@@ -81,7 +91,7 @@ export default function CopyButton({
         : "border border-subtle text-fg-strong hover:border-strong hover:bg-hover hover:text-fg"
       : copied
         ? "bg-green-bright/15 text-green-bright"
-        : "text-fg-muted hover:bg-tint hover:text-fg";
+        : "text-fg-muted hover:text-fg";
 
   const finalLabel = copied ? "Copied" : label;
   const showLabel = !iconOnly;

@@ -43,10 +43,9 @@ export async function POST(request: NextRequest) {
 
   const origin = checkoutReturnOrigin(request);
   const successUrl =
-    body.successUrl?.trim() ||
-    `${origin}/settings?tab=billing&checkout=success`;
+    body.successUrl?.trim() || `${origin}/home?checkout=success`;
   const cancelUrl =
-    body.cancelUrl?.trim() || `${origin}/settings?tab=billing&checkout=cancel`;
+    body.cancelUrl?.trim() || `${origin}/home?checkout=cancel`;
 
   try {
     const session = await requireConsoleSession();

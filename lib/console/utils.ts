@@ -114,8 +114,8 @@ export function formatPrice(model: App): string {
 //   Request / Step: one unit per call
 //   Second / Minute: derived from inferenceTime when known, else one unit
 //   M Tokens: one call ≈ ~500 output tokens (rough mock; tokens not tracked)
-// Returned as a short USD string; "<$0.0001" for tiny amounts so the badge
-// never collapses to "$0.00".
+// Returned as a short USD string; sub-penny estimates render as "<$0.01" so
+// expense badges never expose fractional pennies.
 export function estimateCallCost(
   model: App,
   inferenceTimeSeconds?: number
@@ -137,9 +137,7 @@ export function estimateCallCost(
     default:
       cost = amount;
   }
-  if (cost < 0.0001) return "<$0.0001";
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  if (cost < 1) return `$${cost.toFixed(3)}`;
+  if (cost < 0.01) return "<$0.01";
   return `$${cost.toFixed(2)}`;
 }
 

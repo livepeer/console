@@ -1,28 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/console/AuthContext";
-import { useAccountUsage } from "@/lib/console/useAccountUsage";
 import { useWalletBillingState } from "@/lib/console/useOwnerWallet";
-import {
-  formatPeriodResetLabel,
-  microsToUsd,
-} from "@/lib/console/usage-capability-display";
+import { microsToUsd } from "@/lib/console/usage-capability-display";
 import { includedUsageSummary } from "@/lib/console/wallet-settlement-display";
 
 /**
- * Sidebar usage meter. Remaining included usage comes from the wallet
- * billing state when the live plan has an allowance; otherwise period spend.
- *
- * The eyebrow names the *kind* of figure, never the plan. It used to fall back
- * to the live plan's name, which spent the card's most prominent slot on a
- * label nobody can act on — and on a pilot balance the plan name says nothing
- * the figure underneath doesn't say better.
+ * Sidebar balance meter. It shows the remaining balance against the amount
+ * issued for the current plan period.
  */
 export default function SidebarUsageCard() {
   const { isConnected } = useAuth();
-  const usage = useAccountUsage(isConnected, 30);
   const wallet = useWalletBillingState(isConnected);
   const included =
     wallet.state.status === "ready"
@@ -30,10 +19,8 @@ export default function SidebarUsageCard() {
       : null;
 
   if (
-    usage.status === "loading" ||
-    usage.status === "idle" ||
-    (isConnected &&
-      (wallet.state.status === "loading" || wallet.state.status === "idle"))
+    isConnected &&
+    (wallet.state.status === "loading" || wallet.state.status === "idle")
   ) {
     return (
       <div
@@ -41,115 +28,69 @@ export default function SidebarUsageCard() {
         aria-hidden="true"
       >
         <div className="h-3 w-24 rounded bg-tint" />
-        <div className="my-1.5 h-1 rounded bg-tint" />
-        <div className="h-2.5 w-full rounded bg-tint" />
+        <div className="mt-2 h-3 w-28 rounded bg-tint" />
+        <div className="mt-2 h-1 rounded bg-tint" />
       </div>
     );
   }
 
-  if (usage.status === "error") {
+  if (wallet.state.status === "error") {
     return (
       <Link
-        href="/usage"
+        href="/home"
         title="Open usage details"
         className="mx-1 mt-2 block rounded-md border border-subtle bg-sidebar-card-bg px-2.5 py-2 transition-colors hover:bg-sidebar-card-bg-hover"
       >
         <span className="font-mono text-[10.5px] text-fg-faint">
-          Usage unavailable
+          Balance unavailable
         </span>
       </Link>
     );
   }
 
-  const { data } = usage;
-  const showUsdAllowance = Boolean(included);
+  if (wallet.state.status !== "ready") return null;
 
-  const resetsAt = included?.resetsAt
-    ? new Date(included.resetsAt).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      })
-    : formatPeriodResetLabel(data.period.end);
-  // One word. The rail card is ~150px wide, so a two-word eyebrow wraps.
-  const meterLabel = showUsdAllowance ? "Included" : "Usage";
+  let remainingUsd: number;
+  let issuedUsd: number;
 
-  let primaryUsed: number;
-  let primaryLimit: number | null;
-  let primaryDisplay: ReactNode;
-  let footerLeft: string;
-
-  if (showUsdAllowance && included) {
-    const granted = BigInt(included.totalUsdMicros || "1");
-    const consumed = BigInt(included.consumedUsdMicros || "0");
-    primaryUsed = Number((consumed * BigInt(10000)) / granted) / 100;
-    primaryLimit = 100;
-    // Consumed leads on the top row; the allowance it came out of moves to
-    // the footer. Carrying "$475.78 / $500.00" beside the eyebrow overran the
-    // 150px rail and wrapped the figure onto two lines.
-    primaryDisplay = (
-      <b className="font-medium text-fg">
-        ${microsToUsd(included.consumedUsdMicros).toFixed(2)}
-      </b>
-    );
-    footerLeft = `of $${microsToUsd(included.totalUsdMicros).toFixed(2)}`;
+  if (included) {
+    remainingUsd = microsToUsd(included.remainingUsdMicros);
+    issuedUsd = microsToUsd(included.totalUsdMicros);
   } else {
-    const spendUsd =
-      Number(
-        BigInt(
-          data.current.endUserBillableUsdMicros ||
-            data.current.networkFeeUsdMicros ||
-            "0"
-        )
-      ) / 1_000_000;
-    primaryUsed = 0;
-    primaryLimit = null;
-    primaryDisplay = (
-      <b className="font-medium text-fg">${spendUsd.toFixed(2)}</b>
+    remainingUsd = microsToUsd(wallet.state.wallet.balance?.usdMicros ?? "0");
+    issuedUsd = Math.max(
+      remainingUsd,
+      microsToUsd(wallet.state.wallet.balance?.lifetimeGrantedUsdMicros ?? "0")
     );
-    footerLeft = "spent";
   }
 
   const pct =
-    primaryLimit && primaryLimit > 0
-      ? Math.min(100, (primaryUsed / primaryLimit) * 100)
-      : 0;
+    issuedUsd > 0 ? Math.min(100, (remainingUsd / issuedUsd) * 100) : 0;
+  const canSpend = wallet.state.wallet.billingState.canSpend;
 
   return (
     <Link
-      href="/usage"
+      href="/home"
       title="Open usage details"
-      className="mx-1 mt-2 block rounded-md border border-subtle bg-sidebar-card-bg px-2.5 py-2 transition-colors hover:bg-sidebar-card-bg-hover"
+      aria-label={`Balance: $${remainingUsd.toFixed(2)} remaining of $${issuedUsd.toFixed(2)} issued`}
+      className="mx-1 mt-2 block rounded-md border border-subtle bg-sidebar-card-bg px-2.5 py-2.5 transition-colors hover:bg-sidebar-card-bg-hover"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-fg-faint">
-          {meterLabel}
+      <p className="text-[16px] font-medium leading-none text-fg">
+        ${issuedUsd.toFixed(2)}{" "}
+        <span className="text-[12.5px] font-normal text-fg-faint">
+          / ${remainingUsd.toFixed(2)} remaining
         </span>
-        <span className="font-mono text-[12px] tabular-nums text-fg-strong">
-          {primaryDisplay}
-        </span>
-      </div>
+      </p>
       <div
-        className="my-1.5 h-1 overflow-hidden rounded-[2px] bg-tint"
+        className="mt-2.5 h-1 overflow-hidden rounded-[2px] bg-tint"
         aria-hidden="true"
       >
         <div
           className={`h-full rounded-[2px] ${
-            usage.status === "ready" &&
-            usage.data.balance &&
-            !usage.data.balance.hasAccess
-              ? "bg-warm"
-              : "bg-gradient-to-r from-green to-green-bright"
+            canSpend ? "bg-gradient-to-r from-green to-green-bright" : "bg-warm"
           }`}
           style={{ width: `${pct}%` }}
         />
-      </div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[10.5px] tracking-[0.02em] text-fg-faint">
-          {footerLeft}
-        </span>
-        <span className="font-mono text-[10.5px] tracking-[0.02em] text-fg-faint">
-          resets {resetsAt}
-        </span>
       </div>
     </Link>
   );

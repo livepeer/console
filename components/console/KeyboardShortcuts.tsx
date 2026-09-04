@@ -12,7 +12,7 @@ import Dialog from "@/components/design-system/Dialog";
  * shortcut, grouped Global / Navigation. The overlay reuses the same Dialog
  * chrome as the Cmd-K palette so the two surfaces feel like one vocabulary.
  *
- * `G` followed within ~700ms by `H | E | U | K | S` jumps to the matching route.
+ * `G` followed within ~700ms by `H | I | E` jumps to the matching route.
  * Both handlers ignore inputs / textareas / contentEditable so typing in the
  * playground doesn't accidentally navigate.
  */
@@ -35,20 +35,18 @@ const GROUPS: Group[] = [
     title: "Navigation",
     items: [
       { keys: ["G", "H"], label: "Go to Home" },
+      { keys: ["G", "I"], label: "Go to Install" },
       { keys: ["G", "E"], label: "Go to Explore" },
-      { keys: ["G", "U"], label: "Go to Usage" },
-      { keys: ["G", "S"], label: "Go to Settings" },
     ],
   },
 ];
 
-// G-C (Calls) and G-K (API keys) are gone with their destinations: calls are
-// a section of /usage now, and the pilot provisions no API keys.
+// G-C (Calls), G-U (Usage), and G-K (API keys) are gone with their destinations:
+// calls are a section of /home now, and the pilot provisions no API keys.
 const NAV_TARGETS: Record<string, string> = {
   h: "/home",
+  i: "/install",
   e: "/explore",
-  u: "/usage",
-  s: "/settings",
 };
 
 function isFieldElement(el: EventTarget | null): boolean {

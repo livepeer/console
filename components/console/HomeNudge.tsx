@@ -33,9 +33,9 @@ export default function HomeNudge() {
       return {
         eyebrow: "Heads up",
         title: `You're at ${Math.round(freePct)}% of your free tier this month.`,
-        body: "Connect a payment provider to keep scaling without limits.",
-        cta: "Set up billing",
-        href: "/settings?tab=billing",
+        body: "Keep an eye on your balance before the period resets.",
+        cta: "View usage",
+        href: "/home",
       };
     }
 

@@ -18,10 +18,9 @@ function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
 // redirected here, in middleware, rather than by the page: a client-side
 // redirect runs after the console chrome has already painted, so a cold
 // signed-out load flashed the sidebar for a frame before landing on /login.
-// Usage and Settings are deliberately not listed — they keep the in-shell
-// sign-in wall (see the comment in app/(app)/usage/page.tsx).
+// Home keeps the in-shell sign-in wall; Install redirects before the shell.
 function isSessionOnlyPath(pathname: string): boolean {
-  return pathname === "/" || pathname === "/home";
+  return pathname === "/" || pathname === "/install";
 }
 
 export async function middleware(request: NextRequest) {
@@ -33,7 +32,8 @@ export async function middleware(request: NextRequest) {
   if (devMock) {
     const mocked = devMockResponse(
       request.nextUrl.pathname,
-      request.nextUrl.searchParams
+      request.nextUrl.searchParams,
+      request.url
     );
     if (mocked) return mocked;
   }

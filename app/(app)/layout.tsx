@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
 import { AuthProvider } from "@/components/console/AuthContext";
 import { EnvironmentProvider } from "@/components/console/EnvironmentContext";
 import { ThemeProvider } from "@/components/console/ThemeContext";
@@ -9,40 +7,24 @@ import ConsoleSidebar from "@/components/console/ConsoleSidebar";
 import KeyboardShortcuts from "@/components/console/KeyboardShortcuts";
 
 // FOUT prevention — runs synchronously in the document, before the console
-// subtree paints. Reads the stored theme preference from localStorage and
-// applies `<html data-theme="...">` so dual-source CSS variables resolve to
-// the right theme on first paint. The ThemeProvider takes over after
-// hydration; this is just the bootstrap.
-//
-// Reads the same `localStorage["theme"]` key the marketing site uses (see
-// `app/layout.tsx`'s inline script and `components/layout/ThemeToggle.tsx`),
-// so flipping the theme on either surface propagates to the other. Default
-// is "system" for first-time visitors — we follow the OS `prefers-color-scheme`
-// until the user pins light or dark via Settings → Appearance.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme')||'system';var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
+// subtree paints. Theme is system-only, so first paint follows the OS
+// `prefers-color-scheme` result directly; ThemeProvider keeps it in sync after
+// hydration.
+const THEME_INIT_SCRIPT = `(function(){try{document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export const metadata: Metadata = {
-  title: "Console — Livepeer",
+  title: "Livepeer Early Access",
   description:
-    "Browse AI apps, manage API keys, and monitor usage on the Livepeer network.",
+    "Explore Livepeer AI apps, manage API access, and track usage during early access.",
 };
 
-// The console runs on Geist (Vercel's open-source font) instead of Favorit Pro —
-// the console is a *tool*, the marketing site is the brand. We attach the Geist
-// CSS variables to this subtree and override `--font-sans` / `--font-mono` so
-// every Tailwind `font-sans` / `font-mono` consumer below this point picks Geist.
-//
-// Density: per the Livepeer Console design (Claude Design handoff, Apr 2026),
-// the console subtree uses a 13.5px body with a slightly tighter letter-spacing
-// to land in the same density bracket as Linear. Sidebar width and chrome head
-// height are exposed as custom properties so components can reference them.
+// Product surfaces use the registry theme's Inter-backed `font-sans`.
+// Sidebar width and chrome head height are exposed as custom properties so
+// components can reference them.
 const consoleOverrides = {
-  "--font-sans": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
-  "--font-mono": "var(--font-geist-mono), ui-monospace, monospace",
-  "--side-w": "232px",
+  "--side-w": "256px",
   "--head-h": "44px",
   fontSize: "13.5px",
-  letterSpacing: "-0.005em",
 } as CSSProperties;
 
 export default function ConsoleLayout({
@@ -62,11 +44,11 @@ export default function ConsoleLayout({
         <AuthProvider>
           <EnvironmentProvider>
             <div
-              className={`flex min-h-screen flex-col bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden ${GeistSans.variable} ${GeistMono.variable}`}
+              className="flex min-h-screen flex-col overflow-x-clip overscroll-none bg-dark font-sans md:h-screen md:min-h-0 md:flex-row md:overflow-hidden"
               style={consoleOverrides}
             >
               <ConsoleSidebar />
-              <div className="flex min-w-0 flex-1 flex-col bg-dark border-l border-hairline md:overflow-y-auto">
+              <div className="flex min-w-0 flex-1 flex-col overflow-x-clip overscroll-none bg-dark border-l border-hairline md:overflow-y-auto">
                 {children}
               </div>
               <KeyboardShortcuts />

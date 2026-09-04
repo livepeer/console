@@ -331,14 +331,7 @@ function ApiTab({ model }: { model: App }) {
         <KeyBadge prefix={defaultKey.prefix} />
         <p className="mt-2 text-[11px] text-fg-faint">
           Drop this into the{" "}
-          <code className="text-fg-muted">Authorization</code> header below, or{" "}
-          <Link
-            href="/settings?tab=tokens"
-            className="text-fg-strong underline-offset-2 hover:text-fg hover:underline"
-          >
-            manage your keys
-          </Link>
-          .
+          <code className="text-fg-muted">Authorization</code> header below.
         </p>
       </div>
 
@@ -371,10 +364,10 @@ function ApiTab({ model }: { model: App }) {
           Billed per request. Free tier covers your first 10,000 each month.
         </span>
         <Link
-          href="/settings?tab=billing"
+          href="/home"
           className="text-fg-strong underline-offset-2 hover:text-fg hover:underline"
         >
-          Add a payment provider →
+          View usage →
         </Link>
       </div>
     </div>
