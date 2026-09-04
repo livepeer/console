@@ -126,6 +126,20 @@ test("loopback registered URI matches Codex port and host swaps", () => {
     ),
     false
   );
+  assert.equal(
+    redirectUrisMatch(
+      "http://127.0.0.1/callback",
+      "http://127.0.0.1:48004/callback"
+    ),
+    true
+  );
+  assert.equal(
+    redirectUrisMatch(
+      "http://127.0.0.1:27890/callback",
+      "http://127.0.0.1:27890/callback/"
+    ),
+    true
+  );
 });
 
 test("normalizeRedirectUris accepts Hermes CIMD loopback lists", () => {

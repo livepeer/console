@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
 import { parseAuthCode, verifyPkceS256 } from "@/lib/mcp/as";
 import { isKnownClientId } from "@/lib/mcp/cimd";
+import { redirectUrisMatch } from "@/lib/mcp/dcr";
 import { mintMcpUserTokens, BillingAppMismatchError } from "@/lib/console/mcp-internal-mint";
 import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
 
@@ -85,32 +86,50 @@ export async function POST(req: NextRequest) {
     return json(req, 400, { error: "unsupported_grant_type" });
   }
 
-  const code = params.get("code") ?? "";
-  const redirectUri = params.get("redirect_uri") ?? "";
-  const codeVerifier = params.get("code_verifier") ?? "";
-  const clientId = params.get("client_id") ?? "";
+  const code = params.get("code")?.trim() ?? "";
+  const redirectUri = params.get("redirect_uri")?.trim() ?? "";
+  const codeVerifier = params.get("code_verifier")?.trim() ?? "";
+  const clientId = params.get("client_id")?.trim() ?? "";
   if (!code || !redirectUri || !codeVerifier) {
-    return json(req, 400, { error: "invalid_request" });
+    return json(req, 400, {
+      error: "invalid_request",
+      error_description: "code, redirect_uri, and code_verifier are required"
+    });
   }
 
   const grant = parseAuthCode(code);
   if (!grant) {
-    return json(req, 400, { error: "invalid_grant" });
+    return json(req, 400, {
+      error: "invalid_grant",
+      error_description: "authorization code is invalid or expired"
+    });
   }
-  if (grant.redirectUri !== redirectUri) {
-    return json(req, 400, { error: "invalid_grant" });
+  if (!redirectUrisMatch(grant.redirectUri, redirectUri)) {
+    return json(req, 400, {
+      error: "invalid_grant",
+      error_description: "redirect_uri does not match authorization request"
+    });
   }
   if (clientId) {
     if (grant.clientId !== clientId || !isKnownClientId(clientId)) {
-      return json(req, 400, { error: "invalid_client" });
+      return json(req, 400, {
+        error: "invalid_client",
+        error_description: "client_id does not match authorization request"
+      });
     }
   }
   if (!verifyPkceS256(codeVerifier, grant.codeChallenge)) {
-    return json(req, 400, { error: "invalid_grant" });
+    return json(req, 400, {
+      error: "invalid_grant",
+      error_description: "PKCE verification failed"
+    });
   }
 
   if (!grant.externalUserId) {
-    return json(req, 400, { error: "invalid_grant" });
+    return json(req, 400, {
+      error: "invalid_grant",
+      error_description: "authorization code is missing the end-user"
+    });
   }
 
   try {
@@ -132,6 +151,10 @@ export async function POST(req: NextRequest) {
         error_description: error.message
       });
     }
-    return json(req, 400, { error: "invalid_grant" });
+    console.error("mcp token mint failed", error);
+    return json(req, 503, {
+      error: "temporarily_unavailable",
+      error_description: "failed to mint access token"
+    });
   }
 }

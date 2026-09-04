@@ -79,6 +79,11 @@ export function isAllowedClientRedirectUri(redirectUri: string): boolean {
  * Loopback follows RFC 8252 §7.3 (any port) and treats 127.0.0.1 / localhost
  * / ::1 as the same host so Codex DCR/authorize host swaps still match.
  */
+function loopbackPathname(pathname: string): string {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
 export function redirectUrisMatch(
   registered: string,
   requested: string
@@ -87,7 +92,10 @@ export function redirectUrisMatch(
   const a = parseRedirectUri(registered);
   const b = parseRedirectUri(requested);
   if (!a || !b || !isLoopbackHttp(a) || !isLoopbackHttp(b)) return false;
-  return a.pathname === b.pathname && a.search === b.search;
+  return (
+    loopbackPathname(a.pathname) === loopbackPathname(b.pathname) &&
+    a.search === b.search
+  );
 }
 
 export function clientAllowsRedirect(
