@@ -15,6 +15,7 @@ process.env.MCP_AS_SECRET = "test-as-secret";
 const CODEX_CIMD = "https://chatgpt.com/oauth/codex/BKj9umzr4ef_/client.json";
 const CODEX_STABLE = "https://chatgpt.com/oauth/codex/client.json";
 const CHATGPT_CIMD = "https://chatgpt.com/oauth/BKj9umzr4ef_/client.json";
+const CLAUDE_CIMD = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const HERMES_CIMD =
   "https://nousresearch.github.io/hermes-agent/docs/oauth/client-metadata.json";
 const HERMES_REDIRECTS = [
@@ -38,6 +39,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 test("Codex and ChatGPT CIMD URLs are allowed", () => {
+  assert.equal(isAllowedCimdClientId(CLAUDE_CIMD), true);
   assert.equal(isAllowedCimdClientId(CODEX_CIMD), true);
   assert.equal(isAllowedCimdClientId(CODEX_STABLE), true);
   assert.equal(isAllowedCimdClientId(CHATGPT_CIMD), true);
@@ -63,6 +65,14 @@ test("Codex and ChatGPT CIMD URLs are allowed", () => {
   );
   assert.equal(
     isAllowedCimdClientId("https://CHATGPT.com/oauth/codex/client.json"),
+    false
+  );
+  assert.equal(
+    isAllowedCimdClientId("https://claude.ai/oauth/mcp-oauth-client-metadata/"),
+    false
+  );
+  assert.equal(
+    isAllowedCimdClientId("https://claude.ai/oauth/mcp-oauth-client-metadata?x=1"),
     false
   );
   assert.equal(isAllowedCimdClientId(HERMES_CIMD), true);
@@ -119,6 +129,18 @@ test("resolveCimdClient accepts ChatGPT connector redirects", async () => {
       client_id: CHATGPT_CIMD,
       redirect_uris: ["https://chatgpt.com/connector/oauth/BKj9umzr4ef_"],
       token_endpoint_auth_method: "none",
+    })
+  );
+  assert.equal(result.ok, true);
+});
+
+test("resolveCimdClient accepts Claude metadata", async () => {
+  clearCimdCache();
+  const result = await resolveCimdClient(CLAUDE_CIMD, async () =>
+    jsonResponse({
+      client_id: CLAUDE_CIMD,
+      redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+      token_endpoint_auth_methods_supported: ["none"],
     })
   );
   assert.equal(result.ok, true);
@@ -281,6 +303,7 @@ test("resolveOAuthClient still accepts DCR client ids", async () => {
     ]);
   }
   assert.equal(isKnownClientId(id), true);
+  assert.equal(isKnownClientId(CLAUDE_CIMD), true);
   assert.equal(isKnownClientId(CODEX_CIMD), true);
   assert.equal(isKnownClientId(HERMES_CIMD), true);
   assert.equal(isKnownClientId("not-a-client"), false);

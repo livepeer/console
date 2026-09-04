@@ -2,6 +2,8 @@ import { parseClientId } from "./as";
 import { normalizeRedirectUris } from "./dcr";
 
 const CHATGPT_CIMD_HOST = "chatgpt.com";
+const CLAUDE_CIMD_HOSTS = new Set(["claude.ai", "claude.com"]);
+const CLAUDE_CIMD_PATH = "/oauth/mcp-oauth-client-metadata";
 const HERMES_CIMD_HOST = "nousresearch.github.io";
 const HERMES_CIMD_PATH = "/hermes-agent/docs/oauth/client-metadata.json";
 const CIMD_TIMEOUT_MS = 3000;
@@ -33,6 +35,8 @@ export function clearCimdCache(): void {
 
 /**
  * CIMD documents we fetch:
+ *   https://claude.ai/oauth/mcp-oauth-client-metadata
+ *   https://claude.com/oauth/mcp-oauth-client-metadata
  *   https://chatgpt.com/oauth/codex/client.json
  *   https://chatgpt.com/oauth/codex/<callback_id>/client.json
  *   https://chatgpt.com/oauth/<callback_id>/client.json
@@ -50,6 +54,9 @@ export function isAllowedCimdClientId(clientId: string): boolean {
   if (parsed.port) return false;
   if (parsed.search || parsed.hash) return false;
   if (parsed.href !== clientId) return false;
+  if (CLAUDE_CIMD_HOSTS.has(parsed.hostname)) {
+    return parsed.pathname === CLAUDE_CIMD_PATH;
+  }
   if (parsed.hostname === HERMES_CIMD_HOST) {
     return parsed.pathname === HERMES_CIMD_PATH;
   }
