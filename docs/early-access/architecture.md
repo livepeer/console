@@ -133,3 +133,10 @@ Grandfather dry-run sources are the production PymtHouse app user inventory plus
 trusted app-specific identity evidence, with explicit cutoff and checksums. Do
 not use every Auth0 tenant account or approve uncertain mappings. Unresolved
 records are reported as production blockers, not guessed into the manifest.
+
+# Contract amendment 1 — browser profile
+
+`GET /api/console/session` is approval-protected and returns
+`ConsoleSessionProfile`. The browser consumes its persisted external account ID;
+it must not hash an Auth0 subject. Provider display labels are presentation only.
+The endpoint uses the same 401/403/503 authorization semantics as protected APIs.

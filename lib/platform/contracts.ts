@@ -75,3 +75,13 @@ export type AdminAccessList = {
   page: number;
   pageSize: number;
 };
+
+/** Backend-resolved profile; clients must never derive external account IDs. */
+export type ConsoleSessionProfile = {
+  userId: string;
+  externalUserId: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  provider: "github" | "google" | "email";
+};
