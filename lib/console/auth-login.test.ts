@@ -41,6 +41,10 @@ test("authLoginHref is the Auth0 SDK handoff", () => {
     authLoginHref({ connection: "google-oauth2", returnTo: "//evil.example" }),
     "/auth/login?returnTo=%2Fhome&connection=google-oauth2"
   );
+  assert.equal(
+    authLoginHref({ connection: "github", signup: true }),
+    "/auth/login?screen_hint=signup&returnTo=%2Fhome&connection=github"
+  );
 });
 
 test("console sign-in/up hrefs stay on the branded pages", () => {
