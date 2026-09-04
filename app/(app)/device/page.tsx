@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation";
-
-import { auth0 } from "@/lib/auth0";
-import { authLoginHref } from "@/lib/console/auth-login";
+import { requireConsolePage } from "@/lib/access/page";
 import { parseDeviceInitiateParams } from "@/lib/console/device-approval";
 import DeviceApproveForm, { DevicePageChrome } from "./DeviceApproveForm";
 
@@ -24,10 +21,7 @@ export default async function DevicePage({
   if (params.login_hint) query.set("login_hint", params.login_hint);
   const returnTo = `/device${query.size ? `?${query.toString()}` : ""}`;
 
-  const session = await auth0.getSession();
-  if (!session?.user?.sub) {
-    redirect(authLoginHref({ returnTo }));
-  }
+  await requireConsolePage(returnTo);
 
   let parsed;
   try {
