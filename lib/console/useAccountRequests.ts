@@ -29,10 +29,15 @@ const CACHE_KEY = "account-requests";
 /** Holds the list as last shown, including any pages appended via loadMore. */
 const requestsCache = createClientCache<ReadyState>(CACHE_TTL_MS);
 
+const HISTORY_PERIOD_DAYS = 30;
+
 async function fetchRequestsPage(
   cursor?: string | null
 ): Promise<Omit<ReadyState, "loadMoreError">> {
-  const params = new URLSearchParams({ limit: "50" });
+  const params = new URLSearchParams({
+    limit: "50",
+    days: String(HISTORY_PERIOD_DAYS),
+  });
   if (cursor) params.set("cursor", cursor);
 
   const response = await fetch(`/api/pymthouse/account-requests?${params}`, {

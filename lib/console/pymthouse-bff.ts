@@ -253,6 +253,7 @@ export async function fetchAccountRequestsForExternalUser(input: {
   email?: string;
   cursor?: string | null;
   limit?: number;
+  periodDays?: number;
 }): Promise<AccountRequestsPayload> {
   const publicClientId = readPublicClientId();
   const minted = await mintEndUserAccessToken(
@@ -261,7 +262,10 @@ export async function fetchAccountRequestsForExternalUser(input: {
   );
   const accessToken = minted.access_token;
 
+  const period = rollingPeriodDays(input.periodDays ?? 30);
   const url = new URL(`${issuerOriginFromConfig()}/api/v1/user/usage/requests`);
+  url.searchParams.set("from", period.startDate);
+  url.searchParams.set("to", period.endDate);
   if (input.cursor) url.searchParams.set("cursor", input.cursor);
   if (input.limit != null) url.searchParams.set("limit", String(input.limit));
 

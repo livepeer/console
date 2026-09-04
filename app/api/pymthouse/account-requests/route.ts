@@ -21,6 +21,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const rawDays = request.nextUrl.searchParams.get("days");
+  const periodDays = rawDays ? Number.parseInt(rawDays, 10) : 30;
+  if (!Number.isFinite(periodDays) || periodDays < 1 || periodDays > 90) {
+    return NextResponse.json(
+      { error: "days must be between 1 and 90" },
+      { status: 400, headers: PYMTHOUSE_NO_STORE_HEADERS }
+    );
+  }
+
   try {
     const session = await requireConsoleSession();
     const payload = await fetchAccountRequestsForExternalUser({
@@ -28,6 +37,7 @@ export async function GET(request: NextRequest) {
       email: session.email,
       cursor,
       limit,
+      periodDays,
     });
     return NextResponse.json(payload, { headers: PYMTHOUSE_NO_STORE_HEADERS });
   } catch (error) {
