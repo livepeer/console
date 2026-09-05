@@ -228,3 +228,29 @@ independent security review is claimed for this presentation-only delta.
 Retain the protected preview, isolated database, and captured-email configuration.
 Actual inbox delivery is not enabled or proven by this publication. No schema,
 auth, approval, secrets, production, PR, or domain changes are included.
+
+## Preview transactional Resend delivery
+
+User explicitly authorized real preview mail for verification/sign-in and access
+invitations. Coordinator implementation `8dc44f7` adds the explicit preview mode
+`send_transactional`; unspecified/unsafe modes remain blocked. Newsletter events
+are always captured in preview, even when transactional sending is enabled, and
+cannot synchronize production Contacts. Outbox completion records the per-event
+capture decision and clears token-bearing payloads after actual sending.
+
+Only this feature branch's Vercel preview received the existing sending-only
+Resend credential, sender/reply-to, and delivery mode. Credentials were copied
+privately, not committed or displayed. No production config, schema, grants, PR,
+or newsletter Contacts changed. The isolated preview had zero outstanding outbox
+events before enabling delivery; no backlog was processed. A Resend official
+delivery-simulator request was accepted by the provider; this is transport
+evidence, not human inbox confirmation.
+
+Verification:253 unit tests passed (31 DB cases skipped in credential-free run),
+108 Console/MCP tests passed,14 disposable-database waitlist/access integration
+tests passed; typecheck, lint, and production build passed. New regression cases
+cover live verification/approval delivery, captured newsletter changes, rejected
+unsafe preview modes, and unchanged production sending. Existing admin UI tests
+cover the Console page/sidebar and selection contracts. No fresh independent
+review is claimed. User inbox, Auth0 login, and privileged admin-browser acceptance
+remain separate checks; never infer or grant admin authority from email alone.
