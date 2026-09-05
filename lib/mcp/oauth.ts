@@ -80,13 +80,24 @@ export function consoleLoginUrl(req: Request): string {
   return url.toString();
 }
 
+/** Linear trailing-slash trim. `/\/+$/` is polynomial ReDoS on attacker-controlled input. */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+}
+
 export function isAllowedMcpResource(
   req: Request,
   resource: string | null | undefined
 ): boolean {
   const value = resource?.trim();
   if (!value) return true;
-  return value.replace(/\/+$/, "") === mcpResourceUrl(req);
+  // Clients (Claude, ChatGPT/Codex, Copilot, Hermes) may send the RFC 8707
+  // resource with or without a trailing slash; treat those as the same URL.
+  return stripTrailingSlashes(value) === mcpResourceUrl(req);
 }
 
 export function wellKnownJsonResponse(
