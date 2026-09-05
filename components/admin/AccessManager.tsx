@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Search, X, ArrowDownToLine } from "lucide-react";
+import {
+  selectionCsv,
+  type SelectionExportRow,
+} from "@/lib/admin/selection-csv";
+import SectionHeader from "@/components/console/SectionHeader";
+import SelectionCheckbox from "./SelectionCheckbox";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +29,14 @@ import {
 } from "./access-selection";
 
 const control =
-  "rounded border border-hairline bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40";
-type Filter = "waiting" | "approved" | "revoked" | "all";
+  "rounded-[4px] border border-hairline px-2.5 py-1 text-[11.5px] text-fg-muted transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40";
+const FILTERS = [
+  { value: "approved", label: "Approved" },
+  { value: "waiting", label: "Waitlist" },
+  { value: "subscribed", label: "Subscribed" },
+  { value: "unverified", label: "Unverified" },
+] as const;
+type Filter = (typeof FILTERS)[number]["value"];
 
 export default function AccessManager() {
   const [search, setSearch] = useState("");
@@ -33,6 +47,9 @@ export default function AccessManager() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
+  const [selectionScope, setSelectionScope] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [confirmation, setConfirmation] = useState<BulkAccessRequest[] | null>(
@@ -64,7 +81,7 @@ export default function AccessManager() {
         if (!response.ok)
           throw new Error(
             response.status === 401 || response.status === 403
-              ? "Your administrator session is unavailable. Sign in through the waitlist again."
+              ? "Your administrator session is unavailable. Sign in to Console again."
               : "Could not load entries. Try refreshing the list."
           );
         const result = (await response.json()) as AdminAccessList;
@@ -112,6 +129,7 @@ export default function AccessManager() {
           "The selection response was incomplete. Nothing was changed."
         );
       setSelected(new Set(result.signupIds));
+      setSelectionScope(JSON.stringify([filter, query]));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Selection failed.");
     } finally {
@@ -174,185 +192,257 @@ export default function AccessManager() {
     }
   }
 
-  const locked = working || selecting || !!batch || !!confirmation;
-  const pageIds = list?.rows.map((row) => row.id) ?? [];
-  const allPageSelected =
-    pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  async function exportSelected() {
+    if (exportLock.current || !selected.size) return;
+    exportLock.current = true;
+    setExporting(true);
+    setError("");
+    const ids = [...selected];
+    try {
+      const rows: SelectionExportRow[] = [];
+      for (let offset = 0; offset < ids.length; offset += 500) {
+        const chunk = ids.slice(offset, offset + 500);
+        const response = await fetch("/api/admin/access/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signupIds: chunk }),
+        });
+        if (!response.ok)
+          throw new Error("Could not export the selection. Please try again.");
+        const result = await response.json();
+        if (
+          !Array.isArray(result.rows) ||
+          result.rows.length !== chunk.length ||
+          result.rows.some(
+            (row: SelectionExportRow) =>
+              typeof row.email !== "string" || typeof row.joinedAt !== "string"
+          )
+        )
+          throw new Error("The export was incomplete. Nothing was downloaded.");
+        rows.push(...result.rows);
+      }
+      const url = URL.createObjectURL(
+        new Blob([selectionCsv(rows)], { type: "text/csv;charset=utf-8" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "livepeer-selected-emails.csv";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Export failed.");
+    } finally {
+      exportLock.current = false;
+      setExporting(false);
+    }
+  }
+
+  const locked = working || selecting || exporting || !!batch || !!confirmation;
+  const allMatchingSelected =
+    selected.size > 0 && selectionScope === JSON.stringify([filter, query]);
   const failed = outcomes.filter((item) => item.outcome === "failed").length;
   const pages = Math.max(1, Math.ceil((list?.total ?? 0) / 50));
 
   return (
-    <section className="mt-10" aria-labelledby="access-management-title">
-      <h2 id="access-management-title" className="text-xl">
-        Console access
-      </h2>
-      <p className="mt-2 text-sm text-fg-muted">
-        Approval unlocks Console and MCP. It does not grant administrator
-        permissions or marketing consent.
-      </p>
-      <form
-        className="mt-5 flex flex-wrap items-end gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setQuery(search.trim());
-          setPage(1);
-        }}
-      >
-        <label className="grid gap-1 text-xs">
-          Search by email
-          <input
-            className={control}
-            value={search}
-            disabled={working || selecting}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <button
-          className={control}
-          disabled={working || selecting}
-          type="submit"
-        >
-          Search
-        </button>
-        <label className="grid gap-1 text-xs">
-          Access status
-          <select
-            className={control}
-            value={filter}
-            disabled={working || selecting}
-            onChange={(event) => {
-              setFilter(event.target.value as Filter);
+    <section className="mt-10" aria-label="Console access">
+      <SectionHeader
+        variant="default"
+        title="Console access"
+        className="mb-4 flex flex-wrap items-end justify-between gap-3"
+        action={
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setQuery(search.trim());
               setPage(1);
             }}
           >
-            <option value="waiting">Waiting</option>
-            <option value="approved">Approved</option>
-            <option value="revoked">Revoked</option>
-            <option value="all">All entries</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          className={control}
-          disabled={working || selecting}
-          onClick={() => setReload((value) => value + 1)}
-        >
-          Refresh list
-        </button>
-      </form>
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <span className="text-sm" role="status">
-          {selected.size} selected across all pages
-        </span>
-        <button
-          type="button"
-          className={control}
-          disabled={locked || loading}
-          onClick={() => void selectMatching()}
-        >
-          {selecting
-            ? "Freezing selection…"
-            : "Select all matching (replace selection)"}
-        </button>
-        <button
-          type="button"
-          className={control}
-          disabled={locked || !selected.size}
-          onClick={() => setSelected(new Set())}
-        >
-          Clear selection
-        </button>
-        <button
-          type="button"
-          className={`${control} bg-foreground text-background`}
-          disabled={locked || !selected.size}
-          onClick={() => propose("approve")}
-        >
-          Approve selected
-        </button>
-        <button
-          type="button"
-          className={control}
-          disabled={locked || !selected.size}
-          onClick={() => propose("revoke")}
-        >
-          Revoke selected
-        </button>
+            <div className="flex h-[26px] w-[240px] max-w-full items-center gap-1.5 rounded-[4px] border border-hairline bg-dark px-2.5 focus-within:ring-1 focus-within:ring-green-bright/30">
+              <Search
+                className="h-3 w-3 shrink-0 text-fg-faint"
+                aria-hidden="true"
+              />
+              <input
+                aria-label="Search by email"
+                placeholder="Search by email…"
+                className="min-w-0 flex-1 bg-transparent text-[11.5px] text-fg-strong placeholder:text-fg-faint outline-none"
+                value={search}
+                disabled={working || selecting}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              <button type="submit" className="sr-only">
+                Search
+              </button>
+            </div>
+          </form>
+        }
+      />
+      <div
+        className="flex flex-wrap items-center gap-5 border-b border-hairline"
+        role="group"
+        aria-label="Access status"
+      >
+        {FILTERS.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            aria-pressed={filter === item.value}
+            disabled={locked}
+            onClick={() => {
+              if (filter === item.value) return;
+              setFilter(item.value);
+              setSelected(new Set());
+              setSelectionScope(null);
+              setPage(1);
+            }}
+            className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-40 ${filter === item.value ? "border-foreground font-medium text-fg-strong" : "border-transparent text-fg-faint hover:text-fg"}`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
-      <p className="mt-2 text-xs text-fg-faint">
-        Selections remain fixed when you change filters or pages. Review the
-        exact selection before confirming.
-      </p>
+      <div
+        className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr] sm:gap-3"
+        data-testid="selection-toolbar"
+      >
+        <div className="flex h-12 items-center gap-2">
+          <label className="mr-2 flex items-center gap-2 text-[12px] text-fg-muted">
+            <SelectionCheckbox
+              checked={allMatchingSelected}
+              indeterminate={selected.size > 0 && !allMatchingSelected}
+              disabled={locked || loading || !list?.total}
+              onChange={(event) => {
+                if (event.target.checked) void selectMatching();
+                else {
+                  setSelected(new Set());
+                  setSelectionScope(null);
+                }
+              }}
+            />
+            {selecting ? "Selecting…" : "Select all"}
+          </label>
+          <span className="sr-only" role="status">
+            {selected.size} selected
+          </span>
+        </div>
+        <div
+          className="ml-auto flex h-12 items-center justify-end gap-2"
+          role="group"
+          aria-label="Selection actions"
+        >
+          {!!selected.size && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-[4px] border border-hairline px-1.5 py-0.5 text-[11.5px] text-fg-muted transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Clear selection"
+              title="Clear selection"
+              disabled={locked}
+              onClick={() => {
+                setSelected(new Set());
+                setSelectionScope(null);
+              }}
+            >
+              <span>{selected.size} selected</span>
+              <X className="size-3" aria-hidden="true" />
+            </button>
+          )}
+          {!!selected.size && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-12 rounded-sm px-4"
+              aria-label={exporting ? "Exporting CSV" : "Export CSV"}
+              disabled={locked}
+              onClick={() => void exportSelected()}
+            >
+              <ArrowDownToLine className="size-4" aria-hidden="true" />
+              {exporting ? "Exporting…" : ".csv"}
+            </Button>
+          )}
+          {filter === "approved" && !!selected.size && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-12 rounded-sm px-4"
+              disabled={locked || !selected.size}
+              onClick={() => propose("revoke")}
+            >
+              Revoke selected
+            </Button>
+          )}
+          {filter === "waiting" && !!selected.size && (
+            <Button
+              type="button"
+              size="lg"
+              className="h-12 rounded-sm px-4"
+              disabled={locked || !selected.size}
+              onClick={() => propose("approve")}
+            >
+              Allow
+            </Button>
+          )}
+        </div>
+      </div>
       {error && (
         <p className="mt-4 text-sm text-red-500" role="alert">
           {error}
         </p>
       )}
       <div
-        className="mt-5 overflow-x-auto border-y border-hairline"
+        className="-mx-5 mt-4 overflow-x-auto sm:-mx-7"
+        style={{ overscrollBehaviorY: "auto", overscrollBehaviorX: "contain" }}
         aria-busy={loading}
       >
-        <table className="w-full min-w-[700px] text-left text-sm">
-          <thead className="border-b border-hairline text-fg-muted">
+        <table
+          aria-label="Access entries"
+          className="w-full min-w-[360px] text-left text-[12.5px]"
+        >
+          <colgroup>
+            <col className="w-12" />
+            <col />
+            <col />
+          </colgroup>
+          <thead className="sr-only">
             <tr>
-              <th className="p-3">
-                <input
-                  type="checkbox"
-                  aria-label="Select this page"
-                  checked={allPageSelected}
-                  disabled={locked || !pageIds.length}
-                  onChange={(event) =>
-                    setSelected((old) =>
-                      toggleSelection(old, pageIds, event.target.checked)
-                    )
-                  }
-                />
-              </th>
-              {[
-                "Email",
-                "Waitlist",
-                "Console access",
-                "Newsletter",
-                "Joined",
-              ].map((label) => (
-                <th className="p-3 font-medium" key={label}>
-                  {label}
-                </th>
-              ))}
+              <th scope="col">Selection</th>
+              <th scope="col">Email</th>
+              <th scope="col">Joined</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-hairline">
+          <tbody>
             {list?.rows.map((row) => (
-              <tr key={row.id}>
-                <td className="p-3">
-                  <input
-                    type="checkbox"
+              <tr
+                key={row.id}
+                data-selected={selected.has(row.id)}
+                className="transition-colors hover:bg-hover"
+              >
+                <td className="py-2.5 pl-5 pr-3 sm:pl-7">
+                  <SelectionCheckbox
                     aria-label={`Select ${row.email}`}
                     checked={selected.has(row.id)}
                     disabled={locked}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      setSelectionScope(null);
                       setSelected((old) =>
                         toggleSelection(old, [row.id], event.target.checked)
-                      )
-                    }
+                      );
+                    }}
                   />
                 </td>
-                <td className="p-3">{row.email}</td>
-                <td className="p-3">{row.waitlistStatus}</td>
-                <td className="p-3">
-                  {row.accessState === "pending" ? "Waiting" : row.accessState}
+                <td className="px-3 py-2.5 font-medium text-fg-strong">
+                  {row.email}
                 </td>
-                <td className="p-3">
-                  {row.newsletterSubscribed ? "Subscribed" : "Not subscribed"}
-                </td>
-                <td className="p-3">
+                <td className="whitespace-nowrap py-2.5 pl-3 pr-5 text-right text-fg-faint tabular-nums sm:pr-7">
                   {new Date(row.joinedAt).toLocaleDateString()}
                 </td>
               </tr>
             ))}
             {(!list || !list.rows.length) && (
               <tr>
-                <td className="p-6 text-fg-muted" colSpan={6}>
+                <td className="p-6 text-fg-muted" colSpan={3}>
                   {loading
                     ? "Loading entries…"
                     : error
@@ -364,7 +454,7 @@ export default function AccessManager() {
           </tbody>
         </table>
       </div>
-      <div className="mt-4 flex items-center gap-4 text-sm">
+      <div className="mt-4 flex items-center gap-4 text-[11.5px] text-fg-muted">
         <button
           type="button"
           className={control}

@@ -99,9 +99,10 @@ describe("Auth0-first Console administration presentation", () => {
     });
     const html = renderToStaticMarkup(await AdminPage());
     expect(html).toContain('id="main-content"');
-    expect(html).toContain("Waitlist administration");
+    expect(html).toContain("Administration sections");
+    expect(html).toContain("admin-tab-history");
     expect(html).toContain("Access management");
-    expect(html).toContain("/api/admin/signups.csv");
+    expect(html).not.toContain("/api/admin/signups.csv");
     expect(html).not.toContain("Livepeer Agent Early Access");
   });
 });

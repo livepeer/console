@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { formatCallMetric, formatRunRelativeTime } from "@/lib/console/utils";
 import EnvTag from "@/components/console/EnvTag";
 import StatusDot from "@/components/console/StatusDot";
@@ -53,6 +54,10 @@ export interface CallsTableProps {
    */
   rowColor?: (row: AccountActivityRow) => string;
   className?: string;
+  /** Optional platform-history owner context; omitted on personal History. */
+  rowContext?: (row: AccountActivityRow) => ReactNode;
+  /** Use a local inspector instead of navigating to the personal History route. */
+  onSelectRow?: (row: AccountActivityRow) => void;
 }
 
 export function modalityTag(pipeline: string): string {
@@ -123,6 +128,8 @@ export default function CallsTable({
   variant = "full",
   rowColor,
   className,
+  rowContext,
+  onSelectRow,
 }: CallsTableProps) {
   const compact = variant === "requests";
   // Static class strings — Tailwind's JIT can't resolve interpolated arbitrary
@@ -187,17 +194,9 @@ export default function CallsTable({
           row.status === "success"
             ? "shadow-[0_0_0_2px_rgba(64,191,134,0.18)]"
             : "";
-        return (
-          <Link
-            key={row.id}
-            href={`/home?request=${row.id}`}
-            scroll={false}
-            className={`${cols} ${rowPadY} text-[12.5px] transition-colors hover:bg-hover ${
-              // The header already draws its own bottom hairline; giving the
-              // first row a top one too stacked them into a 2px divider.
-              !compact && i > 0 ? "border-t border-hairline" : ""
-            }`}
-          >
+        const rowClass = `${cols} ${rowPadY} text-[12.5px] transition-colors hover:bg-hover ${!compact && i > 0 ? "border-t border-hairline" : ""}`;
+        const content = (
+          <>
             {/* Status dot sits inside the first cell, not in a column of its
                 own, so the header label starts at the padding edge. */}
             <div className="flex min-w-0 items-center gap-2.5">
@@ -239,6 +238,7 @@ export default function CallsTable({
                 {pipelineLabel}
               </span>
               {showEnvironment && <EnvTag environmentId={row.environmentId} />}
+              {rowContext?.(row)}
             </div>
             {!compact && (
               <span
@@ -266,6 +266,26 @@ export default function CallsTable({
                 {timeLabel}
               </span>
             )}
+          </>
+        );
+        return onSelectRow ? (
+          <button
+            key={row.id}
+            type="button"
+            aria-label={`Inspect ${row.id}`}
+            onClick={() => onSelectRow(row)}
+            className={`${rowClass} w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring`}
+          >
+            {content}
+          </button>
+        ) : (
+          <Link
+            key={row.id}
+            href={`/home?request=${row.id}`}
+            scroll={false}
+            className={rowClass}
+          >
+            {content}
           </Link>
         );
       })}
