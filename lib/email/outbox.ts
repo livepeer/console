@@ -218,7 +218,8 @@ async function deliver(
 ): Promise<"delivered" | "failed" | "invalid" | "terminal"> {
   try {
     const captured = isCaptureDelivery(
-      event.eventType === NEWSLETTER_CONSENT_EVENT ? "newsletter" : "email"
+      event.eventType === NEWSLETTER_CONSENT_EVENT ? "newsletter" : "email",
+      typeof event.payload.to === "string" ? event.payload.to : undefined
     );
     if (event.eventType === VERIFICATION_EMAIL_EVENT) {
       const payload = verificationPayloadSchema.safeParse(event.payload);

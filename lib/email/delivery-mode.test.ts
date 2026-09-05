@@ -26,5 +26,22 @@ describe("preview delivery isolation", () => {
     vi.stubEnv("EMAIL_DELIVERY_MODE", "capture");
     expect(isCaptureDelivery()).toBe(false);
     expect(isCaptureDelivery("newsletter")).toBe(false);
+    expect(
+      isCaptureDelivery("email", "preview-001@preview.livepeer.invalid")
+    ).toBe(false);
+  });
+  it("captures only the reserved fixture domain in transactional preview mode", () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "send_transactional");
+    expect(
+      isCaptureDelivery("email", "preview-001@preview.livepeer.invalid")
+    ).toBe(true);
+    expect(
+      isCaptureDelivery("email", " PREVIEW-001@PREVIEW.LIVEPEER.INVALID ")
+    ).toBe(true);
+    expect(isCaptureDelivery("email", "person@example.com")).toBe(false);
+    expect(
+      isCaptureDelivery("email", "person@preview.livepeer.invalid.example.com")
+    ).toBe(false);
   });
 });

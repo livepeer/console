@@ -1,5 +1,29 @@
 # Early-access migration tools
 
+## Isolated preview contacts
+
+`seed-preview.ts` exports `seedPreviewContacts(env, apply = false)`. It accepts
+only `PREVIEW_SEED_DATABASE_URL` on the approved preview host and
+`PREVIEW_SEED_BRANCH_ID=br-holy-sound-auugm104`; it never falls back to
+`DATABASE_URL`. The default is a read-only count. Keep the URL in an ignored
+private environment file, never in command arguments or logs.
+
+Before applying, verify that the deployed preview includes the reserved-domain
+capture rule, then supply `PREVIEW_FIXTURE_CAPTURE_READY=1` and `apply=true`.
+It adds 150 contacts at `preview.livepeer.invalid`, all tagged
+`preview_fixture_v1`: 90 waiting, 30 approved, 15 revoked, 15 unverified;
+50 simulated subscriptions and 30 referrals. It creates no canonical users,
+provider identities, administrator permissions or outbox events.
+
+Reruns leave the existing fixture set and any manual changes intact. Partial
+sets or collisions fail instead of overwriting records. A guarded disposable
+Postgres test rehearses seed/repeat behavior and rolls back all changes.
+
+The reserved fixture domain is captured only in Vercel Preview, including
+approval invitations. Real inbox tests retain configured transactional delivery;
+all preview newsletter synchronization remains captured. These simulated consent
+records are not real marketing permission. This is not a production seed tool.
+
 These tools never print credentials, email addresses, subjects, or customer IDs.
 Private artifacts contain identity data: write them only outside the repository,
 retain them with the release evidence, and never upload them to a PR. Files are
@@ -22,11 +46,22 @@ Input shape:
 
 ```json
 {
-  "scope": { "service": "pymthouse", "issuer": "https://issuer.example/api/v1/oidc", "appId": "console-app" },
+  "scope": {
+    "service": "pymthouse",
+    "issuer": "https://issuer.example/api/v1/oidc",
+    "appId": "console-app"
+  },
   "auth0Issuer": "https://login.example",
   "cutoff": "2026-09-04T00:00:00.000Z",
   "inventory": { "users": [] },
-  "evidence": [{ "subject": "auth0|synthetic", "issuer": "https://login.example", "source": "console_authentication", "occurredAt": "2026-09-03T00:00:00.000Z" }]
+  "evidence": [
+    {
+      "subject": "auth0|synthetic",
+      "issuer": "https://login.example",
+      "source": "console_authentication",
+      "occurredAt": "2026-09-03T00:00:00.000Z"
+    }
+  ]
 }
 ```
 

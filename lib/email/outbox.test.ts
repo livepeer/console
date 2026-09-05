@@ -164,6 +164,40 @@ describe("outbox dispatch", () => {
     );
     expect(deps.store.markProcessed).toHaveBeenCalledWith("consent", now, true);
   });
+  it("captures seeded preview recipients even when real transactional mail is enabled", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "send_transactional");
+    const to = "preview-001@preview.livepeer.invalid";
+    const deps = dependencies([
+      fixture({
+        payload: {
+          to,
+          verificationUrl:
+            "https://preview.example.invalid/verify?token=fixture",
+          expiresAt: "2026-09-06T00:00:00.000Z",
+        },
+      }),
+      fixture({
+        id: "approval",
+        eventType: "access.approved",
+        payload: { to, loginUrl: "https://preview.example.invalid/login" },
+      }),
+    ]);
+    const sendApprovalEmail = vi.fn();
+    expect(
+      await dispatchPendingOutbox({
+        ...deps,
+        emailProvider: { ...deps.emailProvider, sendApprovalEmail },
+      })
+    ).toMatchObject({ delivered: 2, failed: 0 });
+    expect(deps.sendVerificationEmail).not.toHaveBeenCalled();
+    expect(sendApprovalEmail).not.toHaveBeenCalled();
+    expect(deps.store.markProcessed).toHaveBeenCalledWith(
+      "approval",
+      expect.any(Date),
+      true
+    );
+  });
 
   it("delivers verification events and marks them processed", async () => {
     const deps = dependencies([fixture()]);

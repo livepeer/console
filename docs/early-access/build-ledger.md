@@ -326,3 +326,18 @@ preview or production schema changes were made during reconciliation.
 
 Details, findings and remaining gates:
 [reconciliation-2026-09-05.md](./reconciliation-2026-09-05.md).
+
+### Authorized preview preparation — 2026-09-05
+
+User approved publishing the reconciliation and preparing the existing isolated
+preview, without a PR or production change. Applied only `0009_mcp_assets` after
+verifying every existing journal hash/timestamp. Preserved 7 canonical users,
+8 signups, 6 outbox records and 2 admin grants. Granted asset CRUD to the existing
+preview runtime role; it still cannot create schema objects or update/delete
+access audit events.
+
+Added a repeatable, preview-host/branch-guarded 150-contact seed and reserved-domain
+email capture. The seed creates no users/admins/outbox events and never overwrites
+an existing fixture set. Fixtures will be added only after the exact deployed
+revision includes the capture rule. No newsletter Contacts calls or production
+data writes are authorized by this preview run.
