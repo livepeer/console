@@ -92,11 +92,16 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
       vi.mocked(getDb).mockImplementation(() => db);
       vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://preview.example.invalid");
       const admin = await signup("admin");
+      const adminIdentity = await enroll("admin");
       const [grant] = await db
         .insert(schema.adminRoleGrants)
         .values({ signupId: admin.id, source: "synthetic_fixture" })
         .returning();
-      actor = { signupId: admin.id, adminGrantId: grant.id };
+      actor = {
+        signupId: admin.id,
+        adminGrantId: grant.id,
+        userId: adminIdentity.canonical.userId,
+      };
     });
     afterAll(async () => {
       // Audit is immutable. Retain synthetic fixtures only in this disposable DB;
@@ -129,6 +134,27 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
       expect(rows).toHaveLength(0);
       expect(await getNewsletterConsent(identity.email!)).toBe(false);
     }, 60000);
+    it("admits canonical administrators without a product grant but explicit revocation overrides their role", async () => {
+      const admin = await enroll("separate-admin");
+      expect((await getAccessDecision(admin.canonical.userId)).state).toBe(
+        "pending"
+      );
+      await db
+        .insert(schema.adminRoleGrants)
+        .values({
+          signupId: admin.result.signupId!,
+          source: "synthetic_fixture",
+        });
+      expect((await getAccessDecision(admin.canonical.userId)).state).toBe(
+        "approved"
+      );
+      expect(
+        (await action([admin.result.signupId!], "revoke")).outcomes[0].outcome
+      ).toBe("revoked");
+      expect((await getAccessDecision(admin.canonical.userId)).state).toBe(
+        "revoked"
+      );
+    }, 30000);
     it("confirms a pending entry preserving attribution/referral and never revives suppressed contacts", async () => {
       const row = await signup("pending", "pending");
       const referrer = await signup("referrer");
