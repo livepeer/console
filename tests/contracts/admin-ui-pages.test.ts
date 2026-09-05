@@ -2,7 +2,14 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), identity: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  session: vi.fn(),
+  identity: vi.fn(),
+  referral: vi.fn(),
+}));
+vi.mock("@/lib/waitlist/identity-referral", () => ({
+  getIdentityReferralUrl: mocks.referral,
+}));
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   redirect: (href: string) => {
@@ -25,6 +32,7 @@ beforeEach(() => {
   vi.stubEnv("CONSOLE_DEV_MOCK", "0");
   mocks.session.mockReset();
   mocks.identity.mockReset();
+  mocks.referral.mockReset();
 });
 
 describe("server page admission", () => {
@@ -104,17 +112,77 @@ describe("waiting states", () => {
       const html = renderToStaticMarkup(result);
       expect(html).toContain(waitingCopy[expectedState].title);
       expect(html).toContain('href="/auth/logout"');
-      expect(html).not.toContain("test@example.invalid");
+      expect(html).toContain("test@example.invalid");
     }
   );
-  it("renders retry and independent consent copy on outages", () => {
+  it("keeps the outage status and only the sign-out action", () => {
     const html = renderToStaticMarkup(
       createElement(WaitingContent, {
         state: "unavailable",
-        retryHref: "/access-pending",
       })
     );
-    expect(html).toContain("Check access again");
-    expect(html).toContain("does not subscribe you to marketing emails");
+    expect(html).toContain(waitingCopy.unavailable.title);
+    expect(html).toContain("Sign out");
+    expect(html).not.toContain("Check access again");
+  });
+  it("places the real referral card below centered pending copy", async () => {
+    mocks.session.mockRejectedValue({ status: 403, code: "access_pending" });
+    mocks.identity.mockResolvedValue({
+      email: "test@example.invalid",
+      emailVerified: true,
+      avatarUrl: "https://images.example.com/avatar.png",
+    });
+    mocks.referral.mockResolvedValue(
+      "https://preview.example.com/waitlist?ref=actual-code"
+    );
+    const result = await AccessPendingPage({
+      searchParams: Promise.resolve({}),
+    });
+    expect(result.props.referralUrl).toBe(
+      "https://preview.example.com/waitlist?ref=actual-code"
+    );
+    expect(result.props.email).toBe("test@example.invalid");
+    expect(result.props.avatarUrl).toBe(
+      "https://images.example.com/avatar.png"
+    );
+    const html = renderToStaticMarkup(result);
+    expect(html.indexOf("You’re on the waitlist.")).toBeLessThan(
+      html.indexOf("Refer a friend")
+    );
+    expect(html).toContain("text-center");
+    expect(html).toContain("Copy referral link");
+    expect(html).toContain("aspect-video");
+    expect(html).toContain("max-w-[280px]");
+    expect(html).not.toContain("We’re welcoming people");
+    expect(html).not.toContain("Manage waitlist");
+    expect(html).not.toContain("Check access again");
+  });
+  it("keeps pending admission intact if the optional referral lookup fails", async () => {
+    mocks.session.mockRejectedValue({ status: 403, code: "access_pending" });
+    mocks.identity.mockResolvedValue({
+      email: "test@example.invalid",
+      emailVerified: true,
+    });
+    mocks.referral.mockRejectedValue(new Error("offline"));
+    const result = await AccessPendingPage({
+      searchParams: Promise.resolve({}),
+    });
+    expect(result.props.state).toBe("pending");
+    expect(result.props.referralUrl).toBeNull();
+  });
+  it.each([
+    "verify-email",
+    "revoked",
+    "disabled",
+    "enrollment-attention",
+    "unavailable",
+  ] as const)("does not offer referrals for %s", (state) => {
+    const html = renderToStaticMarkup(
+      createElement(WaitingContent, {
+        state,
+        referralUrl: "https://preview.example.com/waitlist?ref=code",
+      })
+    );
+    expect(html).not.toContain("Copy referral link");
   });
 });

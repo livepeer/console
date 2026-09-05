@@ -6,6 +6,8 @@ export type ProviderIdentity = {
   strategy?: string;
   email?: string;
   emailVerified: boolean;
+  /** Presentation only; never used for identity matching or authorization. */
+  avatarUrl?: string;
 };
 
 export type CanonicalIdentity = {

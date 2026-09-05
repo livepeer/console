@@ -1,3 +1,8 @@
+import { AuthScreen } from "@/components/console/auth/AuthScreen";
+import { AuthCard } from "@/components/console/auth/AuthCard";
+import { AccountAvatar } from "@/components/console/auth/AccountAvatar";
+import { ReferralCard } from "@/components/console/ReferralCard";
+
 export type WaitingState =
   | "pending"
   | "verify-email"
@@ -6,102 +11,56 @@ export type WaitingState =
   | "enrollment-attention"
   | "unavailable";
 
-export const waitingCopy: Record<
-  WaitingState,
-  { title: string; description: string }
-> = {
-  "enrollment-attention": {
-    title: "We couldn’t finish connecting your waitlist entry.",
-    description:
-      "Your sign-in worked, but we can’t confirm waitlist enrollment for this account. Please contact the Livepeer team for help. We haven’t changed your email preferences.",
-  },
-  pending: {
-    title: "You’re on the waitlist.",
-    description:
-      "We’re welcoming people to Livepeer in stages. We’ll email you when your Console access is ready. You don’t need to sign up again.",
-  },
-  "verify-email": {
-    title: "Verify your email to continue.",
-    description:
-      "Your sign-in provider hasn’t confirmed your email address yet. Verify it with your provider, then sign out and sign in again so we can safely connect your waitlist entry.",
-  },
-  revoked: {
-    title: "Your Console access is paused.",
-    description:
-      "Your account no longer has early access. Signing in again won’t change that. Please contact the Livepeer team if you think this is a mistake.",
-  },
-  disabled: {
-    title: "Your account is disabled.",
-    description:
-      "Console access is unavailable for this account. Please contact the Livepeer team for help.",
-  },
-  unavailable: {
-    title: "We can’t check your access right now.",
-    description:
-      "This doesn’t mean your access was removed. Please try again in a moment. Your sign-in and waitlist membership are separate from this temporary check.",
-  },
+export const waitingCopy: Record<WaitingState, { title: string }> = {
+  pending: { title: "You’re on the waitlist." },
+  "verify-email": { title: "Verify your email to continue." },
+  revoked: { title: "Your Console access is paused." },
+  disabled: { title: "Your account is disabled." },
+  "enrollment-attention": { title: "We couldn’t connect your waitlist entry." },
+  unavailable: { title: "We can’t check your access right now." },
 };
 
 export function WaitingContent({
   state,
-  retryHref,
-  fromMcp = false,
+  referralUrl = null,
+  email,
+  avatarUrl,
 }: {
   state: WaitingState;
-  retryHref: string;
-  fromMcp?: boolean;
+  referralUrl?: string | null;
+  email?: string;
+  avatarUrl?: string;
 }) {
   const copy = waitingCopy[state];
   return (
-    <main className="dark flex min-h-svh items-center justify-center bg-background px-6 text-foreground">
-      <section
-        className="w-full max-w-lg py-16 font-sans"
-        aria-labelledby="access-title"
-      >
-        <a href="/waitlist" className="text-sm text-white/60">
-          Livepeer · Early access
-        </a>
-        <h1
-          id="access-title"
-          className="mt-10 font-display text-4xl font-light tracking-tight"
-        >
-          {copy.title}
-        </h1>
-        <p className="mt-5 text-base leading-relaxed text-white/65">
-          {copy.description}
-        </p>
-        {fromMcp ? (
-          <p className="mt-4 text-sm text-white/65">
-            Your agent connection has not been authorized. Once your access is
-            ready, restart the connection from your agent.
-          </p>
-        ) : null}
-        <div className="mt-8 flex flex-wrap items-center gap-5 text-sm">
-          <a
-            className="rounded-md bg-white px-4 py-2 text-black"
-            href={retryHref}
+    <AuthScreen>
+      <AuthCard label={copy.title}>
+        <div className="pt-2 text-center">
+          <h1
+            id="access-title"
+            className="mb-5 text-xl font-medium text-balance"
           >
-            Check access again
-          </a>
+            {copy.title}
+          </h1>
+          <AccountAvatar email={email} avatarUrl={avatarUrl} />
+          <p className="mt-3 break-words text-sm text-muted-foreground">
+            {email || "Signed-in account"}
+          </p>
+        </div>
+        {state === "pending" && (
+          <div className="mt-6 flex justify-center">
+            <ReferralCard referralUrl={referralUrl} compact />
+          </div>
+        )}
+        <div className="mt-6 text-center text-sm">
           <a
-            className="text-white/70 underline underline-offset-4"
+            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
             href="/auth/logout"
           >
             Sign out
           </a>
         </div>
-        {state === "pending" ? (
-          <a
-            href="/waitlist"
-            className="mt-6 inline-block text-sm text-white/70 underline underline-offset-4"
-          >
-            Manage waitlist &amp; email preferences
-          </a>
-        ) : null}
-        <p className="mt-8 text-xs leading-relaxed text-white/45">
-          Waitlist membership does not subscribe you to marketing emails.
-        </p>
-      </section>
-    </main>
+      </AuthCard>
+    </AuthScreen>
   );
 }

@@ -3,6 +3,8 @@ import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { consoleSignInHref, safeReturnTo } from "@/lib/console/auth-login";
 import { requireConsoleSession } from "@/lib/console/session-user";
 import { WaitingContent, type WaitingState } from "./content";
+import { getIdentityReferralUrl } from "@/lib/waitlist/identity-referral";
+import type { ProviderIdentity } from "@/lib/platform/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,8 @@ export default async function AccessPendingPage({
   let approved = false;
   let unauthenticated = false;
   let state: WaitingState = "unavailable";
+  let referralUrl: string | null = null;
+  let identity: ProviderIdentity | null = null;
   try {
     await requireConsoleSession();
     approved = true;
@@ -28,9 +32,17 @@ export default async function AccessPendingPage({
     if (failure?.code === "access_pending") {
       state = "pending";
       try {
-        const identity = await getAuthenticatedIdentity();
+        identity = await getAuthenticatedIdentity();
         if (identity && (!identity.emailVerified || !identity.email))
           state = "verify-email";
+        else if (identity) {
+          try {
+            referralUrl = await getIdentityReferralUrl(identity);
+          } catch {
+            // An optional referral lookup must not alter the access decision.
+            console.error("pending_referral_lookup_failed");
+          }
+        }
       } catch {
         state = "unavailable";
       }
@@ -45,11 +57,19 @@ export default async function AccessPendingPage({
   }
   if (unauthenticated) redirect(consoleSignInHref({ returnTo }));
   if (approved) redirect(returnTo);
+  if (!identity) {
+    try {
+      identity = await getAuthenticatedIdentity();
+    } catch {
+      // Missing presentation data never changes the access decision.
+    }
+  }
   return (
     <WaitingContent
       state={state}
-      fromMcp={params.from === "mcp"}
-      retryHref={`/access-pending?returnTo=${encodeURIComponent(returnTo)}${params.from === "mcp" ? "&from=mcp" : ""}`}
+      referralUrl={referralUrl}
+      email={identity?.email}
+      avatarUrl={identity?.avatarUrl}
     />
   );
 }

@@ -30,7 +30,12 @@ export function validateProviderIdentity(
 }
 
 export function auth0IdentityFromUser(
-  user: { sub?: unknown; email?: unknown; email_verified?: unknown },
+  user: {
+    sub?: unknown;
+    email?: unknown;
+    email_verified?: unknown;
+    picture?: unknown;
+  },
   configuredIssuer: string
 ): ProviderIdentity | null {
   if (typeof user.sub !== "string" || !user.sub.trim()) return null;
@@ -40,6 +45,20 @@ export function auth0IdentityFromUser(
   if (!configuredIssuer.trim())
     throw new Error("Auth0 issuer is not configured");
   const subject = user.sub.trim();
+  let avatarUrl: string | undefined;
+  if (typeof user.picture === "string") {
+    try {
+      const picture = new URL(user.picture);
+      if (
+        picture.protocol === "https:" &&
+        !picture.username &&
+        !picture.password
+      )
+        avatarUrl = picture.toString();
+    } catch {
+      /* Missing or invalid profile images use an initial fallback. */
+    }
+  }
   return validateProviderIdentity({
     authority: "auth0",
     issuer,
@@ -50,5 +69,6 @@ export function auth0IdentityFromUser(
         ? user.email.trim() || undefined
         : undefined,
     emailVerified: user.email_verified === true,
+    ...(avatarUrl ? { avatarUrl } : {}),
   });
 }
