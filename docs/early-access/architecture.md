@@ -202,6 +202,12 @@ POST `/api/waitlist` no longer enrolls or sends sign-in links. The UI starts
 Auth0 instead; legacy routes cannot bypass the new authentication boundary.
 Auth0 logout replaces the custom waitlist-session logout in the browser.
 
+Membership reads resolve existing ownership but never enroll. Only join/sync and
+authenticated Console orchestration enroll; otherwise an already-authenticated
+visitor's background session read could create an entry before referral context
+arrives (independent review SEC-05). Legacy verification confirms an old entry
+only; old tokens do not restore deferred or stale marketing consent.
+
 This amendment needs no database migration or credential-provider change.
 Production remains on hold. PR48 will include PR46 by targeting main; neither
 PR is merged as part of this work.

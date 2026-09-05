@@ -207,6 +207,9 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
       await enrollAuthenticatedUser(referrer.identity, referrer.canonical);
       const ref = await record(address("referrer"));
       const member = await authenticate("member");
+      // A signed-in landing/session refresh must not enroll before referral context.
+      expect((await session()).status).toBe(401);
+      expect(await record(address("member"))).toBeUndefined();
       await enrollAuthenticatedUser(member.identity, member.canonical, {
         source: "waitlist_auth",
         referralCode: ref.referralCode,
