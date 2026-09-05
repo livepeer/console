@@ -34,7 +34,7 @@ describe.skipIf(!databaseUrl)(
       await client?.end();
     });
 
-    it("upgrades production0004 through0008, preserving records and enforcing invariants", async () => {
+    it("upgrades production0004 through0009, preserving records and enforcing invariants", async () => {
       const schema = `migration_${randomUUID().replaceAll("-", "")}`;
       const rollback = new Error("rollback_synthetic_migration_schema");
       try {
@@ -76,6 +76,10 @@ describe.skipIf(!databaseUrl)(
           VALUES (${user.id}, 'auth0', 'auth0|legacy-fixture', 'eu_original') RETURNING id`;
           await apply(7);
           await apply(8);
+          await apply(9);
+          expect(
+            (await tx`SELECT count(*)::int AS n FROM mcp_assets`)[0].n
+          ).toBe(0);
           await tx`INSERT INTO oauth_code_redemptions (code_hash, expires_at)
             VALUES ('synthetic-digest-only', now() + interval '1 minute')`;
           await expect(

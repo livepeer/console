@@ -20,12 +20,16 @@ import {
   dailyRequestSeriesForPipeline,
   utcDateKeysForPeriod,
 } from "@/lib/console/usage-capability-display";
+import {
+  clipHistoryPage,
+  historyWindow,
+} from "@/lib/console/history-window";
+import { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
 
 export type {
   AccountRequestsPayload,
   AccountUsagePayload,
 } from "@/lib/console/account-usage";
-import { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
 
 export { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
 
@@ -262,6 +266,9 @@ export async function fetchAccountRequestsForExternalUser(input: {
   const accessToken = minted.access_token;
 
   const url = new URL(`${issuerOriginFromConfig()}/api/v1/user/usage/requests`);
+  const window = historyWindow();
+  url.searchParams.set("from", window.from);
+  url.searchParams.set("to", window.to);
   if (input.cursor) url.searchParams.set("cursor", input.cursor);
   if (input.limit != null) url.searchParams.set("limit", String(input.limit));
 
@@ -299,9 +306,13 @@ export async function fetchAccountRequestsForExternalUser(input: {
     );
   }
 
+  const clipped = clipHistoryPage(
+    body?.items ?? [],
+    body?.nextCursor ?? null
+  );
   return {
-    items: body?.items ?? [],
-    nextCursor: body?.nextCursor ?? null,
+    items: clipped.items,
+    nextCursor: clipped.nextCursor,
     openMeterConfigured: body?.openMeterConfigured !== false,
     clientId: body?.clientId ?? publicClientId,
     externalUserId: body?.externalUserId ?? input.externalUserId,

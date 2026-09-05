@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Search, X } from "lucide-react";
 import SectionHeader from "@/components/console/SectionHeader";
-import CallsTable, { modalityTag } from "@/components/console/CallsTable";
+import CallsTable from "@/components/console/CallsTable";
 import CallDetailDrawer from "@/components/console/CallDetailDrawer";
 import { useAuth } from "@/components/console/AuthContext";
 import { useAccountRequests } from "@/lib/console/useAccountRequests";
@@ -59,7 +59,7 @@ export default function CallsSection({
             r.id.toLowerCase().includes(q) ||
             r.model.toLowerCase().includes(q) ||
             r.pipeline.toLowerCase().includes(q) ||
-            modalityTag(r.pipeline).includes(q)
+            r.modality.toLowerCase().includes(q)
         )
       : allRows;
     return [...scoped].sort(
@@ -124,6 +124,7 @@ export default function CallsSection({
         variant="default"
         className="mb-3 flex flex-wrap items-end justify-between gap-3 px-3 md:px-7"
         title="History"
+        description="Last 7 days"
         action={
           <div className="flex h-[26px] w-[240px] items-center gap-1.5 rounded-[4px] border border-hairline bg-dark px-2.5 focus-within:ring-1 focus-within:ring-green-bright/30">
             <Search

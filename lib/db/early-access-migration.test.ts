@@ -216,9 +216,10 @@ describe("early-access migration and grandfather planning", () => {
     const journal = JSON.parse(
       readFileSync(resolve(process.cwd(), "drizzle/meta/_journal.json"), "utf8")
     );
-    expect(journal.entries.at(-2).tag).toBe("0007_early_access_domains");
-    expect(journal.entries.at(-1).tag).toBe("0008_oauth_code_redemptions");
-    expect(journal.entries).toHaveLength(9);
+    expect(journal.entries[7].tag).toBe("0007_early_access_domains");
+    expect(journal.entries[8].tag).toBe("0008_oauth_code_redemptions");
+    expect(journal.entries[9].tag).toBe("0009_mcp_assets");
+    expect(journal.entries).toHaveLength(10);
   });
   it("scopes identities/accounts and permits multiple accounts per user", () => {
     expect(authIdentities.externalUserId.notNull).toBe(false);

@@ -80,13 +80,37 @@ export function consoleLoginUrl(req: Request): string {
   return url.toString();
 }
 
+function trimPathTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === "/") {
+    end -= 1;
+  }
+  return end === pathname.length ? pathname : pathname.slice(0, end);
+}
+
 export function isAllowedMcpResource(
   req: Request,
   resource: string | null | undefined
 ): boolean {
   const value = resource?.trim();
   if (!value) return true;
-  return value.replace(/\/+$/, "") === mcpResourceUrl(req);
+  let requested: URL;
+  let expected: URL;
+  try {
+    requested = new URL(value);
+    expected = new URL(mcpResourceUrl(req));
+  } catch {
+    return false;
+  }
+  if (requested.username || requested.password) return false;
+  if (requested.search || requested.hash) return false;
+  if (requested.origin !== expected.origin) return false;
+  // Clients (Claude, ChatGPT/Codex, Copilot, Hermes) may send the RFC 8707
+  // resource with or without a trailing slash; treat those as equivalent.
+  return (
+    trimPathTrailingSlashes(requested.pathname) ===
+    trimPathTrailingSlashes(expected.pathname)
+  );
 }
 
 export function wellKnownJsonResponse(

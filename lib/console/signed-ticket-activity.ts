@@ -1,9 +1,8 @@
 import type { AccountActivityRow, PipelineKind } from "@/lib/console/types";
 import type { SignedTicketRequestRow } from "@/lib/console/account-usage";
-import {
-  humanizePipelineModel,
-  microsToUsdDisplay,
-} from "@/lib/console/usage-capability-display";
+import { resolveActivityCapability } from "@/lib/console/capability-modality";
+import { requestFeeDisplay } from "@/lib/console/request-fee-display";
+import { humanizePipelineModel } from "@/lib/console/usage-capability-display";
 
 const LIVE_PIPELINES = new Set([
   "video-to-video",
@@ -11,24 +10,31 @@ const LIVE_PIPELINES = new Set([
   "live-transcoding",
 ]);
 
-function inferKind(pipeline: string): PipelineKind {
-  return LIVE_PIPELINES.has(pipeline) ? "live" : "batch";
+function inferKind(pipeline: string, modality: string): PipelineKind {
+  return LIVE_PIPELINES.has(pipeline) || modality === "realtime"
+    ? "live"
+    : "batch";
 }
 
 /** Map PymtHouse signed-ticket rows into the /calls table shape. */
 export function mapSignedTicketToActivityRow(
   row: SignedTicketRequestRow
 ): AccountActivityRow {
-  const kind = inferKind(row.pipeline);
-  const model = humanizePipelineModel(row.pipeline, row.modelId);
-  const fee = microsToUsdDisplay(row.networkFeeUsdMicros || "0");
+  const { modality, pipeline } = resolveActivityCapability({
+    pipeline: row.pipeline,
+    capabilityId: row.modelId,
+  });
+  const kind = inferKind(pipeline, modality);
+  const model = humanizePipelineModel(pipeline, row.modelId);
+  const { display, exact } = requestFeeDisplay(row);
 
   return {
     id: row.gatewayRequestId || row.eventId,
     environmentId: "env-production",
     timestamp: row.time,
     model,
-    pipeline: row.pipeline,
+    pipeline,
+    modality,
     status: "success",
     kind,
     latencyMs: null,
@@ -37,6 +43,9 @@ export function mapSignedTicketToActivityRow(
     signerLabel: row.appName?.trim() || "PymtHouse",
     tokenId: "",
     tokenName: "",
-    costDisplay: fee,
+    costDisplay: display,
+    costExact: exact,
+    outputUrl: row.outputUrl?.trim() || undefined,
+    providerRequestId: row.providerRequestId?.trim() || undefined,
   };
 }

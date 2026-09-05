@@ -36,6 +36,7 @@ vi.mock("jose", async (importOriginal) => {
 });
 
 import { verifyMcpUserJwt } from "@/lib/mcp/jwt";
+import { externalUserIdFromSub } from "@/lib/console/external-user-id";
 
 let privateKey: CryptoKey;
 let wrongKey: CryptoKey;
@@ -94,6 +95,19 @@ describe("MCP issuer-signed app-scoped identity", () => {
       )
     ).toMatchObject({ externalUserId: "eu_usage" });
   });
+  it("normalizes signed legacy Auth0 subjects to the existing Console alias", async () => {
+    const sub = "google-oauth2|synthetic-account";
+    expect(
+      await verifyMcpUserJwt(await token({ sub, external_user_id: undefined }))
+    ).toMatchObject({ externalUserId: await externalUserIdFromSub(sub) });
+  });
+  it("preserves an explicit account alias even when sub is a provider identity", async () => {
+    expect(
+      await verifyMcpUserJwt(
+        await token({ sub: "auth0|synthetic", external_user_id: "eu_existing" })
+      )
+    ).toMatchObject({ externalUserId: "eu_existing" });
+  });
   it.each([
     ["wrong issuer", { iss: "https://attacker.example" }],
     ["wrong audience", { aud: "https://attacker.example" }],
@@ -106,6 +120,13 @@ describe("MCP issuer-signed app-scoped identity", () => {
     ["missing scope", { scope: "openid" }],
     ["conflicting external aliases", { usage_subject: "eu_other" }],
     ["unsupported subject type", { usage_subject_type: "internal" }],
+    [
+      "conflicting subject types",
+      {
+        external_user_id_type: "external_user_id",
+        usage_subject_type: "internal",
+      },
+    ],
   ] as const)("rejects %s", async (_name, claims) => {
     await expect(verifyMcpUserJwt(await token(claims))).rejects.toBeDefined();
   });

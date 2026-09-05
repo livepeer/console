@@ -29,6 +29,8 @@ export function chunkIds(
   ids: string[],
   size = GATEWAY_ID_QUERY_CHUNK
 ): string[][] {
+  if (!Number.isInteger(size) || size < 1)
+    throw new RangeError("Invalid chunk size");
   const unique = [
     ...new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0)),
   ];
@@ -196,7 +198,7 @@ export async function forgetAssets(
   ids?: string[]
 ): Promise<number> {
   const db = getDb();
-  if (!ids?.length) {
+  if (ids === undefined) {
     const rows = await db
       .delete(mcpAssets)
       .where(eq(mcpAssets.principalId, principalId))

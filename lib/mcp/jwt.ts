@@ -2,6 +2,7 @@ import * as jose from "jose";
 import { pymthouseIssuerUrl, pymthouseJwksUrl } from "./env";
 import { configuredPymthouseScope } from "@/lib/external-accounts/service";
 import { AccessError } from "@/lib/access/service";
+import { resolveMcpExternalUserId } from "./principal";
 
 const keySets = new Map<string, ReturnType<typeof jose.createRemoteJWKSet>>();
 
@@ -72,16 +73,22 @@ export async function verifyMcpUserJwt(token: string): Promise<McpPrincipal> {
   // only after signature/issuer/audience/app checks and a scoped persisted lookup.
   const explicitExternal = asString(payload.external_user_id);
   const usageSubject = asString(payload.usage_subject);
-  const subjectType =
-    asString(payload.external_user_id_type) ||
-    asString(payload.usage_subject_type);
+  const subjectTypes = [
+    asString(payload.external_user_id_type),
+    asString(payload.usage_subject_type),
+  ];
   if (
-    (subjectType && subjectType !== "external_user_id") ||
+    subjectTypes.some((type) => type && type !== "external_user_id") ||
     (explicitExternal && usageSubject && explicitExternal !== usageSubject)
   ) {
     throw new Error("token has ambiguous external account claims");
   }
-  const externalUserId = explicitExternal || usageSubject || sub;
+  // Normalize legacy Auth0 subjects exactly as Console does. The caller must
+  // still resolve this alias through the scoped persisted account/access gate.
+  const externalUserId = await resolveMcpExternalUserId(
+    sub,
+    explicitExternal || usageSubject
+  );
 
   return {
     sub,

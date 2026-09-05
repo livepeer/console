@@ -138,12 +138,12 @@ User approved replacing waitlist join/sign-in with Auth0 and moving administrati
 inside Console chrome. Frozen contract: architecture amendment4, `91a19d2`.
 No provider replacement, migration, credential change, production write or merge.
 
-| Owner | Worktree | Scope | Handoff |
-| --- | --- | --- | --- |
-| Coordinator | root | Contracts, entry routing, integration fixtures, current-main MCP merge, Git/preview | `85a96eb`, `b0ce454`, `053dc5f`, `c18fc0f` |
-| access_backend | auth0-backend | Auth0 join/sync, canonical admin/CSV/member permissions, enrollment context, consent authentication | `8738def`, referral fix `6b4c071` |
-| data_owner (UI role) | auth0-ui | Auth0 CTAs, Console admin layout/navigation, membership preferences, legacy-link notices | `48e462c`, `83d34f0` |
-| security_reviewer | review-security | Independent exact-commit MCP and Auth0 boundary review; no implementation edits | `b0ce454`, `48e462c`, final `c18fc0f` |
+| Owner                | Worktree        | Scope                                                                                               | Handoff                                    |
+| -------------------- | --------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Coordinator          | root            | Contracts, entry routing, integration fixtures, current-main MCP merge, Git/preview                 | `85a96eb`, `b0ce454`, `053dc5f`, `c18fc0f` |
+| access_backend       | auth0-backend   | Auth0 join/sync, canonical admin/CSV/member permissions, enrollment context, consent authentication | `8738def`, referral fix `6b4c071`          |
+| data_owner (UI role) | auth0-ui        | Auth0 CTAs, Console admin layout/navigation, membership preferences, legacy-link notices            | `48e462c`, `83d34f0`                       |
+| security_reviewer    | review-security | Independent exact-commit MCP and Auth0 boundary review; no implementation edits                     | `b0ce454`, `48e462c`, final `c18fc0f`      |
 
 PR48 now targets main and includes PR46. PR46 is closed as superseded; its branch
 and commits are preserved. PR48 remains draft. Current main `b3439cd` (CIMD
@@ -308,3 +308,21 @@ changed. Existing release blockers and production holds remain in force.
   passed with the existing warnings. Local-only fixture
   navigation and toast wiring stay outside the repository; no auth bypass or
   fictional backend is included in this update. No PR or production action.
+
+### Main / MCP reconciliation — 2026-09-05
+
+Coordinator integrated feature input `44656c4` and main `aab9b61` in a separate
+local worktree. Kept the existing migration chain; reviewed but did not apply the
+separate squash proposal. Resolved JWT claim handling without dropping app/access
+enforcement, adapted Admin History to main's modality contract, and corrected
+asset-test isolation and empty-selection deletion behavior.
+
+Validation: 306 credential-free Vitest tests passed (33 database tests skipped),
+137 Console/MCP Node tests passed, and 42 tests passed in the full guarded
+database run. Full lint, typecheck and build passed. Existing hosted preview
+checks confirmed auth/discovery routing and anonymous denials, but found that
+`mcp_assets` is not yet present. That blocks hosted asset validation. No runtime
+preview or production schema changes were made during reconciliation.
+
+Details, findings and remaining gates:
+[reconciliation-2026-09-05.md](./reconciliation-2026-09-05.md).

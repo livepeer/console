@@ -6,6 +6,7 @@ import SectionHeader from "@/components/console/SectionHeader";
 import CallsTable from "@/components/console/CallsTable";
 import type { AccountActivityRow } from "@/lib/console/types";
 import CallDetailDrawer from "@/components/console/CallDetailDrawer";
+import { resolveCapabilityModality } from "@/lib/console/capability-modality";
 
 // Presentation fixtures only. No API calls, execution, credentials, or customer data.
 const sampleRuns = [
@@ -187,6 +188,8 @@ export default function RunsPreview() {
       timestamp: new Date(sampleNow - (index * 120 + 30) * 1000).toISOString(),
       model: presentation[0],
       pipeline: presentation[1],
+      modality:
+        resolveCapabilityModality({ pipeline: presentation[1] }) ?? "unknown",
       costDisplay: presentation[2],
       status:
         run.status === "Completed"
