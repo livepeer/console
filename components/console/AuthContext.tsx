@@ -16,6 +16,7 @@ export interface ConsoleUser {
   /** Persisted app-scoped PymtHouse external account ID, supplied by the server. */
   id: string;
   canonicalUserId: string;
+  isAdmin: boolean;
   name: string;
   email: string;
   initials: string;
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? {
             id: profile.externalUserId,
             canonicalUserId: profile.userId,
+            isAdmin: profile.isAdmin === true,
             name: profile.name,
             email: profile.email,
             provider: profile.provider,

@@ -21,7 +21,7 @@ import {
 } from "./access-selection";
 
 const control =
-  "rounded border border-white/20 bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded border border-hairline bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40";
 type Filter = "waiting" | "approved" | "revoked" | "all";
 
 export default function AccessManager() {
@@ -186,7 +186,7 @@ export default function AccessManager() {
       <h2 id="access-management-title" className="text-xl">
         Console access
       </h2>
-      <p className="mt-2 text-sm text-white/55">
+      <p className="mt-2 text-sm text-fg-muted">
         Approval unlocks Console and MCP. It does not grant administrator
         permissions or marketing consent.
       </p>
@@ -264,7 +264,7 @@ export default function AccessManager() {
         </button>
         <button
           type="button"
-          className={`${control} bg-white text-black`}
+          className={`${control} bg-foreground text-background`}
           disabled={locked || !selected.size}
           onClick={() => propose("approve")}
         >
@@ -279,21 +279,21 @@ export default function AccessManager() {
           Revoke selected
         </button>
       </div>
-      <p className="mt-2 text-xs text-white/45">
+      <p className="mt-2 text-xs text-fg-faint">
         Selections remain fixed when you change filters or pages. Review the
         exact selection before confirming.
       </p>
       {error && (
-        <p className="mt-4 text-sm text-red-300" role="alert">
+        <p className="mt-4 text-sm text-red-500" role="alert">
           {error}
         </p>
       )}
       <div
-        className="mt-5 overflow-x-auto border-y border-white/15"
+        className="mt-5 overflow-x-auto border-y border-hairline"
         aria-busy={loading}
       >
         <table className="w-full min-w-[700px] text-left text-sm">
-          <thead className="border-b border-white/15 text-white/55">
+          <thead className="border-b border-hairline text-fg-muted">
             <tr>
               <th className="p-3">
                 <input
@@ -321,7 +321,7 @@ export default function AccessManager() {
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="divide-y divide-hairline">
             {list?.rows.map((row) => (
               <tr key={row.id}>
                 <td className="p-3">
@@ -352,7 +352,7 @@ export default function AccessManager() {
             ))}
             {(!list || !list.rows.length) && (
               <tr>
-                <td className="p-6 text-white/55" colSpan={6}>
+                <td className="p-6 text-fg-muted" colSpan={6}>
                   {loading
                     ? "Loading entries…"
                     : error
@@ -387,7 +387,7 @@ export default function AccessManager() {
       </div>
       {batch && (
         <section
-          className="mt-6 rounded border border-white/20 p-4"
+          className="mt-6 rounded border border-hairline p-4"
           aria-label="Bulk action results"
         >
           <p role="status">
@@ -399,7 +399,7 @@ export default function AccessManager() {
             )}{" "}
             outcomes recorded; {failed} need retry.
           </p>
-          <p className="mt-2 text-xs text-white/55">
+          <p className="mt-2 text-xs text-fg-muted">
             Retries reuse the original request IDs. Already completed approvals
             do not send another invitation.
           </p>
@@ -438,7 +438,7 @@ export default function AccessManager() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 break-all text-xs text-white/45">
+            <p className="mt-3 break-all text-xs text-fg-faint">
               Requests: {batch.map((request) => request.requestId).join(", ")}
             </p>
           </details>
@@ -450,7 +450,7 @@ export default function AccessManager() {
           if (!open) setConfirmation(null);
         }}
       >
-        <DialogContent className="dark max-h-[85vh] overflow-auto">
+        <DialogContent className="max-h-[85vh] overflow-auto">
           <DialogTitle>
             {confirmation?.[0]?.action === "approve" ? "Approve" : "Revoke"}{" "}
             {confirmation?.reduce(

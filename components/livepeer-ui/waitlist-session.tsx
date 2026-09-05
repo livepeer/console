@@ -10,121 +10,93 @@ import {
   useRef,
   useState,
 } from "react";
-
 import {
   captureEvent,
   identifyMember,
   resetAnalyticsIdentity,
 } from "@/lib/analytics";
-import type {
-  WaitlistMessageResponse,
-  WaitlistSessionResponse,
-  WaitlistSignupRequest,
-} from "@/lib/waitlist/contracts";
+import type { WaitlistSessionResponse } from "@/lib/waitlist/contracts";
+import { buildWaitlistJoinHref } from "./waitlist-auth-navigation";
 
 type WaitlistState =
-  | { status: "loading" }
   | { status: "signed-out" }
-  | { status: "submitting" }
-  | { status: "verification-pending"; email: string }
   | { status: "signed-in"; data: WaitlistSessionResponse }
   | { status: "error"; message: string };
 
 type WaitlistContextValue = {
   state: WaitlistState;
-  join: (
-    email: string,
-    options?: {
-      authOnly?: boolean;
-      company?: string;
-      newsletterOptIn?: boolean;
-    }
-  ) => Promise<void>;
-  signOut: () => Promise<void>;
-  signingOut: boolean;
-  signOutError: string | null;
-  reset: () => void;
+  joinHref: string;
+  onAuthStart: () => void;
+  onSignOut: () => void;
+  updateNewsletterConsent: (subscribed: boolean) => Promise<void>;
+  consentSaving: boolean;
+  consentError: string | null;
 };
-
 const WaitlistContext = createContext<WaitlistContextValue | null>(null);
-const attributionKeys = [
-  "utm_source",
-  "utm_medium",
-  "utm_campaign",
-  "utm_content",
-  "utm_term",
-] as const;
 
 export function WaitlistSessionProvider({
   children,
   initialSession,
+  initialJoinHref,
 }: {
   children: ReactNode;
   initialSession: WaitlistSessionResponse | null;
+  initialJoinHref?: string;
 }) {
   const [state, setState] = useState<WaitlistState>(() =>
     initialSession
       ? { status: "signed-in", data: initialSession }
       : { status: "signed-out" }
   );
-  const [signingOut, setSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [joinHref, setJoinHref] = useState(
+    initialJoinHref ?? buildWaitlistJoinHref(new URLSearchParams())
+  );
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
   const identifiedMemberRef = useRef<string | null>(null);
+  const sessionRequestRef = useRef(0);
+  const consentLock = useRef(false);
 
-  const loadSession = useCallback(async (preservePending = false) => {
+  const loadSession = useCallback(async () => {
+    const request = ++sessionRequestRef.current;
     try {
       const response = await fetch("/api/session", { cache: "no-store" });
+      if (request !== sessionRequestRef.current) return;
       if (response.status === 401) {
-        setState((current) =>
-          preservePending && current.status === "verification-pending"
-            ? current
-            : { status: "signed-out" }
-        );
+        setState({ status: "signed-out" });
         return;
       }
-      const result = (await response.json()) as
-        | WaitlistSessionResponse
-        | WaitlistMessageResponse;
-      if (!response.ok || !("member" in result)) {
+      const result = (await response.json()) as WaitlistSessionResponse;
+      if (!response.ok || !result?.member)
         throw new Error(
-          "message" in result ? result.message : "Couldn’t load your place."
+          "Couldn’t load your waitlist membership. Please try again."
         );
-      }
-      setState({ status: "signed-in", data: result });
-    } catch (error) {
-      setState({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Couldn’t load your place.",
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(window.location.search);
-      if (
-        process.env.NODE_ENV !== "production" &&
-        params.get("preview") === "email-sent"
-      ) {
-        setState({
-          status: "verification-pending",
-          email: params.get("email") || "you@example.com",
-        });
-        return;
-      }
-      if (params.get("verification") === "invalid") {
+      if (request === sessionRequestRef.current)
+        setState({ status: "signed-in", data: result });
+    } catch {
+      if (request === sessionRequestRef.current)
         setState({
           status: "error",
           message:
-            "This verification link is invalid or expired. Enter your email to request a new one.",
+            "Couldn’t load your waitlist membership. Please sign in or try again.",
         });
-        return;
-      }
-      if (!initialSession) void loadSession();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [initialSession, loadSession]);
+    }
+  }, []);
+
+  const cancelPendingSession = useCallback(() => {
+    sessionRequestRef.current++;
+  }, []);
+
+  useEffect(() => {
+    setJoinHref(
+      buildWaitlistJoinHref(
+        new URLSearchParams(window.location.search),
+        document.referrer
+      )
+    );
+    if (!initialSession) void loadSession();
+    return cancelPendingSession;
+  }, [cancelPendingSession, initialSession, loadSession]);
 
   useEffect(() => {
     if (state.status !== "signed-in") return;
@@ -138,120 +110,87 @@ export function WaitlistSessionProvider({
   }, [state]);
 
   useEffect(() => {
-    function refreshVisibleSession() {
-      if (document.visibilityState === "visible") void loadSession(true);
+    function refresh() {
+      if (document.visibilityState === "visible" && !consentLock.current)
+        void loadSession();
     }
-
-    window.addEventListener("focus", refreshVisibleSession);
-    window.addEventListener("pageshow", refreshVisibleSession);
-    document.addEventListener("visibilitychange", refreshVisibleSession);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
-      window.removeEventListener("focus", refreshVisibleSession);
-      window.removeEventListener("pageshow", refreshVisibleSession);
-      document.removeEventListener("visibilitychange", refreshVisibleSession);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [loadSession]);
 
-  const join = useCallback(
-    async (
-      email: string,
-      options?: {
-        authOnly?: boolean;
-        company?: string;
-        newsletterOptIn?: boolean;
-      }
-    ) => {
-      const normalizedEmail = email.trim().toLowerCase();
-      setState({ status: "submitting" });
-      const params = new URLSearchParams(window.location.search);
-      const attribution: Record<string, string> = {
-        landing_page: `${window.location.pathname}${window.location.search}`,
-      };
-      for (const key of attributionKeys) {
-        const value = params.get(key);
-        if (value) attribution[key] = value;
-      }
-      if (document.referrer) attribution.referrer = document.referrer;
-
-      const payload: WaitlistSignupRequest = {
-        email: normalizedEmail,
-        newsletterOptIn: options?.newsletterOptIn ?? false,
-        referralCode: params.get("ref") || undefined,
-        company: options?.company,
-        attribution,
-        authOnly: options?.authOnly,
-      };
-
-      try {
-        const response = await fetch("/api/waitlist", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const result = response.headers
-          .get("content-type")
-          ?.includes("application/json")
-          ? ((await response.json()) as Partial<WaitlistMessageResponse>)
-          : {};
-        if (!response.ok) {
-          throw new Error(
-            result.message || "We couldn’t send the verification email."
-          );
-        }
-        setState({ status: "verification-pending", email: normalizedEmail });
-        if (!options?.authOnly) {
-          captureEvent("waitlist_signup_submitted", {
-            ...attribution,
-            newsletter_opt_in: options?.newsletterOptIn ?? false,
-            referred: Boolean(payload.referralCode),
-          });
-        }
-      } catch (error) {
-        setState({
-          status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Something went wrong. Please try again.",
-        });
-        throw error;
-      }
-    },
-    []
-  );
-
-  const signOut = useCallback(async () => {
-    setSigningOut(true);
-    setSignOutError(null);
+  const updateNewsletterConsent = useCallback(async (subscribed: boolean) => {
+    if (consentLock.current) return;
+    consentLock.current = true;
+    sessionRequestRef.current++;
+    setConsentSaving(true);
+    setConsentError(null);
     try {
-      const response = await fetch("/api/logout", { method: "POST" });
-      if (!response.ok) throw new Error("Couldn’t sign out. Please try again.");
-      resetAnalyticsIdentity();
-      identifiedMemberRef.current = null;
-      setState({ status: "signed-out" });
-    } catch (error) {
-      setSignOutError(
-        error instanceof Error
-          ? error.message
-          : "Couldn’t sign out. Please try again."
+      const response = await fetch("/api/newsletter-consent", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newsletterOptIn: subscribed }),
+      });
+      const result = (await response.json()) as { newsletterOptIn?: unknown };
+      if (!response.ok || typeof result?.newsletterOptIn !== "boolean")
+        throw new Error("preference_failed");
+      const newsletterOptIn = result.newsletterOptIn;
+      setState((current) =>
+        current.status === "signed-in"
+          ? {
+              ...current,
+              data: {
+                ...current.data,
+                member: { ...current.data.member, newsletterOptIn },
+              },
+            }
+          : current
+      );
+    } catch {
+      setConsentError(
+        "We couldn’t save your email preference. Please try again."
       );
     } finally {
-      setSigningOut(false);
+      consentLock.current = false;
+      setConsentSaving(false);
     }
   }, []);
-
+  const onAuthStart = useCallback(() => {
+    captureEvent("waitlist_auth_started", {
+      referred: new URL(joinHref, "https://local.invalid").searchParams.has(
+        "ref"
+      ),
+    });
+  }, [joinHref]);
+  const onSignOut = useCallback(() => {
+    resetAnalyticsIdentity();
+    identifiedMemberRef.current = null;
+  }, []);
   const value = useMemo(
     () => ({
       state,
-      join,
-      signOut,
-      signingOut,
-      signOutError,
-      reset: () => setState({ status: "signed-out" }),
+      joinHref,
+      onAuthStart,
+      onSignOut,
+      updateNewsletterConsent,
+      consentSaving,
+      consentError,
     }),
-    [join, signOut, signOutError, signingOut, state]
+    [
+      state,
+      joinHref,
+      onAuthStart,
+      onSignOut,
+      updateNewsletterConsent,
+      consentSaving,
+      consentError,
+    ]
   );
-
   return (
     <WaitlistContext.Provider value={value}>
       {children}
@@ -261,10 +200,9 @@ export function WaitlistSessionProvider({
 
 export function useWaitlistSession() {
   const value = useContext(WaitlistContext);
-  if (!value) {
+  if (!value)
     throw new Error(
       "useWaitlistSession must be used within WaitlistSessionProvider"
     );
-  }
   return value;
 }
