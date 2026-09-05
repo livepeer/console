@@ -13,7 +13,16 @@ import {
 } from "./run-capability";
 import { fetchMcpUsage } from "./pymthouse-spend";
 import { assertSpendable } from "./pymthouse-usage";
-import { forgetAssets, listAssets, rememberAsset } from "./store";
+import {
+  ASSET_STORE_UNAVAILABLE,
+  FORGET_IDS_OR_ALL_REQUIRED,
+  forgetAssets,
+  listAssets,
+  logAssetStoreError,
+  publicAssetStoreError,
+  rememberAsset,
+  serializeAsset,
+} from "./store";
 import { principalId } from "./log";
 
 function text(data: unknown, isError = false) {
@@ -162,29 +171,81 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   server.registerTool(
     "get_recent_assets",
     {
-      description: "Assets produced in this isolate for the current principal.",
-      inputSchema: {},
+      description:
+        "Recent media URLs for this principal, persisted in Postgres. Join to usage history with gateway_request_id. Newest first, default 20, max 50.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional(),
+        capability: z.string().min(1).optional(),
+        gateway_request_id: z.string().min(1).optional(),
+      },
     },
-    async () => text({ assets: listAssets(pid) })
+    async ({ limit, capability, gateway_request_id }) => {
+      try {
+        const assets = await listAssets(pid, {
+          limit,
+          capability,
+          gatewayRequestId: gateway_request_id,
+        });
+        return text({
+          assets: assets.map(serializeAsset),
+          count: assets.length,
+        });
+      } catch (err) {
+        logAssetStoreError(err);
+        return text(publicAssetStoreError(), true);
+      }
+    }
   );
 
   server.registerTool(
     "search_assets",
     {
-      description: "Search recent assets by capability or URL substring.",
+      description:
+        "Search this principal's persisted assets by capability, URL, or gateway_request_id substring.",
       inputSchema: { query: z.string().min(1) },
     },
-    async ({ query }) => text({ assets: listAssets(pid, query) })
+    async ({ query }) => {
+      try {
+        const assets = await listAssets(pid, { query });
+        return text({
+          assets: assets.map(serializeAsset),
+          count: assets.length,
+        });
+      } catch (err) {
+        logAssetStoreError(err);
+        return text(publicAssetStoreError(), true);
+      }
+    }
   );
 
   server.registerTool(
     "forget_assets",
     {
       description:
-        "Drop remembered assets for this principal (this isolate only).",
-      inputSchema: { ids: z.array(z.string()).optional() },
+        "Delete persisted assets for this principal. Pass ids, or all: true to drop every asset they own.",
+      inputSchema: {
+        ids: z.array(z.string()).optional(),
+        all: z.boolean().optional(),
+      },
     },
-    async ({ ids }) => text({ forgotten: forgetAssets(pid, ids) })
+    async ({ ids, all }) => {
+      try {
+        return text({ forgotten: await forgetAssets(pid, { ids, all }) });
+      } catch (err) {
+        if (err instanceof Error && err.name === FORGET_IDS_OR_ALL_REQUIRED) {
+          return text(
+            {
+              error: FORGET_IDS_OR_ALL_REQUIRED,
+              message:
+                "Pass ids, or all: true to delete every asset for this principal.",
+            },
+            true
+          );
+        }
+        logAssetStoreError(err);
+        return text(publicAssetStoreError(), true);
+      }
+    }
   );
 
   server.registerTool(
@@ -283,14 +344,21 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
         const urlRaw =
           result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
         const url = urlRaw && !isQueueControlUrl(urlRaw) ? urlRaw : null;
+        let persistError: string | null = null;
         if (url) {
-          rememberAsset(pid, {
-            id: newId("asset"),
-            url,
-            capability,
-            createdAt: new Date().toISOString(),
-            gatewayRequestId: result.gatewayRequestId,
-          });
+          try {
+            await rememberAsset(pid, {
+              id: newId("asset"),
+              url,
+              capability,
+              createdAt: new Date().toISOString(),
+              gatewayRequestId: result.gatewayRequestId,
+              providerRequestId: result.providerRequestId,
+            });
+          } catch (err) {
+            logAssetStoreError(err);
+            persistError = ASSET_STORE_UNAVAILABLE;
+          }
         }
         return text({
           capability,
@@ -302,6 +370,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
           orchestrator: result.orchestrator,
           elapsed_ms: result.elapsedMs,
           gateway_request_id: result.gatewayRequestId,
+          ...(persistError ? { persist_error: persistError } : {}),
           ...(url ? {} : { data: result.data }),
         });
       } catch (err) {
