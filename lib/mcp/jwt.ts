@@ -1,5 +1,6 @@
 import * as jose from "jose";
 import { pymthouseIssuerUrl, pymthouseJwksUrl } from "./env";
+import { resolveMcpExternalUserId } from "./principal";
 
 const jwks = jose.createRemoteJWKSet(new URL(pymthouseJwksUrl()));
 
@@ -45,7 +46,10 @@ export async function verifyMcpUserJwt(token: string): Promise<McpPrincipal> {
   const publicClientId =
     asString(payload.client_id) || asString(payload.azp) || "";
 
-  const externalUserId = asString(payload.external_user_id) || sub;
+  const externalUserId = await resolveMcpExternalUserId(
+    sub,
+    asString(payload.external_user_id)
+  );
 
   return {
     sub,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatCallMetric, formatRunRelativeTime } from "@/lib/console/utils";
 import EnvTag from "@/components/console/EnvTag";
 import StatusDot from "@/components/console/StatusDot";
+import Tooltip from "@/components/design-system/Tooltip";
 import { useTickWhileActive } from "@/components/console/useTickWhileActive";
 import type { AccountActivityRow } from "@/lib/console/types";
 
@@ -16,7 +17,7 @@ import type { AccountActivityRow } from "@/lib/console/types";
  * drawer now lives.
  *
  * Full row vocabulary (left → right):
- *   8px status dot · mono short id · model · pipeline pill · latency|duration ·
+ *   8px status dot · mono short id · model · modality pill · latency|duration ·
  *   cost · via (signer) · relative time.
  *
  * History rows are quieter: relative time · model · modality pill · cost.
@@ -55,54 +56,6 @@ export interface CallsTableProps {
   className?: string;
 }
 
-export function modalityTag(pipeline: string): string {
-  const normalized = pipeline.toLowerCase();
-  const exact: Record<string, string> = {
-    "audio-to-text": "a2t",
-    "image-to-image": "i2i",
-    "image-to-video": "i2v",
-    language: "t2t",
-    llm: "t2t",
-    "live-transcoding": "v2v",
-    "live-video-to-video": "v2v",
-    "speech-to-text": "s2t",
-    "text-generation": "t2t",
-    "text-to-audio": "t2a",
-    "text-to-image": "t2i",
-    "text-to-speech": "t2s",
-    "text-to-video": "t2v",
-    transcoding: "v2v",
-    "video-understanding": "v2t",
-    "video-to-video": "v2v",
-  };
-  const mapped = exact[normalized];
-  if (mapped) return mapped;
-
-  const match = normalized.match(
-    /^(text|image|video|audio|speech|live)-to-(text|image|video|audio|speech)$/
-  );
-  if (match) {
-    const token = (part: string) =>
-      part === "text"
-        ? "t"
-        : part === "image"
-          ? "i"
-          : part === "video"
-            ? "v"
-            : part === "audio"
-              ? "a"
-              : "s";
-    return `${token(match[1]!)}2${token(match[2]!)}`;
-  }
-
-  return normalized
-    .split(/[-_./|:]+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 8);
-}
-
 function formatHistoryRelativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isFinite(then)) {
@@ -111,6 +64,39 @@ function formatHistoryRelativeTime(iso: string): string {
   }
 
   return formatRunRelativeTime(iso).replace(/ ago$/, "");
+}
+
+function HistoryCost({
+  row,
+  compact,
+}: {
+  row: AccountActivityRow;
+  compact: boolean;
+}) {
+  const amount = (
+    <span
+      className={`text-right font-mono tabular-nums text-fg ${
+        compact ? "text-[12.5px]" : "text-[11.5px]"
+      } ${row.costExact && row.costExact !== row.costDisplay ? "cursor-help" : ""}`}
+    >
+      {row.costDisplay}
+    </span>
+  );
+  if (!row.costExact || row.costExact === row.costDisplay) {
+    return amount;
+  }
+  return (
+    <span className="justify-self-end">
+      <Tooltip
+        content={
+          <span className="font-mono tabular-nums">{row.costExact}</span>
+        }
+        side="left"
+      >
+        {amount}
+      </Tooltip>
+    </span>
+  );
 }
 
 export default function CallsTable({
@@ -129,8 +115,8 @@ export default function CallsTable({
   // values, so each density preset is spelled out in full.
   const cols = compact
     ? density === "cozy"
-      ? "grid items-center gap-3 px-3 md:px-7 grid-cols-[minmax(0,1fr)_88px]"
-      : "grid items-center gap-3 px-4 grid-cols-[minmax(0,1fr)_76px]"
+      ? "grid items-center gap-3 px-3 md:px-7 grid-cols-[minmax(0,1fr)_4.5rem]"
+      : "grid items-center gap-3 px-4 grid-cols-[minmax(0,1fr)_4.5rem]"
     : density === "cozy"
       ? "grid items-center gap-3 px-5 grid-cols-[minmax(0,1fr)_80px_80px_80px_80px]"
       : "grid items-center gap-3 px-4 grid-cols-[minmax(0,1fr)_70px_70px_70px_70px]";
@@ -171,9 +157,7 @@ export default function CallsTable({
       )}
       {rows.map((row, i) => {
         const active = row.status === "active";
-        const pipelineLabel = compact
-          ? modalityTag(row.pipeline)
-          : row.pipeline;
+        const pipelineLabel = row.modality;
         const timeLabel = compact
           ? formatHistoryRelativeTime(row.timestamp)
           : formatRunRelativeTime(row.timestamp);
@@ -249,13 +233,7 @@ export default function CallsTable({
                 {formatCallMetric(row, nowMs)}
               </span>
             )}
-            <span
-              className={`text-right text-fg ${
-                compact ? "text-[12.5px]" : "font-mono text-[11.5px]"
-              }`}
-            >
-              {row.costDisplay}
-            </span>
+            <HistoryCost row={row} compact={compact} />
             {!compact && (
               <span className="truncate text-right font-mono text-[11.5px] text-fg-faint">
                 {row.signerLabel}

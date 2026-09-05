@@ -411,6 +411,8 @@ export interface AccountActivityRow {
   timestamp: string;
   model: string;
   pipeline: string;
+  /** Capability modality (`t2i`, `i2v`, `realtime`, …). Displayed instead of pipeline. */
+  modality: string;
   status: AccountActivityStatus;
   /** Invocation shape: a batch request/response, or a live streaming session. */
   kind: PipelineKind;
@@ -424,6 +426,12 @@ export interface AccountActivityRow {
   tokenName: string;
   /** Pre-formatted cost string, "—" when failed. */
   costDisplay: string;
+  /** Full-precision cost for hover. */
+  costExact?: string;
+  /** Neon asset URL joined from OpenMeter `gatewayRequestId`. */
+  outputUrl?: string;
+  /** Upstream provider request id when the asset store has one. */
+  providerRequestId?: string;
 }
 
 // ─── Stats: Overview ─────────────────────────────────────────────────────────

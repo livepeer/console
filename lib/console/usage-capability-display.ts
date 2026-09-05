@@ -177,12 +177,6 @@ export function buildUsageCapabilityRows(input: {
     .sort((a, b) => b.requestCount - a.requestCount);
 }
 
-export function microsToUsdDisplay(micros: string): string {
-  const usd = microsToUsd(micros);
-  if (usd < 0.01) return "<$0.01";
-  return `$${usd.toFixed(2)}`;
-}
-
 export function formatPeriodResetLabel(periodEndIso: string): string {
   try {
     const end = new Date(periodEndIso);

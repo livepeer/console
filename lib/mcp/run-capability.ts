@@ -33,20 +33,26 @@ export function validateRunCapabilityEndpoint(
   return null;
 }
 
-function requestIdFromError(err: unknown): string {
-  if (!err || typeof err !== "object" || !("gatewayRequestId" in err)) {
+function stringField(err: unknown, key: string): string {
+  if (!err || typeof err !== "object" || !(key in err)) {
     return "";
   }
-  const id = (err as { gatewayRequestId?: unknown }).gatewayRequestId;
-  return typeof id === "string" ? id.trim() : "";
+  const value = (err as Record<string, unknown>)[key];
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export function runCapabilityFailurePayload(
   err: unknown,
   mintedId: string
-): { error: string; gateway_request_id: string } {
+): {
+  error: string;
+  gateway_request_id: string;
+  request_id?: string;
+} {
+  const providerRequestId = stringField(err, "providerRequestId");
   return {
     error: err instanceof Error ? err.message : String(err),
-    gateway_request_id: requestIdFromError(err) || mintedId,
+    gateway_request_id: stringField(err, "gatewayRequestId") || mintedId,
+    ...(providerRequestId ? { request_id: providerRequestId } : {}),
   };
 }
