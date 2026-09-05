@@ -209,3 +209,22 @@ User explicitly authorized updating the existing preview after local verificatio
 Publish only the feature branch through the required signed-head workflow; retain
 the isolated database and captured-email setting. No production environment change.
 PR48 remains closed; do not create/reopen a PR without explicit user approval.
+
+## Waitlist visual corrections — preview publication
+
+User authorized publishing the existing branch for preview testing, explicitly
+without a PR. Visual implementation commit: `ec0b5e9` (base `522afab`).
+Coordinator-owned changes restore the original waitlist `-0.045em` display
+tracking through a scoped token while preserving Console's zero default. The
+animation canvas is taller, with projected logo/blur bounds checked across a
+complete rotation; original logo sizes and motion remain unchanged.
+
+Seven presentation regression tests, typecheck, lint, and production build pass.
+Local browser verification confirmed the original tracking (-1.62px at 36px),
+scoped to the waitlist, and a complete ring inside the enlarged canvas. Browser
+checks are local evidence; deployed smoke checks follow publication. No fresh
+independent security review is claimed for this presentation-only delta.
+
+Retain the protected preview, isolated database, and captured-email configuration.
+Actual inbox delivery is not enabled or proven by this publication. No schema,
+auth, approval, secrets, production, PR, or domain changes are included.
