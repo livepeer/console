@@ -1,1 +1,0 @@
-ALTER TABLE "auth_identities" ADD COLUMN "provider_metadata" jsonb DEFAULT '{}'::jsonb NOT NULL;

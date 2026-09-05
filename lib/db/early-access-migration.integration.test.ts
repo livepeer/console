@@ -34,7 +34,7 @@ describe.skipIf(!databaseUrl)(
       await client?.end();
     });
 
-    it("upgrades production0004 through0008, preserving records and enforcing invariants", async () => {
+    it("upgrades production 0004 through squashed 0005, preserving records and enforcing invariants", async () => {
       const schema = `migration_${randomUUID().replaceAll("-", "")}`;
       const rollback = new Error("rollback_synthetic_migration_schema");
       try {
@@ -68,14 +68,11 @@ describe.skipIf(!databaseUrl)(
           VALUES (${conflict.id}, 'product_marketing', false, 'fixture', 'fixture'),
           (${confirmed.id}, 'product_marketing', true, 'fixture', 'fixture')`;
           await apply(5);
-          await apply(6);
           const [user] =
             await tx`INSERT INTO users DEFAULT VALUES RETURNING id`;
           const [identity] =
             await tx`INSERT INTO auth_identities (user_id, provider, provider_subject, external_user_id)
           VALUES (${user.id}, 'auth0', 'auth0|legacy-fixture', 'eu_original') RETURNING id`;
-          await apply(7);
-          await apply(8);
           await tx`INSERT INTO oauth_code_redemptions (code_hash, expires_at)
             VALUES ('synthetic-digest-only', now() + interval '1 minute')`;
           await expect(
@@ -119,7 +116,7 @@ describe.skipIf(!databaseUrl)(
           const migration = readFileSync(
             path.resolve(
               process.cwd(),
-              "drizzle/0007_early_access_domains.sql"
+              "drizzle/0005_early_access_foundation.sql"
             ),
             "utf8"
           );

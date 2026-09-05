@@ -36,7 +36,8 @@ without PII and never stolen.
 ## Data ownership
 
 The schema compatibility barrel remains `lib/db/schema.ts`; domain definitions
-move below `lib/db/schema/`. Append migration0007, never rewrite0000–0006.
+move below `lib/db/schema/`. Never rewrite `0000`–`0004`. The unapplied tail is
+squashed as `0005_early_access_foundation`.
 
 - Identity: users/authIdentities/userEmails; externalUserId becomes nullable
   legacy compatibility data. No new identity rows need a subject-derived alias.
@@ -154,9 +155,9 @@ the obsolete guard. Existing production identifiers and token formats stay intac
 
 ## Contract amendment 3 — single-use OAuth code redemption
 
-Independent review found inherited replayable authorization codes. Add migration
-0008 with `oauth_code_redemptions`: unique SHA-256 code digest, expiration and
-creation timestamps. No raw credentials are stored. After signature, PKCE and
+Independent review found inherited replayable authorization codes. The squashed
+`0005_early_access_foundation` migration includes `oauth_code_redemptions`:
+unique SHA-256 code digest, expiration and creation timestamps. No raw credentials are stored. After signature, PKCE and
 approval validation, `consumeAuthorizationCode(code, expiresAt)` atomically inserts
 the digest before token minting; duplicate redemption is invalid_grant and storage
 failure is unavailable. A failed upstream mint still consumes the code; restart

@@ -56,7 +56,7 @@ does not emit invitation emails or change subscriptions.
 
 ## Migration and permissions
 
-Migration0007 is additive. It backfills admin grants and subscription snapshots,
+`0005_early_access_foundation` is additive. It backfills admin grants and subscription snapshots,
 links historical consent records, and creates no product grants. Subscription
 rows with source `legacy_consent_conflict` require reconciliation before release;
 their state defaults to unsubscribed, while original evidence is preserved.

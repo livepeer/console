@@ -28,7 +28,7 @@ Outbox counts are a snapshot, not permission to process the backlog.
 `br-super-bird-auln2med` is the marked disposable test database, separate from
 both the old user-test preview and the new runtime preview. Migration test builds
 0000–0004 in a transaction-local synthetic schema, seeds legacy fixtures, applies
-0005–0007, verifies preserved counts, admin/subscription backfill idempotency,
+squashed `0005_early_access_foundation`, verifies preserved counts, admin/subscription backfill idempotency,
 uniqueness/FKs, append-only audit, immutable aliases and synthetic grandfather
 dry-run/repeat application/revocation rejection, then rolls back.
 

@@ -8,16 +8,14 @@ the only session accepted by `/admin`.
 ## Database boundaries
 
 - Migrations `0000` through `0004` reproduce the deployed waitlist schema.
-- Migration `0005_canonical_user_foundation` adds `users`,
-  `auth_identities`, `user_emails`, and the nullable waitlist user link.
-- Migration `0006_auth_identity_provider_metadata` records the Auth0 authority
-  and provider strategy on identities. Existing identities receive this metadata
-  on their next successful reconciliation.
+- Migration `0005_early_access_foundation` is the unapplied tail: canonical
+  users (`users`, `auth_identities`, `user_emails`), identity metadata, early
+  access domains, OAuth code receipts, and the admin/subscription backfills.
 - Production uses the existing waitlist Postgres database. Preview deployments,
   CI, and destructive tests must use an isolated database branch.
 - Do not copy production records. Apply `0005` in place after taking the
-  provider's normal point-in-time backup and before enabling Console traffic;
-  then apply `0006`. Neither migration rewrites waitlist contact data.
+  provider's normal point-in-time backup and before enabling Console traffic.
+  It does not rewrite waitlist contact data.
 
 Authenticated requests keep the existing deterministic PymtHouse external user
 ID. A successful Auth0 login also best-effort upserts the application-owned user,
@@ -43,7 +41,7 @@ scheduler until an explicitly configured Vercel cron replacement is tested.
 
 ## Staged release checklist
 
-1. Deploy a preview with the isolated database and migrations `0000`-`0006`.
+1. Deploy a preview with the isolated database and migrations `0000`-`0005`.
 2. Verify `/waitlist`, signup delivery, `/verify`, referrals, consent changes,
    newsletter sync, admin access, CSV export, and outbox retries.
 3. Verify Auth0 callback and repeat-login reconciliation, including verified and
@@ -51,7 +49,7 @@ scheduler until an explicitly configured Vercel cron replacement is tested.
 4. Smoke-test billing, keys, device approval, MCP discovery, and `/api/mcp`; the
    external PymtHouse identifier must match its pre-cutover value.
 5. Record production counts for signups, confirmed members, consent events, and
-   pending outbox events. Apply `0005` and `0006`, deploy Console, and compare the counts.
+   pending outbox events. Apply `0005`, deploy Console, and compare the counts.
 6. Move `earlyaccess.livepeer.org` only after the deployed checks pass. Retain
    the standalone waitlist deployment and its domain mapping as the rollback
    target until the observation window closes.

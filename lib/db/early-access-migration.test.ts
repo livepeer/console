@@ -20,7 +20,7 @@ import {
 } from "../../scripts/early-access/reconcile";
 
 const sql = readFileSync(
-  resolve(process.cwd(), "drizzle/0007_early_access_domains.sql"),
+  resolve(process.cwd(), "drizzle/0005_early_access_foundation.sql"),
   "utf8"
 );
 const issuer = "https://login.example";
@@ -212,13 +212,21 @@ describe("early-access migration and grandfather planning", () => {
         );
     }
   );
-  it("keeps journal history and appends domain and single-use code migrations", () => {
+  it("keeps waitlist journal history and squashes the unapplied tail into 0005", () => {
     const journal = JSON.parse(
       readFileSync(resolve(process.cwd(), "drizzle/meta/_journal.json"), "utf8")
     );
-    expect(journal.entries.at(-2).tag).toBe("0007_early_access_domains");
-    expect(journal.entries.at(-1).tag).toBe("0008_oauth_code_redemptions");
-    expect(journal.entries).toHaveLength(9);
+    expect(
+      journal.entries.slice(0, 5).map((entry: { tag: string }) => entry.tag)
+    ).toEqual([
+      "0000_dusty_krista_starr",
+      "0001_massive_vanisher",
+      "0002_empty_mach_iv",
+      "0003_consent_hardening",
+      "0004_curious_hellfire_club",
+    ]);
+    expect(journal.entries.at(-1).tag).toBe("0005_early_access_foundation");
+    expect(journal.entries).toHaveLength(6);
   });
   it("scopes identities/accounts and permits multiple accounts per user", () => {
     expect(authIdentities.externalUserId.notNull).toBe(false);
