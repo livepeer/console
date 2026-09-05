@@ -1,14 +1,18 @@
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { dispatchOutboxEvent } from "@/lib/email/outbox";
 import { changeNewsletterConsent } from "@/lib/subscriptions/service";
-import { getAuthenticatedWaitlistSignup } from "@/lib/waitlist/current-session";
+import { getSignupForSession } from "@/lib/waitlist/queries";
+import { SESSION_COOKIE } from "@/lib/waitlist/security";
 import { apiError, requireSameOrigin } from "@/lib/admin/http";
 export const runtime = "nodejs";
 const consentSchema = z.object({ newsletterOptIn: z.boolean() });
 export async function PUT(request: Request) {
   try {
     requireSameOrigin(request);
-    const current = await getAuthenticatedWaitlistSignup();
+    const current = await getSignupForSession(
+      (await cookies()).get(SESSION_COOKIE)?.value
+    );
     if (!current)
       return Response.json({ error: "unauthorized" }, { status: 401 });
     const parsed = consentSchema.safeParse(await request.json());

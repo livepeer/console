@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnchorHTMLAttributes } from "react";
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), summary: vi.fn() }));
+vi.mock("@/lib/authentication/session", () => ({
+  getAuthenticatedIdentity: vi.fn(async () => null),
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin",
   redirect: (href: string) => {
@@ -76,7 +79,9 @@ describe("Auth0-first Console administration presentation", () => {
   it("keeps the admin server check even when local design mock is enabled", async () => {
     vi.stubEnv("CONSOLE_DEV_MOCK", "1");
     mocks.admin.mockResolvedValue(null);
-    await expect(AdminPage()).rejects.toThrow("redirect:/waitlist");
+    await expect(AdminPage()).rejects.toThrow(
+      "redirect:/login?returnTo=%2Fadmin"
+    );
     expect(mocks.admin).toHaveBeenCalledOnce();
     expect(mocks.summary).not.toHaveBeenCalled();
   });

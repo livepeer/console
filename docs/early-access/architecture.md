@@ -216,3 +216,22 @@ Current-main MCP integration retains its native loopback host/port matching at
 code redemption (SEC-04), along with PKCE, approval checks and single-use code
 receipts. This compatibility exception and inherited unbound reusable refresh
 credentials (SEC-02) are unresolved production-hold decisions, not audit acceptance.
+
+## Contract amendment 5 — restore Resend waitlist authentication
+
+User reversed the Auth0-first waitlist decision. `/waitlist` again uses email
+signup, Resend verification/sign-in links, and independent waitlist-cookie
+sessions for membership and consent. No Auth0 account is needed to join or view
+membership. Restore referral attribution, rate limiting, outbox retry and consent
+verification behavior. Existing email-link sessions remain usable. Old Auth0-join
+bookmarks and in-flight return paths redirect to the email form with bounded
+referral/UTM values; they do not enroll through Auth0.
+
+Console, `/admin`, protected APIs and MCP keep Auth0 plus the canonical access
+and admin-permission services. A waitlist-cookie session never grants Console
+or administrator access. `/admin` directs signed-out visitors to Console sign-in.
+Waitlist logout does not log out Console. Existing identity, approval, subscription
+and billing schemas and migrations are unchanged; no data rollback or copy.
+
+PR48 was closed at the user's request. Do not reopen or create a PR until the
+user explicitly authorizes it. Preview publication requires user confirmation.

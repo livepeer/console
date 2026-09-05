@@ -51,19 +51,15 @@ describe("post-Auth0 landing and enrollment context", () => {
     });
     vi.mocked(getAdminPrincipalForUser).mockResolvedValue(null);
   });
-  it("lands new waiting users on the pending page and passes no marketing consent", async () => {
+  it("returns retired waitlist Auth0 transactions to the Resend form without enrolling", async () => {
     expect(
       (
         await GET(
           request("?from=waitlist&ref=friend&utm_source=campaign&role=admin")
         )
       ).headers.get("location")
-    ).toBe("https://preview.invalid/access-pending");
-    expect(enrollAuthenticatedUser).toHaveBeenCalledWith(identity, canonical, {
-      source: "waitlist_auth",
-      referralCode: "friend",
-      attribution: { landing_page: "/waitlist", utm_source: "campaign" },
-    });
+    ).toBe("https://preview.invalid/waitlist?ref=friend&utm_source=campaign");
+    expect(enrollAuthenticatedUser).not.toHaveBeenCalled();
   });
   it("sends approved ordinary users home and administrators to administration", async () => {
     vi.mocked(getAccessDecision).mockResolvedValue({

@@ -3,12 +3,18 @@ import ConsolePageHeader from "@/components/console/ConsolePageHeader";
 import AccessManager from "@/components/admin/AccessManager";
 import { getAdminWaitlistSummary } from "@/lib/waitlist/admin";
 import { getAdminPrincipal } from "@/lib/admin/auth";
+import { getAuthenticatedIdentity } from "@/lib/authentication/session";
+import { consoleSignInHref } from "@/lib/console/auth-login";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const admin = await getAdminPrincipal();
-  if (!admin) redirect("/waitlist");
+  if (!admin) {
+    if (!(await getAuthenticatedIdentity()))
+      redirect(consoleSignInHref({ returnTo: "/admin" }));
+    redirect("/waitlist");
+  }
   const summary = await getAdminWaitlistSummary();
   return (
     <main

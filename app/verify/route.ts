@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
@@ -7,10 +8,19 @@ import { captureEmailVerified } from "@/lib/analytics-server";
 import { getDb } from "@/lib/db";
 import {
   pointEvents,
+  sessions,
   verificationTokens,
   waitlistSignups,
 } from "@/lib/db/schema";
-import { analyticsMemberId, hashToken } from "@/lib/waitlist/security";
+import { changeNewsletterConsentInTransaction } from "@/lib/subscriptions/service";
+import {
+  analyticsMemberId,
+  hashToken,
+  randomToken,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+  SESSION_TTL_MS,
+} from "@/lib/waitlist/security";
 
 export const runtime = "nodejs";
 
@@ -20,6 +30,8 @@ export async function GET(request: Request) {
 
   const db = getDb();
   const now = new Date();
+  const rawSessionToken = randomToken();
+  const sessionExpiresAt = new Date(now.getTime() + SESSION_TTL_MS);
 
   const result = await db.transaction(async (tx) => {
     const [verification] = await tx
@@ -78,8 +90,13 @@ export async function GET(request: Request) {
           eq(waitlistSignups.status, "pending")
         )
       );
-    // Legacy links confirm only their original record; Auth0 now owns sessions
-    // and authenticated preference changes. Never replay old requested consent.
+    // A sign-in link must not restore stale consent captured before a preference change.
+    if (signup.status === "pending")
+      await changeNewsletterConsentInTransaction(tx, {
+        signup,
+        subscribed: verification.requestedMarketingConsent,
+        source: "email_verification",
+      });
 
     if (signup.referredBy && signup.referredBy !== signup.id) {
       await tx
@@ -96,6 +113,11 @@ export async function GET(request: Request) {
         });
     }
 
+    await tx.insert(sessions).values({
+      signupId: signup.id,
+      tokenHash: hashToken(rawSessionToken),
+      expiresAt: sessionExpiresAt,
+    });
     return {
       analyticsId: analyticsMemberId(signup.id),
       verificationId: verification.id,
@@ -103,6 +125,12 @@ export async function GET(request: Request) {
   });
 
   if (!result) redirect("/waitlist?verification=invalid");
+  const cookieStore = await cookies();
+  cookieStore.set(
+    SESSION_COOKIE,
+    rawSessionToken,
+    sessionCookieOptions(sessionExpiresAt)
+  );
   after(async () => {
     try {
       await captureEmailVerified(result);
@@ -112,5 +140,5 @@ export async function GET(request: Request) {
       });
     }
   });
-  redirect("/waitlist?verification=confirmed");
+  redirect("/waitlist");
 }
