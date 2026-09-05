@@ -638,17 +638,17 @@ textarea:-webkit-autofill {
   --text-display-sm: 36px;
   --text-display-sm--line-height: 0.98;
   --text-display-sm--font-weight: 300;
-  --text-display-sm--letter-spacing: 0;
+  --text-display-sm--letter-spacing: var(--display-tracking, 0);
   --text-display-md: 48px;
   --text-display-md--line-height: 0.98;
   --text-display-md--font-weight: 300;
-  --text-display-md--letter-spacing: 0;
+  --text-display-md--letter-spacing: var(--display-tracking, 0);
   --text-display-lg: 60px;
   --text-display-lg--line-height: 0.98;
   --text-display-lg--font-weight: 300;
-  --text-display-lg--letter-spacing: 0;
+  --text-display-lg--letter-spacing: var(--display-tracking, 0);
   --text-display-fluid: 64px;
   --text-display-fluid--line-height: 0.98;
   --text-display-fluid--font-weight: 300;
-  --text-display-fluid--letter-spacing: 0;
+  --text-display-fluid--letter-spacing: var(--display-tracking, 0);
 }

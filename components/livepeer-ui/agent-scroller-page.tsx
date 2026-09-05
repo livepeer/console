@@ -27,6 +27,11 @@ import {
   WaitlistHeaderAuth,
 } from "@/components/livepeer-ui/waitlist-header-auth";
 import { cn } from "@/lib/utils";
+import {
+  fitLogoOrbitRadius,
+  logoOrbitPose,
+  ORBIT_PERSPECTIVE,
+} from "./logo-orbit";
 
 type MediaItem = {
   id: string;
@@ -353,29 +358,23 @@ function CapabilityFamilyLogoAnimation({
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)"
     ).matches;
-    const tiltX = Math.PI * 0.31;
-    const tiltZ = Math.PI * 0.16;
     let animationFrame = 0;
     let lastTime = 0;
+    let radius = 0;
+    const measureOrbit = () => {
+      radius = fitLogoOrbitRadius(
+        orbit.clientWidth,
+        orbit.clientHeight,
+        logoElements[0]?.offsetWidth ?? 48
+      );
+    };
 
     const renderOrbit = (time: number) => {
-      const width = orbit.clientWidth;
-      const height = orbit.clientHeight;
-      const radius = Math.min(width * 0.34, height * 0.66);
-      const depthRadius = radius * Math.sin(tiltX);
       const elapsed = reducedMotion ? 0 : time * 0.000095;
 
       logoElements.forEach((element, index) => {
         const angle = elapsed + (index / logoElements.length) * Math.PI * 2;
-        const circleX = Math.cos(angle) * radius;
-        const circleY = Math.sin(angle) * radius;
-        const tiltedY = circleY * Math.cos(tiltX);
-        const z = circleY * Math.sin(tiltX);
-        const x = circleX * Math.cos(tiltZ) - tiltedY * Math.sin(tiltZ);
-        const y = circleX * Math.sin(tiltZ) + tiltedY * Math.cos(tiltZ);
-        const depth = (z + depthRadius) / (depthRadius * 2);
-        const blur = Math.pow(1 - depth, 1.6) * 5;
-        const scale = 0.68 + depth * 0.32;
+        const { x, y, z, depth, blur, scale } = logoOrbitPose(angle, radius);
 
         element.style.zIndex = String(Math.round(depth * 100));
         element.style.opacity = String(0.28 + depth * 0.72);
@@ -384,6 +383,7 @@ function CapabilityFamilyLogoAnimation({
       });
     };
 
+    measureOrbit();
     renderOrbit(0);
     const tick = (time: number) => {
       lastTime = time;
@@ -392,7 +392,10 @@ function CapabilityFamilyLogoAnimation({
     };
     if (!reducedMotion) animationFrame = requestAnimationFrame(tick);
 
-    const resizeObserver = new ResizeObserver(() => renderOrbit(lastTime));
+    const resizeObserver = new ResizeObserver(() => {
+      measureOrbit();
+      renderOrbit(lastTime);
+    });
     resizeObserver.observe(orbit);
 
     return () => {
@@ -404,7 +407,8 @@ function CapabilityFamilyLogoAnimation({
   return (
     <div
       ref={orbitRef}
-      className="relative h-[13rem] w-full max-w-4xl overflow-hidden [perspective:800px] [transform-style:preserve-3d] sm:h-[17rem]"
+      className="relative h-[16rem] w-full max-w-4xl overflow-hidden [transform-style:preserve-3d] sm:h-[21rem]"
+      style={{ perspective: ORBIT_PERSPECTIVE }}
       aria-label="Model and tool families available through Livepeer Agent"
     >
       {logos.map((logo) => (
