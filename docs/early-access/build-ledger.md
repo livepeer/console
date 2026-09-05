@@ -131,3 +131,50 @@ New runtime preview uses isolated `br-holy-sound-auugm104`, migrations through00
 restricted runtime role, independent preview-only secrets, captured email, explicit
 staging PymtHouse scope and its own MCP origin. Configuration is branch-scoped.
 Preview acceptance and live token compatibility are **not yet claimed**.
+
+## User amendment — Auth0-first joining and consolidated PR
+
+User approved replacing waitlist join/sign-in with Auth0 and moving administration
+inside Console chrome. Frozen contract: architecture amendment4, `91a19d2`.
+No provider replacement, migration, credential change, production write or merge.
+
+| Owner | Worktree | Scope | Handoff |
+| --- | --- | --- | --- |
+| Coordinator | root | Contracts, entry routing, integration fixtures, current-main MCP merge, Git/preview | `85a96eb`, `b0ce454`, `053dc5f`, `c18fc0f` |
+| access_backend | auth0-backend | Auth0 join/sync, canonical admin/CSV/member permissions, enrollment context, consent authentication | `8738def`, referral fix `6b4c071` |
+| data_owner (UI role) | auth0-ui | Auth0 CTAs, Console admin layout/navigation, membership preferences, legacy-link notices | `48e462c`, `83d34f0` |
+| security_reviewer | review-security | Independent exact-commit MCP and Auth0 boundary review; no implementation edits | `b0ce454`, `48e462c`, final `c18fc0f` |
+
+PR48 now targets main and includes PR46. PR46 is closed as superseded; its branch
+and commits are preserved. PR48 remains draft. Current main `b3439cd` (CIMD
+Codex/ChatGPT compatibility) was merged into the feature branch, not into production.
+Token conflict resolution retains the shared approval gate and single-use receipts.
+
+Implemented: Auth0-first join/sign-in, bounded referral/UTM return context,
+admin→`/admin`, approved→`/home`, pending→waiting, explicit protocol return paths,
+server-owned admin navigation and permissions, disabled/revoked precedence.
+Old cookies no longer authorize member, consent, admin or CSV operations. Old
+verification links confirm enrollment only, never a session or deferred consent.
+Resend remains email delivery, with preview capture isolation unchanged.
+
+Independent review found SEC-05: background membership reads could enroll before
+referral context. Author fixed it by making reads non-enrolling. Reviewer closed
+SEC-05 at `c18fc0f`;19 focused tests reproduced. No new critical/high findings.
+SEC-02 (reusable/unbound refresh credentials) and SEC-04 (current-main native
+loopback redirect flexibility at redemption) remain unresolved production holds.
+They have not been silently accepted. No production-readiness claim.
+
+Integrated checks:253 unit tests passed (33 database cases intentionally skipped
+in credential-free run),108 Console/MCP tests passed; lint and typecheck passed.
+Disposable Postgres:11 access/enrollment/bulk/consent checks +5 route checks passed;
+the latter reran after SEC-05 with a real authenticated-read-before-referral-join
+regression. Production build passed after regenerating stale route types caused
+by moving `/admin`; final exact-source build and unchanged identity/migration
+rechecks run before preview handoff. Existing Auth0 bundler warnings remain.
+
+Preview publication stays on the existing isolated protected feature alias;
+GitHub-signed head required, no protection-policy bypass. Live Auth0 callback,
+admin/approved/pending browser acceptance and actual staging token issuance are
+separate verification gates, not implied by mocked tests. Production inventory,
+grandfather activation, secret reconciliation, cutover and access-enforcing
+rollback planning remain unexecuted release work.
