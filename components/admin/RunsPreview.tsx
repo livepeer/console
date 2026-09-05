@@ -255,9 +255,18 @@ export default function RunsPreview() {
               key={value}
               aria-pressed={status === value}
               onClick={() => setStatus(value)}
-              className={`-mb-px border-b-2 px-0.5 pb-2.5 pt-1 text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${status === value ? "border-foreground font-medium text-fg-strong" : "border-transparent text-fg-faint hover:text-fg"}`}
+              className={`-mb-px inline-grid shrink-0 border-b-2 px-3 pb-2.5 pt-1 text-[12.5px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${status === value ? "border-foreground font-medium text-fg-strong" : "border-transparent text-fg-faint hover:text-fg"}`}
             >
-              {value}
+              {/* Keep neighboring filters still when the selected label gets heavier. */}
+              <span
+                aria-hidden="true"
+                className="invisible col-start-1 row-start-1 whitespace-nowrap font-medium"
+              >
+                {value}
+              </span>
+              <span className="col-start-1 row-start-1 whitespace-nowrap">
+                {value}
+              </span>
             </button>
           ))}
         </div>

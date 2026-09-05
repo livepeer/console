@@ -31,6 +31,10 @@ it("copies the supplied referral URL", async () => {
   expect(screen.getByRole("button").className).toContain("bg-card");
   expect(screen.getByRole("button").className).toContain("border-border");
   expect(screen.getByRole("button").getAttribute("style")).toBeNull();
+  expect(
+    screen.getByRole("button").querySelector("img")?.getAttribute("src")
+  ).toBe("/images/console/explore/nomic-embed.webp");
+  expect(screen.queryByRole("img")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Copy referral link" }));
   await waitFor(() => expect(toast.success).toHaveBeenCalled());
   expect(writeText).toHaveBeenCalledWith(

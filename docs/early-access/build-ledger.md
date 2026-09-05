@@ -293,3 +293,18 @@ and preview acceptance must be checked against the newly published deployment.
 No schema/migrations, canonical-account merges, new admin grants, credentials,
 production data, outbox backlog, production configuration, domains, or PR state
 changed. Existing release blockers and production holds remain in force.
+
+### Follow-up UI polish — 2026-09-04
+
+- Reused the existing birds-and-pixels image on the shared referral card, with
+  a contrast overlay and decorative-image accessibility coverage.
+- Added horizontal padding and reserved selected-weight label widths to both
+  admin table filter groups. Browser checks found no position or size shifts
+  across selections at 1280, 640, and 375px.
+- Removed appearance-control borders/shadows and used `bg-foreground/3` for the
+  selected icon. Browser checks confirmed all three choices use the intended
+  background without borders or shadows.
+- All 41 focused tests, focused lint, and typecheck passed; the production build
+  passed with the existing warnings. Local-only fixture
+  navigation and toast wiring stay outside the repository; no auth bypass or
+  fictional backend is included in this update. No PR or production action.

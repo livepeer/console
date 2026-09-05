@@ -209,7 +209,7 @@ function UserFooter({
                   <div
                     role="group"
                     aria-label="Appearance"
-                    className="inline-flex rounded-full border border-border p-0.5"
+                    className="inline-flex rounded-full p-0.5"
                   >
                     {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
                       <button
@@ -220,7 +220,7 @@ function UserFooter({
                         title={label}
                         disabled={themeLoading}
                         onClick={() => setPreference(value)}
-                        className={`inline-flex size-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${preference === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`inline-flex size-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${preference === value ? "bg-foreground/3 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                       >
                         <Icon className="size-3.5" aria-hidden="true" />
                       </button>
