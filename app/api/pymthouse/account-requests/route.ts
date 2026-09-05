@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { attachOutputsToTickets } from "@/lib/console/activity-assets";
 import { fetchAccountRequestsForExternalUser } from "@/lib/console/pymthouse-bff";
 import { requireConsoleSession } from "@/lib/console/session-user";
 import {
@@ -29,7 +30,14 @@ export async function GET(request: NextRequest) {
       cursor,
       limit,
     });
-    return NextResponse.json(payload, { headers: PYMTHOUSE_NO_STORE_HEADERS });
+    const items = await attachOutputsToTickets(
+      session.externalUserId,
+      payload.items
+    );
+    return NextResponse.json(
+      { ...payload, items },
+      { headers: PYMTHOUSE_NO_STORE_HEADERS }
+    );
   } catch (error) {
     return pymthouseErrorResponse(error, "Requests fetch failed");
   }

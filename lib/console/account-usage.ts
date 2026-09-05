@@ -55,7 +55,13 @@ export type SignedTicketRequestRow = {
   networkFeeUsdMicros: string;
   feeWei?: string;
   pixels?: string;
+  /** ETH/USD at ingest; with `feeWei`, the exact ticket price. */
+  ethUsdPrice?: string;
   eventId: string;
+  /** Neon-stored media URL joined on `gatewayRequestId`. */
+  outputUrl?: string | null;
+  /** fal/runner request id from the asset store (#26). */
+  providerRequestId?: string | null;
 };
 
 export type AccountRequestsPayload = {

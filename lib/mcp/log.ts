@@ -1,4 +1,4 @@
-import type { McpPrincipal } from "./jwt";
+export { principalId } from "./principal";
 
 export function logToolCall(input: {
   tool: string;
@@ -36,8 +36,4 @@ export function clientClassFromHeaders(req: Request): string {
   if (ua.includes("codex") || ua.includes("openai")) return "codex";
   if (ua.includes("chatgpt")) return "chatgpt";
   return "unknown";
-}
-
-export function principalId(principal: McpPrincipal): string {
-  return principal.externalUserId || principal.sub;
 }

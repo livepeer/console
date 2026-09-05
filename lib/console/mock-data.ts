@@ -26,6 +26,7 @@ import type {
   UsageSummary,
   RoutingSummary,
 } from "./types";
+import { resolveActivityCapability } from "./capability-modality";
 
 // ─── Environments ─────────────────────────────────────────────────────────────
 //
@@ -3152,6 +3153,10 @@ function generateRecentRequests(): import("./types").AccountActivityRow[] {
       timestamp: new Date(now - s.minutesAgo * 60_000).toISOString(),
       model: s.model,
       pipeline: s.pipeline,
+      modality: resolveActivityCapability({
+        pipeline: s.pipeline,
+        capabilityId: s.model,
+      }).modality,
       status: s.status,
       kind,
       latencyMs: s.latencyMs,

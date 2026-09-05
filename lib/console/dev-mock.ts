@@ -102,6 +102,20 @@ const CAPABILITIES: Array<{
     trend: 1.0,
   },
   {
+    pipeline: "fixed",
+    modelId: "livepeer-example/fal-gpt-image-2",
+    base: 160,
+    unit: 0.004,
+    trend: 1.2,
+  },
+  {
+    pipeline: "hour",
+    modelId: "livepeer-example/comfyui-stream",
+    base: 40,
+    unit: 0.012,
+    trend: 0.9,
+  },
+  {
     pipeline: "image-to-video",
     modelId: "stable-video-diffusion",
     base: 90,
@@ -225,7 +239,8 @@ function buildUsage(
 }
 
 function devRedirect(path: string | null, requestUrl: string): Response {
-  const safePath = path?.startsWith("/") && !path.startsWith("//") ? path : "/home";
+  const safePath =
+    path?.startsWith("/") && !path.startsWith("//") ? path : "/home";
   const baseUrl = process.env.APP_BASE_URL || requestUrl;
 
   return new Response(null, {
@@ -275,7 +290,10 @@ function buildWallet() {
         },
         // builder-sdk 0.6.x omits this from BillingState; the API sends it.
         includedUsage: {
-          total: { usdMicros: usd(INCLUDED_TOTAL_USD), usd: INCLUDED_TOTAL_USD.toFixed(2) },
+          total: {
+            usdMicros: usd(INCLUDED_TOTAL_USD),
+            usd: INCLUDED_TOTAL_USD.toFixed(2),
+          },
           remaining: { usdMicros: usd(remaining), usd: remaining.toFixed(2) },
           consumed: { usdMicros: usd(consumed), usd: consumed.toFixed(2) },
           resetsAt: resetsAt.toISOString(),
@@ -410,7 +428,9 @@ function buildInvoices() {
  */
 function buildRequests(limit: number, cursor: string | null) {
   const offset = cursor ? Number.parseInt(cursor, 10) || 0 : 0;
-  const TOTAL = 180;
+  // 7 days at one call every 30 minutes — enough pages to exercise loadMore.
+  const STEP_MINUTES = 30;
+  const TOTAL = Math.ceil((7 * 24 * 60) / STEP_MINUTES);
   const rand = seeded(0x5ca11 + offset);
 
   // Pick capabilities in proportion to their daily volume.
@@ -429,8 +449,8 @@ function buildRequests(limit: number, cursor: string | null) {
   const items = Array.from({ length: Math.max(0, count) }, (_, i) => {
     const index = offset + i;
     const cap = pick();
-    // Roughly one call every few minutes, walking backwards from now.
-    const minutesAgo = index * 4 + Math.floor(rand() * 4);
+    // Walk backwards from now across the 7-day history window.
+    const minutesAgo = index * STEP_MINUTES + Math.floor(rand() * 8);
     const fee = Math.round(cap.unit * (0.7 + rand() * 0.6) * 1_000_000);
     return {
       time: new Date(Date.now() - minutesAgo * 60_000).toISOString(),

@@ -69,4 +69,15 @@ test("runCapabilityFailurePayload prefers the id stamped on the thrown error", (
   });
   const payload = runCapabilityFailurePayload(err, "job_minted1");
   assert.equal(payload.gateway_request_id, "job_from_sdk");
+  assert.equal(payload.request_id, undefined);
+});
+
+test("runCapabilityFailurePayload forwards provider request id from #26 errors", () => {
+  const err = Object.assign(new Error("runner 500"), {
+    gatewayRequestId: "job_from_sdk",
+    providerRequestId: "req-fal-abc",
+  });
+  const payload = runCapabilityFailurePayload(err, "job_minted1");
+  assert.equal(payload.gateway_request_id, "job_from_sdk");
+  assert.equal(payload.request_id, "req-fal-abc");
 });
