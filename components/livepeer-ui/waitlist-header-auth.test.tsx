@@ -15,6 +15,7 @@ vi.mock("@/lib/analytics", () => ({
 import { WaitlistSessionProvider } from "./waitlist-session";
 import {
   JoinWaitlistControl,
+  LegacyVerificationNotice,
   WaitlistHeaderAuth,
 } from "./waitlist-header-auth";
 afterEach(() => {
@@ -22,6 +23,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("waitlist Auth0 controls", () => {
+  it.each(["confirmed", "invalid"] as const)(
+    "legacy %s notice never claims that the link signed the visitor in",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({}, { status: 401 }))
+      );
+      render(
+        <WaitlistSessionProvider initialSession={null}>
+          <LegacyVerificationNotice status={status} />
+        </WaitlistSessionProvider>
+      );
+      expect(screen.getByRole("status").textContent).toContain(
+        "does not sign you in"
+      );
+      expect(
+        screen
+          .getByRole("link", { name: "Sign in securely" })
+          .getAttribute("href")
+      ).toContain("/api/waitlist/join?");
+      expect(document.querySelector('input[type="email"]')).toBeNull();
+    }
+  );
   it("offers live Join and Sign in links with no email form or verification dialog", () => {
     vi.stubGlobal(
       "fetch",

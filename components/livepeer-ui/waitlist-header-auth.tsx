@@ -13,6 +13,40 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
+/** Legacy verification confirms an enrollment, never an authenticated session. */
+export function LegacyVerificationNotice({
+  status,
+}: {
+  status: "confirmed" | "invalid";
+}) {
+  const { state, joinHref, onAuthStart } = useWaitlistSession();
+  return (
+    <aside
+      role="status"
+      className="fixed top-20 left-1/2 z-[70] w-[min(90vw,32rem)] -translate-x-1/2 rounded-sm border border-white/20 bg-black/85 p-3 text-center text-xs leading-relaxed text-white backdrop-blur"
+    >
+      <p>
+        {status === "confirmed"
+          ? "Your legacy waitlist link has been confirmed."
+          : "This legacy waitlist link is invalid or expired."}
+      </p>
+      {state.status !== "signed-in" && (
+        <p className="mt-1">
+          This link does not sign you in.{" "}
+          <a
+            href={joinHref}
+            onClick={onAuthStart}
+            className="font-semibold underline underline-offset-4"
+          >
+            Sign in securely
+          </a>{" "}
+          to view or join the waitlist.
+        </p>
+      )}
+    </aside>
+  );
+}
+
 function ReferralControl({
   compact = false,
   smoothTheme = false,
