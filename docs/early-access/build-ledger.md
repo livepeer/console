@@ -178,3 +178,34 @@ admin/approved/pending browser acceptance and actual staging token issuance are
 separate verification gates, not implied by mocked tests. Production inventory,
 grandfather activation, secret reconciliation, cutover and access-enforcing
 rollback planning remain unexecuted release work.
+
+## Resend restoration — local verification
+
+User reversed Auth0-first waitlist joining after closing PR48. Coordinator owns
+this bounded restoration from clean head `91def27`; prior Resend implementation
+source is `87f94c3`. Architecture amendment5 supersedes waitlist portions of4.
+
+Restored email form, signup/rate limiting, verification/session cookies, referral
+credit, consent verification/preferences, waitlist logout and durable outbox
+integration. Removed superseded Auth0-only waitlist UI/helpers and assertions;
+reinstated Resend regression coverage. Old join URLs and in-flight Auth0 waitlist
+transactions return to the email form with bounded referral/campaign context.
+
+Auth0 Console/admin authentication and shared approval/MCP enforcement remain.
+Added explicit Console sign-in redirect for waitlist members visiting admin;
+waitlist cookies alone cannot authorize CSV/admin. Waitlist logout cannot end an
+independent Console session. Preserved same-origin logout protection and sanitized
+signup failure logging. No schema, migration, account mapping, grant or production
+environment changes. No new independent security signoff is claimed for this delta.
+
+Verification:240 unit tests passed (31 DB cases skipped in credential-free run),
+108 Console/MCP tests passed; typecheck, lint and production build passed (existing
+Auth0 warnings). Three restored route integration tests passed on the marked
+disposable Postgres branch with synthetic identities/mocked providers: signup,
+email verification/session, referrals, consent, admin isolation, independent
+logout, rate limits and outbox retry. No external email sent by these tests.
+
+User explicitly authorized updating the existing preview after local verification.
+Publish only the feature branch through the required signed-head workflow; retain
+the isolated database and captured-email setting. No production environment change.
+PR48 remains closed; do not create/reopen a PR without explicit user approval.
