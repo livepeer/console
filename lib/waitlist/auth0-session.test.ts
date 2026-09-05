@@ -16,6 +16,7 @@ vi.mock("next/headers", () => ({
 import { cookies } from "next/headers";
 import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { resolveProviderIdentity } from "@/lib/identity/provider-user";
+import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
 import { getDb } from "@/lib/db";
 import { getAuthenticatedWaitlistSignup } from "./current-session";
 import { GET as sessionRoute } from "@/app/api/session/route";
@@ -69,6 +70,27 @@ describe("Auth0-derived waitlist membership", () => {
       signup,
       userId: "canonical",
     });
+    expect(enrollAuthenticatedUser).not.toHaveBeenCalled();
+  });
+  it("does not enroll a signed-in visitor during background membership reads", async () => {
+    vi.mocked(getAuthenticatedIdentity).mockResolvedValue({
+      authority: "auth0",
+      issuer: "https://auth.invalid",
+      subject: "new-visitor",
+      emailVerified: true,
+      email: "new@example.invalid",
+    });
+    vi.mocked(resolveProviderIdentity).mockResolvedValue({
+      userId: "canonical-new",
+      identityId: "identity-new",
+      accountStatus: "active",
+      conflicts: [],
+      identityCreated: false,
+    });
+    limit.mockResolvedValue([]);
+    expect(await getAuthenticatedWaitlistSignup()).toBeNull();
+    expect((await sessionRoute()).status).toBe(401);
+    expect(enrollAuthenticatedUser).not.toHaveBeenCalled();
   });
   it("rejects disabled canonical users without consulting legacy sessions", async () => {
     vi.mocked(getAuthenticatedIdentity).mockResolvedValue({

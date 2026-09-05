@@ -2,7 +2,6 @@ import "server-only";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { resolveProviderIdentity } from "@/lib/identity/provider-user";
-import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
 import { getAdminPrincipalForUser } from "@/lib/admin/permissions";
 import { getDb } from "@/lib/db";
 import { waitlistSignups } from "@/lib/db/schema";
@@ -14,7 +13,8 @@ export async function getAuthenticatedWaitlistSignup() {
   if (!identity) return null;
   const canonical = await resolveProviderIdentity(identity);
   if (canonical.accountStatus !== "active") return null;
-  await enrollAuthenticatedUser(identity, canonical);
+  // Membership reads never enroll: a background fetch must not consume the
+  // first enrollment before the explicit join carries referral/attribution.
   const [signup] = await getDb()
     .select()
     .from(waitlistSignups)
