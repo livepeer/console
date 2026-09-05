@@ -77,7 +77,11 @@ export type OutboxEvent = {
 export interface OutboxStore {
   claimDue(limit: number, now: Date): Promise<OutboxEvent[]>;
   claimById(id: string, now: Date): Promise<OutboxEvent | null>;
-  markProcessed(id: string, processedAt: Date): Promise<void>;
+  markProcessed(
+    id: string,
+    processedAt: Date,
+    captured: boolean
+  ): Promise<void>;
   markRetry(id: string, nextAttemptAt: Date, errorCode: string): Promise<void>;
   markTerminal(id: string, terminalAt: Date, errorCode: string): Promise<void>;
 }
@@ -150,8 +154,7 @@ export function createDrizzleOutboxStore(): OutboxStore {
     async claimById(id, now) {
       return (await claim(1, now, id))[0] ?? null;
     },
-    async markProcessed(id, processedAt) {
-      const captured = isCaptureDelivery();
+    async markProcessed(id, processedAt, captured) {
       await db
         .update(emailOutbox)
         .set({
@@ -214,7 +217,9 @@ async function deliver(
   now: Date
 ): Promise<"delivered" | "failed" | "invalid" | "terminal"> {
   try {
-    const captured = isCaptureDelivery();
+    const captured = isCaptureDelivery(
+      event.eventType === NEWSLETTER_CONSENT_EVENT ? "newsletter" : "email"
+    );
     if (event.eventType === VERIFICATION_EMAIL_EVENT) {
       const payload = verificationPayloadSchema.safeParse(event.payload);
       if (!payload.success) {
@@ -266,7 +271,7 @@ async function deliver(
       return "invalid";
     }
 
-    await store.markProcessed(event.id, now);
+    await store.markProcessed(event.id, now, captured);
     return "delivered";
   } catch (error) {
     const providerError =

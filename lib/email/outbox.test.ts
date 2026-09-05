@@ -114,6 +114,57 @@ describe("outbox dispatch", () => {
     );
   });
 
+  it("sends preview verification and approval mail but never syncs Contacts", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "send_transactional");
+    const deps = dependencies([
+      fixture(),
+      fixture({
+        id: "consent",
+        eventType: NEWSLETTER_CONSENT_EVENT,
+        payload: {
+          email: "person@example.com",
+          subscribed: false,
+          consentEventId: "34cdd9d3-a720-4a62-b2b1-e5996a1c3b82",
+        },
+      }),
+      fixture({
+        id: "approval",
+        eventType: "access.approved",
+        payload: {
+          to: "person@example.com",
+          loginUrl: "https://preview.example.com/login",
+        },
+      }),
+    ]);
+    const sendApprovalEmail = vi
+      .fn()
+      .mockResolvedValue({ providerMessageId: "approval-id" });
+    const now = new Date("2026-09-04T18:00:00.000Z");
+    expect(
+      await dispatchPendingOutbox({
+        ...deps,
+        now,
+        emailProvider: { ...deps.emailProvider, sendApprovalEmail },
+      })
+    ).toMatchObject({ delivered: 3, failed: 0 });
+    expect(deps.sendVerificationEmail).toHaveBeenCalledOnce();
+    expect(sendApprovalEmail).toHaveBeenCalledOnce();
+    expect(deps.updateContact).not.toHaveBeenCalled();
+    expect(deps.newsletterSync).not.toHaveBeenCalled();
+    expect(deps.store.markProcessed).toHaveBeenCalledWith(
+      "event-id",
+      now,
+      false
+    );
+    expect(deps.store.markProcessed).toHaveBeenCalledWith(
+      "approval",
+      now,
+      false
+    );
+    expect(deps.store.markProcessed).toHaveBeenCalledWith("consent", now, true);
+  });
+
   it("delivers verification events and marks them processed", async () => {
     const deps = dependencies([fixture()]);
     const now = new Date("2026-07-27T18:00:00.000Z");
@@ -128,7 +179,11 @@ describe("outbox dispatch", () => {
     expect(deps.sendVerificationEmail).toHaveBeenCalledWith(
       expect.objectContaining({ idempotencyKey: "verification:signup-id" })
     );
-    expect(deps.store.markProcessed).toHaveBeenCalledWith("event-id", now);
+    expect(deps.store.markProcessed).toHaveBeenCalledWith(
+      "event-id",
+      now,
+      false
+    );
   });
 
   it("projects consent through the audience provider", async () => {
