@@ -254,3 +254,42 @@ unsafe preview modes, and unchanged production sending. Existing admin UI tests
 cover the Console page/sidebar and selection contracts. No fresh independent
 review is claimed. User inbox, Auth0 login, and privileged admin-browser acceptance
 remain separate checks; never infer or grant admin authority from email alone.
+
+## Console presentation cleanup — September 4, 2026
+
+User authorized publishing the feature branch after local design acceptance,
+without creating or reopening a PR. Starting remote/local head: `739c0f6`.
+Coordinator owns this delta; no fresh independent security signoff is claimed.
+Publish as focused GitHub-verified commits, retaining all earlier branch history:
+
+- Shared auth screen/card, pending identity presentation and trusted referral
+  lookup; reusable referral card; intrinsic Home balance/card wrapping.
+- Verified/subscribed/unverified admin filters and bounded selected-email CSV
+  export, protected by the existing administrator and same-origin checks.
+- Simplified admin selection UI and Waitlist/History navigation. Platform History
+  remains a fictional, non-networked presentation preview, using Home's actual
+  `CallsTable` and `CallDetailDrawer`, not a second inspector implementation.
+- Restored persisted Light/Dark/System appearance controls in the bottom-left
+  account menu. Root and Console pre-paint theme setup agree with that preference;
+  referral surfaces use card, border, and foreground theme tokens.
+
+Validation: 293 Vitest tests passed (32 database-dependent tests skipped in the
+credential-free run); 108 Console/MCP Node tests passed. All 12 access-domain
+integration tests passed on the marked disposable database branch
+`br-super-bird-auln2med`, including filters, frozen selection, consent, access
+transitions, and selected exports. Typecheck, lint, and production build passed
+with existing Auth0/dependency and local missing-auth-config warnings.
+
+Local browser evidence: Home/Admin navigation and the shared inspector; Home
+balance stays unwrapped and at a stable content-relative Y position at 16 widths;
+26 admin stats checks confirm unwrapped labels with 4/2/1 columns. Local fixture
+appearance checks confirm Light/Dark/System selection, persisted reloads, OS
+updates in system mode, and at least 4.5:1 referral title/link contrast after
+transitions settle. Local fixture
+scripts and synthetic backend adapters remain outside the repository; they are
+not deployed authentication bypasses. Hosted callback, inbox, real admin selection,
+and preview acceptance must be checked against the newly published deployment.
+
+No schema/migrations, canonical-account merges, new admin grants, credentials,
+production data, outbox backlog, production configuration, domains, or PR state
+changed. Existing release blockers and production holds remain in force.

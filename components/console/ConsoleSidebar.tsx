@@ -11,6 +11,7 @@ import { AUTH_SIGNIN_HREF, AUTH_SIGNUP_HREF } from "@/lib/console/auth-login";
 import { useAuth, type ConsoleUser } from "@/components/console/AuthContext";
 import Drawer from "@/components/design-system/Drawer";
 import NavLink from "@/components/console/NavLink";
+import { THEME_OPTIONS, useTheme } from "@/components/console/ThemeContext";
 
 type PortalNavItem = {
   href: string;
@@ -143,6 +144,7 @@ function UserFooter({
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { preference, setPreference, isLoading: themeLoading } = useTheme();
   const reduceMotion = useReducedMotion();
   const transition = reduceMotion
     ? { duration: 0 }
@@ -203,8 +205,27 @@ function UserFooter({
                 transition={transition}
                 className="px-3 pb-5"
               >
-                <div className="min-h-8" aria-hidden="true" />
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <div
+                    role="group"
+                    aria-label="Appearance"
+                    className="inline-flex rounded-full border border-border p-0.5"
+                  >
+                    {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-label={`${label} appearance`}
+                        aria-pressed={preference === value}
+                        title={label}
+                        disabled={themeLoading}
+                        onClick={() => setPreference(value)}
+                        className={`inline-flex size-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${preference === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        <Icon className="size-3.5" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     onClick={signOut}
