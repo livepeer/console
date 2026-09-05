@@ -211,3 +211,8 @@ only; old tokens do not restore deferred or stale marketing consent.
 This amendment needs no database migration or credential-provider change.
 Production remains on hold. PR48 will include PR46 by targeting main; neither
 PR is merged as part of this work.
+
+Current-main MCP integration retains its native loopback host/port matching at
+code redemption (SEC-04), along with PKCE, approval checks and single-use code
+receipts. This compatibility exception and inherited unbound reusable refresh
+credentials (SEC-02) are unresolved production-hold decisions, not audit acceptance.
