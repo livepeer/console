@@ -1,5 +1,5 @@
 {
-  "id": "b194958b-6d47-422b-a5ab-b0eec9a5d704",
+  "id": "c8a7fdb3-fc88-4d53-a2d4-38c75c9f02e1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -53,15 +53,9 @@
         }
       },
       "indexes": {
-        "mcp_assets_principal_job_url_idx": {
-          "name": "mcp_assets_principal_job_url_idx",
+        "mcp_assets_job_url_unique": {
+          "name": "mcp_assets_job_url_unique",
           "columns": [
-            {
-              "expression": "principal_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "gateway_request_id",
               "isExpression": false,
@@ -92,7 +86,7 @@
             {
               "expression": "created_at",
               "isExpression": false,
-              "asc": true,
+              "asc": false,
               "nulls": "last"
             }
           ],
@@ -112,27 +106,6 @@
             },
             {
               "expression": "capability",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "mcp_assets_principal_gateway_idx": {
-          "name": "mcp_assets_principal_gateway_idx",
-          "columns": [
-            {
-              "expression": "principal_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "gateway_request_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

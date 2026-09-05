@@ -21,22 +21,17 @@ export const mcpAssets = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("mcp_assets_principal_job_url_idx").on(
-      table.principalId,
+    uniqueIndex("mcp_assets_job_url_unique").on(
       table.gatewayRequestId,
       table.url
     ),
     index("mcp_assets_principal_created_idx").on(
       table.principalId,
-      table.createdAt
+      table.createdAt.desc()
     ),
     index("mcp_assets_principal_capability_idx").on(
       table.principalId,
       table.capability
-    ),
-    index("mcp_assets_principal_gateway_idx").on(
-      table.principalId,
-      table.gatewayRequestId
     ),
   ]
 );
