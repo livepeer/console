@@ -1,6 +1,7 @@
 import { requireConsoleSession } from "@/lib/console/session-user";
 import { apiError } from "@/lib/admin/http";
 import type { ConsoleSessionProfile } from "@/lib/platform/contracts";
+import { getAdminPrincipalForUser } from "@/lib/admin/permissions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET() {
@@ -12,6 +13,7 @@ export async function GET() {
       externalUserId: session.externalUserId,
       name: session.email?.split("@")[0] ?? "Member",
       email: session.email ?? "",
+      isAdmin: !!(await getAdminPrincipalForUser(session.canonicalUserId)),
       provider:
         strategy === "github" || strategy === "google-oauth2"
           ? strategy === "github"

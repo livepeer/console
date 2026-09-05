@@ -22,6 +22,7 @@ import type {
 } from "@/lib/platform/contracts";
 import { AccessError } from "@/lib/access/service";
 import { APPROVAL_EMAIL_EVENT, dispatchOutboxEvent } from "@/lib/email/outbox";
+import { getAdminPrincipalForUser } from "./permissions";
 
 export const bulkAccessSchema = z
   .object({
@@ -82,6 +83,16 @@ export async function mutateAccessSelection(
       : [];
     if (adminSignup.status !== "confirmed" || adminUser?.status === "disabled")
       throw new AccessError("disabled", "admin_required");
+    const principal = adminSignup.userId
+      ? await getAdminPrincipalForUser(adminSignup.userId, tx)
+      : null;
+    if (
+      !principal ||
+      principal.adminGrantId !== actor.adminGrantId ||
+      principal.signupId !== actor.signupId ||
+      (actor.userId && principal.userId !== actor.userId)
+    )
+      throw new AccessError("pending", "admin_required");
     await tx
       .insert(accessOperations)
       .values({
@@ -181,6 +192,16 @@ export async function mutateAccessSelection(
           adminUser?.status === "disabled"
         )
           throw new AccessError("disabled", "admin_required");
+        const principal = adminSignup.userId
+          ? await getAdminPrincipalForUser(adminSignup.userId, tx)
+          : null;
+        if (
+          !principal ||
+          principal.adminGrantId !== actor.adminGrantId ||
+          principal.signupId !== actor.signupId ||
+          (actor.userId && principal.userId !== actor.userId)
+        )
+          throw new AccessError("pending", "admin_required");
         const [user] = signup.userId
           ? await tx
               .select()

@@ -12,12 +12,14 @@ import {
 import type {
   CanonicalIdentity,
   ProviderIdentity,
+  WaitlistEnrollmentContext,
 } from "@/lib/platform/contracts";
 import { normalizeEmail, randomReferralCode } from "@/lib/waitlist/security";
 
 export async function enrollAuthenticatedUser(
   identity: ProviderIdentity,
-  canonical: CanonicalIdentity
+  canonical: CanonicalIdentity,
+  context?: WaitlistEnrollmentContext
 ): Promise<{ enrolled: boolean; signupId?: string; reason?: string }> {
   if (
     !identity.emailVerified ||
@@ -74,18 +76,38 @@ export async function enrollAuthenticatedUser(
       return { enrolled: false, reason: "inactive_contact" };
     const now = new Date();
     if (!signup) {
+      const [referrer] = context?.referralCode
+        ? await tx
+            .select({
+              id: waitlistSignups.id,
+              normalizedEmail: waitlistSignups.normalizedEmail,
+            })
+            .from(waitlistSignups)
+            .where(
+              and(
+                eq(waitlistSignups.referralCode, context.referralCode),
+                eq(waitlistSignups.status, "confirmed")
+              )
+            )
+            .limit(1)
+        : [];
+      const touch = context?.attribution ?? {};
       [signup] = await tx
         .insert(waitlistSignups)
         .values({
           email: identity.email!.trim(),
           normalizedEmail,
           userId: canonical.userId,
-          enrollmentSource: "console_auth",
+          enrollmentSource: context?.source ?? "console_auth",
+          referredBy:
+            referrer && referrer.normalizedEmail !== normalizedEmail
+              ? referrer.id
+              : null,
           referralCode: randomReferralCode(),
           status: "confirmed",
           confirmedAt: now,
-          firstTouch: {},
-          lastTouch: {},
+          firstTouch: touch,
+          lastTouch: touch,
           marketingConsent: false,
         })
         .returning();
@@ -140,16 +162,14 @@ export async function enrollAuthenticatedUser(
         .update(accessGrants)
         .set({ signupId: signup.id, activatedAt: now, updatedAt: now, version })
         .where(eq(accessGrants.id, userGrant.id));
-      await tx
-        .insert(accessEvents)
-        .values({
-          grantId: userGrant.id,
-          action: "activate",
-          source: "trusted_waitlist_link",
-          previousStatus: userGrant.status,
-          nextStatus: userGrant.status,
-          grantVersion: version,
-        });
+      await tx.insert(accessEvents).values({
+        grantId: userGrant.id,
+        action: "activate",
+        source: "trusted_waitlist_link",
+        previousStatus: userGrant.status,
+        nextStatus: userGrant.status,
+        grantVersion: version,
+      });
     }
     if (
       grant &&
@@ -166,16 +186,14 @@ export async function enrollAuthenticatedUser(
           version,
         })
         .where(eq(accessGrants.id, grant.id));
-      await tx
-        .insert(accessEvents)
-        .values({
-          grantId: grant.id,
-          action: "activate",
-          source: "trusted_waitlist_link",
-          previousStatus: grant.status,
-          nextStatus: grant.status,
-          grantVersion: version,
-        });
+      await tx.insert(accessEvents).values({
+        grantId: grant.id,
+        action: "activate",
+        source: "trusted_waitlist_link",
+        previousStatus: grant.status,
+        nextStatus: grant.status,
+        grantVersion: version,
+      });
     } else if (grant && grant.userId !== canonical.userId) {
       console.warn("access_grant_link_conflict", {
         userId: canonical.userId,

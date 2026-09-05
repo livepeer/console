@@ -1,8 +1,9 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { accessGrants, users } from "@/lib/db/schema";
 import { findExternalAccountOwner } from "@/lib/external-accounts/service";
+import { getAdminPrincipalForUser } from "@/lib/admin/permissions";
 import type {
   AccessDecision,
   AccessState,
@@ -32,17 +33,33 @@ export async function getAccessDecision(
         status: users.status,
         grantId: accessGrants.id,
         grantStatus: accessGrants.status,
+        revokedGrantId: sql<
+          string | null
+        >`(select revoked.id from access_grants revoked where revoked.status = 'revoked' and (revoked.user_id = ${users.id} or revoked.signup_id in (select linked.id from waitlist_signups linked where linked.user_id = ${users.id})) limit 1)`,
       })
       .from(users)
       .leftJoin(accessGrants, eq(accessGrants.userId, users.id))
       .where(eq(users.id, userId))
       .limit(1);
     if (!row) return { state: "unavailable", userId };
+    const revoked = !!row.revokedGrantId || row.grantStatus === "revoked";
+    const admin =
+      row.status !== "disabled" && !revoked
+        ? await getAdminPrincipalForUser(userId)
+        : null;
     return {
       state:
-        row.status === "disabled" ? "disabled" : (row.grantStatus ?? "pending"),
+        row.status === "disabled"
+          ? "disabled"
+          : revoked
+            ? "revoked"
+            : admin
+              ? "approved"
+              : (row.grantStatus ?? "pending"),
       userId,
-      ...(row.grantId ? { grantId: row.grantId } : {}),
+      ...(row.revokedGrantId || row.grantId
+        ? { grantId: row.revokedGrantId ?? row.grantId! }
+        : {}),
     };
   } catch (error) {
     console.error("access_decision_failed", {
