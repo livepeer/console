@@ -80,13 +80,12 @@ export function consoleLoginUrl(req: Request): string {
   return url.toString();
 }
 
-/** Linear trailing-slash trim. `/\/+$/` is polynomial ReDoS on attacker-controlled input. */
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value[end - 1] === "/") {
+function trimPathTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === "/") {
     end -= 1;
   }
-  return end === value.length ? value : value.slice(0, end);
+  return end === pathname.length ? pathname : pathname.slice(0, end);
 }
 
 export function isAllowedMcpResource(
@@ -95,9 +94,23 @@ export function isAllowedMcpResource(
 ): boolean {
   const value = resource?.trim();
   if (!value) return true;
+  let requested: URL;
+  let expected: URL;
+  try {
+    requested = new URL(value);
+    expected = new URL(mcpResourceUrl(req));
+  } catch {
+    return false;
+  }
+  if (requested.username || requested.password) return false;
+  if (requested.search || requested.hash) return false;
+  if (requested.origin !== expected.origin) return false;
   // Clients (Claude, ChatGPT/Codex, Copilot, Hermes) may send the RFC 8707
-  // resource with or without a trailing slash; treat those as the same URL.
-  return stripTrailingSlashes(value) === mcpResourceUrl(req);
+  // resource with or without a trailing slash; treat those as equivalent.
+  return (
+    trimPathTrailingSlashes(requested.pathname) ===
+    trimPathTrailingSlashes(expected.pathname)
+  );
 }
 
 export function wellKnownJsonResponse(

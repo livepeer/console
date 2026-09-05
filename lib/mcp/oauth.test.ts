@@ -19,8 +19,12 @@ test("RFC 8707 resource is optional and must match /api/mcp when present", () =>
   assert.equal(isAllowedMcpResource(req, `${allowed}/`), true);
   assert.equal(isAllowedMcpResource(req, `${allowed}///`), true);
   assert.equal(isAllowedMcpResource(req, `  ${allowed}/  `), true);
+  assert.equal(isAllowedMcpResource(req, "https://dashboard.livepeer.org:443/api/mcp"), true);
   assert.equal(isAllowedMcpResource(req, `${allowed}${"/".repeat(10_000)}`), true);
   assert.equal(isAllowedMcpResource(req, `${"/".repeat(10_000)}x`), false);
+  assert.equal(isAllowedMcpResource(req, "not-a-url"), false);
+  assert.equal(isAllowedMcpResource(req, `${allowed}?x=1`), false);
+  assert.equal(isAllowedMcpResource(req, "https://user@dashboard.livepeer.org/api/mcp"), false);
   assert.equal(isAllowedMcpResource(req, "https://evil.example/api/mcp"), false);
   assert.equal(isAllowedMcpResource(req, `${allowed}/extra`), false);
 });
