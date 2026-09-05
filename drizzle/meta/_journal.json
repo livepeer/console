@@ -64,6 +64,13 @@
       "when": 1788565051000,
       "tag": "0008_oauth_code_redemptions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788589131742,
+      "tag": "0009_mcp_assets",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ export default defineConfig({
       "components/livepeer-ui/**/*.test.tsx",
       "lib/analytics*.test.ts",
       "lib/db/**/*.test.ts",
+      "lib/mcp/store.test.ts",
       "lib/email/**/*.test.ts",
       "lib/env.test.ts",
       "lib/identity/**/*.test.ts",

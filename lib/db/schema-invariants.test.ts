@@ -10,6 +10,7 @@ import {
   users,
   verificationTokens,
   waitlistSignups,
+  mcpAssets,
 } from "@/lib/db/schema";
 
 function uniqueIndexColumns(table: Parameters<typeof getTableConfig>[0]) {
@@ -79,5 +80,17 @@ describe("database-enforced adversarial invariants", () => {
   it("allows waitlist-only contacts and limits canonical membership", () => {
     expect(waitlistSignups.userId.notNull).toBe(false);
     expect(uniqueIndexColumns(waitlistSignups)).toContainEqual(["user_id"]);
+  });
+
+  it("scopes MCP asset uniqueness to the principal", () => {
+    expect(uniqueIndexColumns(mcpAssets)).toContainEqual([
+      "principal_id",
+      "gateway_request_id",
+      "url",
+    ]);
+    expect(uniqueIndexColumns(mcpAssets)).not.toContainEqual([
+      "gateway_request_id",
+      "url",
+    ]);
   });
 });
