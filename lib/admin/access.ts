@@ -1,6 +1,17 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { and, asc, count, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import {
@@ -377,7 +388,16 @@ export async function mutateAccessSelection(
 
 export function parseAccessFilters(params: URLSearchParams) {
   const state = params.get("state") ?? "waiting";
-  if (!["waiting", "approved", "revoked", "all"].includes(state))
+  if (
+    ![
+      "waiting",
+      "approved",
+      "revoked",
+      "all",
+      "unverified",
+      "subscribed",
+    ].includes(state)
+  )
     throw new AdminRequestError(400, "invalid_state");
   const page = Number(params.get("page") ?? "1"),
     pageSize = Number(params.get("pageSize") ?? "50");
@@ -398,6 +418,13 @@ export function parseAccessFilters(params: URLSearchParams) {
 }
 function filterWhere(filters: ReturnType<typeof parseAccessFilters>) {
   return and(
+    // All entries retains unverified contacts; the dedicated debugging filter
+    // narrows to them. Access-status filters retain verified contacts only.
+    filters.state === "unverified"
+      ? isNull(waitlistSignups.confirmedAt)
+      : filters.state === "all" || filters.state === "subscribed"
+        ? undefined
+        : isNotNull(waitlistSignups.confirmedAt),
     filters.search
       ? ilike(
           waitlistSignups.email,
@@ -406,9 +433,11 @@ function filterWhere(filters: ReturnType<typeof parseAccessFilters>) {
       : undefined,
     filters.state === "waiting"
       ? and(eq(waitlistSignups.status, "confirmed"), isNull(accessGrants.id))
-      : filters.state === "all"
-        ? undefined
-        : eq(accessGrants.status, filters.state as "approved" | "revoked")
+      : filters.state === "subscribed"
+        ? eq(emailSubscriptions.status, "subscribed")
+        : filters.state === "all" || filters.state === "unverified"
+          ? undefined
+          : eq(accessGrants.status, filters.state as "approved" | "revoked")
   );
 }
 export async function listAccessEntries(
@@ -419,6 +448,13 @@ export async function listAccessEntries(
     .select({ value: count() })
     .from(waitlistSignups)
     .leftJoin(accessGrants, eq(accessGrants.signupId, waitlistSignups.id))
+    .leftJoin(
+      emailSubscriptions,
+      and(
+        eq(emailSubscriptions.normalizedEmail, waitlistSignups.normalizedEmail),
+        eq(emailSubscriptions.purpose, "product_marketing")
+      )
+    )
     .where(filterWhere(filters));
   const rows = await db
     .select({
@@ -438,7 +474,13 @@ export async function listAccessEntries(
       )
     )
     .where(filterWhere(filters))
-    .orderBy(asc(waitlistSignups.firstSeenAt), asc(waitlistSignups.id))
+    .orderBy(
+      asc(
+        sql`case when ${waitlistSignups.confirmedAt} is null then 1 else 0 end`
+      ),
+      asc(waitlistSignups.firstSeenAt),
+      asc(waitlistSignups.id)
+    )
     .limit(filters.pageSize)
     .offset((filters.page - 1) * filters.pageSize);
   return {
@@ -464,9 +506,43 @@ export async function freezeAccessSelection(
     .select({ id: waitlistSignups.id })
     .from(waitlistSignups)
     .leftJoin(accessGrants, eq(accessGrants.signupId, waitlistSignups.id))
+    .leftJoin(
+      emailSubscriptions,
+      and(
+        eq(emailSubscriptions.normalizedEmail, waitlistSignups.normalizedEmail),
+        eq(emailSubscriptions.purpose, "product_marketing")
+      )
+    )
     .where(filterWhere(filters))
-    .orderBy(asc(waitlistSignups.firstSeenAt), asc(waitlistSignups.id));
+    .orderBy(
+      asc(
+        sql`case when ${waitlistSignups.confirmedAt} is null then 1 else 0 end`
+      ),
+      asc(waitlistSignups.firstSeenAt),
+      asc(waitlistSignups.id)
+    );
   return { signupIds: rows.map((row) => row.id), total: rows.length };
+}
+
+export async function exportAccessSelection(signupIds: string[]) {
+  const ids = [...new Set(signupIds)];
+  if (!ids.length || ids.length > 500)
+    throw new AdminRequestError(400, "invalid_selection");
+  const rows = await getDb()
+    .select({
+      id: waitlistSignups.id,
+      email: waitlistSignups.email,
+      joinedAt: waitlistSignups.firstSeenAt,
+    })
+    .from(waitlistSignups)
+    .where(inArray(waitlistSignups.id, ids));
+  if (rows.length !== ids.length)
+    throw new AdminRequestError(409, "selection_changed");
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.map((id) => {
+    const row = byId.get(id)!;
+    return { email: row.email, joinedAt: row.joinedAt.toISOString() };
+  });
 }
 
 /** Dispatch only this request's approval transitions, never the unrelated backlog. */

@@ -20,6 +20,7 @@ import {
   listAccessEntries,
   freezeAccessSelection,
   parseAccessFilters,
+  exportAccessSelection,
 } from "@/lib/admin/access";
 import {
   changeNewsletterConsent,
@@ -139,12 +140,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
       expect((await getAccessDecision(admin.canonical.userId)).state).toBe(
         "pending"
       );
-      await db
-        .insert(schema.adminRoleGrants)
-        .values({
-          signupId: admin.result.signupId!,
-          source: "synthetic_fixture",
-        });
+      await db.insert(schema.adminRoleGrants).values({
+        signupId: admin.result.signupId!,
+        source: "synthetic_fixture",
+      });
       expect((await getAccessDecision(admin.canonical.userId)).state).toBe(
         "approved"
       );
@@ -234,6 +233,125 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
       expect(await getAccessDecision(canonical.userId)).toMatchObject({
         state: "revoked",
       });
+    }, 60000);
+    it("sorts unverified contacts last across pages and supports a debugging filter without deleting them", async () => {
+      const pending = await signup("visibility-pending", "pending");
+      const missingVerification = await signup(
+        "visibility-missing-verification"
+      );
+      const verified = await signup("visibility-verified");
+      await db
+        .update(schema.waitlistSignups)
+        .set({ confirmedAt: null })
+        .where(eq(schema.waitlistSignups.id, missingVerification.id));
+      for (const state of ["all", "waiting", "approved", "revoked"]) {
+        const filters = parseAccessFilters(
+          new URLSearchParams({ search: `${prefix}-visibility-`, state })
+        );
+        const expected =
+          state === "all"
+            ? [verified.id, pending.id, missingVerification.id]
+            : state === "waiting"
+              ? [verified.id]
+              : [];
+        const list = await listAccessEntries(filters);
+        expect(list.rows.map((row) => row.id)).toEqual(expected);
+        expect(list.total).toBe(expected.length);
+        expect(await freezeAccessSelection(filters)).toEqual({
+          signupIds: expected,
+          total: expected.length,
+        });
+      }
+      const retained = await db
+        .select()
+        .from(schema.waitlistSignups)
+        .where(
+          inArray(schema.waitlistSignups.id, [
+            pending.id,
+            missingVerification.id,
+          ])
+        );
+      expect(retained).toHaveLength(2);
+      const firstPage = parseAccessFilters(
+        new URLSearchParams({
+          search: `${prefix}-visibility-`,
+          state: "all",
+          pageSize: "1",
+        })
+      );
+      expect(
+        (await listAccessEntries(firstPage)).rows.map((row) => row.id)
+      ).toEqual([verified.id]);
+      expect(
+        (await listAccessEntries({ ...firstPage, page: 2 })).rows.map(
+          (row) => row.id
+        )
+      ).toEqual([pending.id]);
+      const debugFilters = parseAccessFilters(
+        new URLSearchParams({
+          search: `${prefix}-visibility-`,
+          state: "unverified",
+        })
+      );
+      const debugList = await listAccessEntries(debugFilters);
+      expect(debugList.rows.map((row) => row.id).sort()).toEqual(
+        [pending.id, missingVerification.id].sort()
+      );
+      expect(debugList.total).toBe(2);
+      expect(
+        (await freezeAccessSelection(debugFilters)).signupIds.sort()
+      ).toEqual([pending.id, missingVerification.id].sort());
+      await db.insert(schema.emailSubscriptions).values([
+        {
+          normalizedEmail: verified.normalizedEmail,
+          signupId: verified.id,
+          purpose: "product_marketing",
+          status: "subscribed",
+          source: "synthetic_fixture",
+        },
+        {
+          normalizedEmail: pending.normalizedEmail,
+          signupId: pending.id,
+          purpose: "product_marketing",
+          status: "subscribed",
+          source: "synthetic_fixture",
+        },
+        {
+          normalizedEmail: missingVerification.normalizedEmail,
+          signupId: missingVerification.id,
+          purpose: "other_purpose",
+          status: "subscribed",
+          source: "synthetic_fixture",
+        },
+      ]);
+      const subscribedFilters = parseAccessFilters(
+        new URLSearchParams({
+          search: `${prefix}-visibility-`,
+          state: "subscribed",
+        })
+      );
+      const subscribedList = await listAccessEntries(subscribedFilters);
+      expect(subscribedList.rows.map((row) => row.id)).toEqual([
+        verified.id,
+        pending.id,
+      ]);
+      expect(subscribedList.total).toBe(2);
+      expect(
+        subscribedList.rows.every(
+          (row) => row.newsletterSubscribed && row.accessState === "pending"
+        )
+      ).toBe(true);
+      expect(
+        (await freezeAccessSelection(subscribedFilters)).signupIds
+      ).toEqual([verified.id, pending.id]);
+      const exported = await exportAccessSelection([pending.id, verified.id]);
+      expect(exported.map((row) => row.email)).toEqual([
+        pending.email,
+        verified.email,
+      ]);
+      await expect(exportAccessSelection([randomUUID()])).rejects.toMatchObject(
+        { code: "selection_changed" }
+      );
     }, 60000);
     it("handles25 explicit IDs across pages, idempotent retries and no duplicate invitations", async () => {
       const rows = await Promise.all(
