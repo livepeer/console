@@ -41,6 +41,7 @@ import type {
   RunTransition,
   JsonValue,
 } from "./types";
+import { billingSummaryFromEvents } from "./billing";
 
 type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -83,11 +84,36 @@ async function detail(
   db: Reader,
   row: typeof runs.$inferSelect
 ): Promise<RunDetail> {
+  const referencedAssetIds = new Set<string>();
+  const collectAssetIds = (value: JsonValue | undefined): void => {
+    if (typeof value === "string") {
+      try {
+        const match = new URL(value).pathname.match(/^\/api\/assets\/([^/]+)$/);
+        if (match) referencedAssetIds.add(decodeURIComponent(match[1]!));
+      } catch {
+        // Captured strings need not be URLs.
+      }
+      return;
+    }
+    if (Array.isArray(value)) value.forEach(collectAssetIds);
+    else if (value && typeof value === "object")
+      Object.values(value).forEach(collectAssetIds);
+  };
+  collectAssetIds(row.submittedArguments ?? undefined);
+  const assetFilter = referencedAssetIds.size
+    ? or(
+        eq(mcpAssets.runId, row.id),
+        and(
+          eq(mcpAssets.principalId, row.principalId),
+          inArray(mcpAssets.id, [...referencedAssetIds])
+        )
+      )
+    : eq(mcpAssets.runId, row.id);
   const [assets, events, emails] = await Promise.all([
     db
       .select()
       .from(mcpAssets)
-      .where(eq(mcpAssets.runId, row.id))
+      .where(assetFilter)
       .orderBy(asc(mcpAssets.createdAt), asc(mcpAssets.id)),
     db
       .select()
@@ -102,10 +128,15 @@ async function detail(
       )
       .limit(1),
   ]);
+  const mappedEvents = events.map((event) => ({
+    ...event,
+    createdAt: event.createdAt.toISOString(),
+  }));
   return {
     ...record(row, emails[0]?.email ?? null),
     assets: assets.map((asset) => ({
       id: asset.id,
+      role: asset.runId === row.id ? "output" : "input",
       url: asset.url,
       mediaType: asset.mediaType,
       providerRequestId: asset.providerRequestId,
@@ -115,10 +146,8 @@ async function detail(
       hiddenAt: iso(asset.hiddenAt),
       createdAt: asset.createdAt.toISOString(),
     })),
-    events: events.map((event) => ({
-      ...event,
-      createdAt: event.createdAt.toISOString(),
-    })),
+    events: mappedEvents,
+    billing: billingSummaryFromEvents(mappedEvents),
   };
 }
 
@@ -384,6 +413,19 @@ async function list(
     .where(and(...filters))
     .orderBy(desc(runs.createdAt), desc(runs.id))
     .limit(limit + 1);
+  const visibleRows = rows.slice(0, limit);
+  const billingEvents = visibleRows.length
+    ? await db
+        .select({ runId: runEvents.runId, metadata: runEvents.metadata })
+        .from(runEvents)
+        .where(inArray(runEvents.runId, visibleRows.map(({ row }) => row.id)))
+    : [];
+  const billingByRun = new Map<string, { metadata: Record<string, JsonValue> }[]>();
+  for (const event of billingEvents) {
+    const events = billingByRun.get(event.runId) ?? [];
+    events.push({ metadata: event.metadata });
+    billingByRun.set(event.runId, events);
+  }
   const grouped = await db
     .select({ status: runs.status, count: sql<number>`count(*)::int` })
     .from(runs)
@@ -406,7 +448,7 @@ async function list(
     counts[group.status] = group.count;
     counts.total += group.count;
   }
-  const items: RunSummary[] = rows.slice(0, limit).map(({ row, email }) => {
+  const items: RunSummary[] = visibleRows.map(({ row, email }) => {
     const full = record(row, email);
     const {
       submittedArguments: _args,
@@ -417,7 +459,10 @@ async function list(
     void _args;
     void _result;
     void _paths;
-    return summary;
+    return {
+      ...summary,
+      billing: billingSummaryFromEvents(billingByRun.get(row.id) ?? []),
+    };
   });
   const last = items.at(-1);
   return {
@@ -525,8 +570,9 @@ export async function recordRunUsage(
     gatewayRequestId: string;
     metadata: Record<string, JsonValue>;
   }[]
-): Promise<void> {
-  await getDb().transaction(async (tx) => {
+): Promise<string[]> {
+  return getDb().transaction(async (tx) => {
+    const changed = new Set<string>();
     for (const ticket of [...tickets].sort(
       (a, b) =>
         a.gatewayRequestId.localeCompare(b.gatewayRequestId) ||
@@ -544,7 +590,7 @@ export async function recordRunUsage(
         )
         .for("update");
       if (!run) continue;
-      await tx
+      const inserted = await tx
         .insert(runEvents)
         .values({
           runId: run.id,
@@ -556,9 +602,21 @@ export async function recordRunUsage(
             eventId: ticket.eventId,
           },
         })
-        .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] });
+        .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] })
+        .returning({ runId: runEvents.runId });
+      if (inserted[0]) changed.add(inserted[0].runId);
     }
+    return [...changed];
   });
+}
+
+export async function ownedRunsByIds(owner: RunOwner, ids: string[]) {
+  const unique = [...new Set(ids)].slice(0, 50);
+  if (!unique.length) return [];
+  return getDb()
+    .select({ id: runs.id, gatewayRequestId: runs.gatewayRequestId })
+    .from(runs)
+    .where(and(ownerWhere(owner), inArray(runs.id, unique)));
 }
 
 export async function claimReconciliationJobs(

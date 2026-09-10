@@ -96,6 +96,7 @@ it("shows Postgres rows even when billing is unavailable", async () => {
     startedAt: "2026-09-01T12:00:00Z",
     completedAt: "2026-09-01T12:00:01Z",
     email: null,
+    billing: null,
   });
   navigation.search = "request=saved-run";
   fetcher.mockImplementation(async (input: string) => {
@@ -131,7 +132,7 @@ it("shows Postgres rows even when billing is unavailable", async () => {
   );
 });
 
-it("joins an orchestrator 8-hex ticket onto an MCP job_* run", async () => {
+it("does not infer a cost from an unmatched orchestrator ticket", async () => {
   const run = {
     id: "28d04c8a-7edd-487e-a0c4-5f95ed637a4b",
     principalId: "external",
@@ -154,6 +155,7 @@ it("joins an orchestrator 8-hex ticket onto an MCP job_* run", async () => {
     startedAt: "2026-09-09T21:42:18.000Z",
     completedAt: "2026-09-09T21:42:19.000Z",
     email: null,
+    billing: null,
   };
   records.push(run);
   navigation.search = "request=28d04c8a-7edd-487e-a0c4-5f95ed637a4b";
@@ -168,6 +170,8 @@ it("joins an orchestrator 8-hex ticket onto an MCP job_* run", async () => {
         events: [],
       });
     }
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({ changedRunIds: [], changedCount: 0 });
     if (String(input).startsWith("/api/console/runs"))
       return Response.json({ items: records, nextCursor: null });
     return Response.json({
@@ -189,13 +193,11 @@ it("joins an orchestrator 8-hex ticket onto an MCP job_* run", async () => {
     });
   });
   render(<CallsSection query="" onQueryChange={vi.fn()} />);
-  await waitFor(() =>
-    expect(screen.getByTestId("detail-cost").textContent).not.toBe("—")
-  );
-  expect(screen.getByTestId("detail-cost").textContent).toMatch(/^\$0\.0/);
+  await waitFor(() => expect(fetcher).toHaveBeenCalled());
+  expect(screen.getByTestId("detail-cost").textContent).toBe("—");
 });
 
-it("joins a correlated ticket fee onto the saved run, without adding a billing row", async () => {
+it("reloads the Neon cost after an exact billing sync", async () => {
   records.push({
     id: "saved-run",
     principalId: "external",
@@ -218,45 +220,26 @@ it("joins a correlated ticket fee onto the saved run, without adding a billing r
     startedAt: "2026-09-01T12:00:00Z",
     completedAt: "2026-09-01T12:00:01Z",
     email: null,
+    billing: null,
   });
+  let synced = false;
   fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync") {
+      synced = true;
+      records[0]!.billing = {
+        networkFeeUsdMicros: "1000",
+        receiptCount: 1,
+      };
+      return Response.json({ changedRunIds: ["saved-run"], changedCount: 1 });
+    }
     if (input.startsWith("/api/console/runs"))
       return Response.json({ items: records, nextCursor: null });
-    return Response.json({
-      items: [
-        {
-          eventId: "evt-saved",
-          gatewayRequestId: "job_saved",
-          time: "2026-09-01T12:00:00Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "text-generation",
-          modelId: "saved-model",
-          networkFeeUsdMicros: "1000",
-        },
-        {
-          eventId: "legacy-event",
-          gatewayRequestId: "legacy-job",
-          time: "2025-01-01T00:00:00Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "text-generation",
-          modelId: "legacy-only-model",
-          networkFeeUsdMicros: "100",
-        },
-      ],
-      nextCursor: null,
-      openMeterConfigured: true,
-    });
+    return Response.json({ error: "not found" }, { status: 404 });
   });
   renderCallsSection();
   await screen.findByRole("button", { name: "Inspect saved-run" });
   await waitFor(() => expect(screen.getByText("$0.0010")).toBeTruthy());
-  expect(
-    fetcher.mock.calls.some(([url]) =>
-      String(url).includes("includeCorrelated=1")
-    )
-  ).toBe(true);
+  expect(synced).toBe(true);
   expect(screen.queryByText("legacy-only-model")).toBeNull();
 });
 

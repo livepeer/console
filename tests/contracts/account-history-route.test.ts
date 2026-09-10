@@ -74,7 +74,7 @@ beforeEach(() => {
     email: "fixture@example.invalid",
   } as never);
   vi.mocked(resolveRunOwner).mockResolvedValue(owner);
-  vi.mocked(recordRunUsage).mockResolvedValue(undefined);
+  vi.mocked(recordRunUsage).mockResolvedValue([]);
   vi.mocked(existingRunGatewayIds).mockResolvedValue([]);
   vi.mocked(attachOutputsToTickets).mockImplementation(
     async (_principal, items) => items
@@ -105,10 +105,13 @@ it("suppresses owned run tickets, persists fee-only evidence, and joins assets o
         eventId: "event-owned",
         gatewayRequestId: "owned",
         metadata: {
+          billingEventId: "event-owned",
+          ticketGatewayRequestId: "owned",
           networkFeeUsdMicros: "100",
           feeWei: "10",
           ethUsdPrice: "2000.25",
           pixels: "512",
+          timestamp: "2020-01-01T00:00:00.000Z",
         },
       },
     ])

@@ -203,7 +203,12 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             {
               eventId: "event-1",
               gatewayRequestId: "job-1",
-              metadata: { fee: "0.01" },
+              metadata: { networkFeeUsdMicros: "0.932" },
+            },
+            {
+              eventId: "event-2",
+              gatewayRequestId: "job-1",
+              metadata: { networkFeeUsdMicros: "2.068" },
             },
           ];
           await recordRunUsage(owner, usage);
@@ -216,7 +221,16 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             afterUsage?.events.filter((event) =>
               event.eventKey.startsWith("usage:")
             )
-          ).toHaveLength(1);
+          ).toHaveLength(2);
+          expect(afterUsage?.billing).toEqual({
+            networkFeeUsdMicros: "3",
+            receiptCount: 2,
+          });
+          expect(
+            (await listOwnRuns(owner, { limit: 10 })).items.find(
+              (item) => item.id === created.id
+            )?.billing
+          ).toEqual({ networkFeeUsdMicros: "3", receiptCount: 2 });
           expect(afterUsage?.version).toBe(beforeUsage?.version);
           expect(afterUsage?.status).toBe("succeeded");
           const stale = await createRun(owner, {

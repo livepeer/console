@@ -6,6 +6,7 @@ vi.mock("@/lib/mcp/store", () => ({ getAssetSource: vi.fn() }));
 import { lookup } from "node:dns/promises";
 import { getAssetSource } from "@/lib/mcp/store";
 import { GET } from "@/app/api/assets/[id]/route";
+import { publicAssetUrl } from "@/lib/assets/public";
 
 describe("first-party asset proxy", () => {
   beforeEach(() => {
@@ -18,6 +19,8 @@ describe("first-party asset proxy", () => {
     vi.mocked(getAssetSource).mockResolvedValue({
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
+      principalId: "eu_test",
+      expiresAt: null,
     });
     vi.mocked(lookup).mockResolvedValue([
       { address: "203.0.113.10", family: 4 },
@@ -34,7 +37,7 @@ describe("first-party asset proxy", () => {
     vi.stubGlobal("fetch", fetcher);
 
     const response = await GET(
-      new Request("https://earlyaccess.livepeer.org/api/assets/asset_123", {
+      new Request(publicAssetUrl("asset_123", "eu_test"), {
         headers: { Range: "bytes=0-4" },
       }),
       { params: Promise.resolve({ id: "asset_123" }) }
@@ -60,6 +63,8 @@ describe("first-party asset proxy", () => {
     vi.mocked(getAssetSource).mockResolvedValue({
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
+      principalId: "eu_test",
+      expiresAt: null,
     });
     vi.mocked(lookup).mockResolvedValue([
       { address: "127.0.0.1", family: 4 },
@@ -68,11 +73,63 @@ describe("first-party asset proxy", () => {
     vi.stubGlobal("fetch", fetcher);
 
     const response = await GET(
-      new Request("https://earlyaccess.livepeer.org/api/assets/asset_123"),
+      new Request(publicAssetUrl("asset_123", "eu_test")),
       { params: Promise.resolve({ id: "asset_123" }) }
     );
 
     expect(response.status).toBe(502);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("returns the same non-revealing 404 for missing and tampered signatures", async () => {
+    vi.mocked(getAssetSource).mockResolvedValue({
+      url: "https://media.example.test/video.mp4",
+      mediaType: "video",
+      principalId: "eu_test",
+      expiresAt: null,
+    });
+    const signed = new URL(publicAssetUrl("asset_123", "eu_test"));
+    signed.searchParams.set("sig", "tampered");
+    const response = await GET(new Request(signed), {
+      params: Promise.resolve({ id: "asset_123" }),
+    });
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+
+  it("treats stored expiresAt as a hard expiry", async () => {
+    vi.mocked(getAssetSource).mockResolvedValue({
+      url: "https://media.example.test/video.mp4",
+      mediaType: "video",
+      principalId: "eu_test",
+      expiresAt: new Date(Date.now() - 1),
+    });
+    const response = await GET(
+      new Request(publicAssetUrl("asset_123", "eu_test")),
+      { params: Promise.resolve({ id: "asset_123" }) }
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it("revalidates redirect destinations against the provider allowlist", async () => {
+    vi.mocked(getAssetSource).mockResolvedValue({
+      url: "https://media.example.test/video.mp4",
+      mediaType: "video",
+      principalId: "eu_test",
+      expiresAt: null,
+    });
+    vi.mocked(lookup).mockResolvedValue([
+      { address: "203.0.113.10", family: 4 },
+    ] as never);
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(null, { status: 302, headers: { location: "https://evil.example/file" } })
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const response = await GET(
+      new Request(publicAssetUrl("asset_123", "eu_test")),
+      { params: Promise.resolve({ id: "asset_123" }) }
+    );
+    expect(response.status).toBe(502);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

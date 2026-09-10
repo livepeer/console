@@ -22,10 +22,11 @@ test("gives every asset a canonical first-party URL and rewrites captured output
     result: { value: { video_urls: [source], note: "done" } },
   } as unknown as RunDetail;
 
+  detail.principalId = "eu_test";
   const result = publicRunDetail(detail);
-  assert.equal(result.assets[0]?.url, publicAssetUrl("asset_123"));
+  assert.equal(result.assets[0]?.url, publicAssetUrl("asset_123", "eu_test"));
   assert.deepEqual(result.result?.value, {
-    video_urls: [publicAssetUrl("asset_123")],
+    video_urls: [publicAssetUrl("asset_123", "eu_test")],
     note: "done",
   });
   assert.doesNotMatch(JSON.stringify(result), /fal\.media/);

@@ -139,13 +139,21 @@ and keyset pagination. It does not render the upstream billing feed as a second
 section. Admin uses the same presentation/detail components, with user-email
 search and status filters. Billing events do not prove successful execution.
 
-Owned billing receipts are appended idempotently to run events with numeric fee
-fields only. The detail drawer labels these **Observed usage**, not a guaranteed
-final bill. A background billing read correlates owned receipts without adding
-displayed rows. It is not a platform history backfill: history starts with newly
-captured Console MCP runs. Any old test-only upstream records remain untouched
-and are not shown as separate history. Saved runs remain readable when billing
-is unavailable.
+Owned billing receipts are appended idempotently to run events with reviewed
+billing identifiers, numeric fee fields, and receipt timestamp only. History
+sync accepts at most 50 owned run IDs and attaches receipts only when PymtHouse
+returns the exact caller-supplied `job_*` gateway request ID. Costs are summed
+from distinct persisted events with decimal-safe arithmetic; the table and
+drawer read the same Neon-derived summary. Unmatched receipts display `—` and
+model/time proximity is never authoritative. Saved runs remain readable when
+billing is unavailable. PymtHouse deployment of exact gateway-ID propagation is
+a release prerequisite for this UI.
+
+Asset URLs are one-hour HMAC links bound to asset ID, stored principal, and
+expiry. Deployed environments require `ASSET_URL_SIGNING_SECRET` and
+`ASSET_PROXY_ALLOWED_HOSTS`. The proxy rechecks every redirect, retains byte
+range behavior, and never caches beyond the link or exact provider expiry.
+`available_until` remains a minimum availability guarantee, not a hard expiry.
 Client history state is scoped to the authenticated account.
 
 ## Fresh-start history

@@ -180,13 +180,15 @@ describe("durable MCP execution", () => {
       { capability: "video" },
       deps
     );
-    expect(response.payload.url).toBe(
-      "https://earlyaccess.livepeer.org/api/assets/asset_123"
+    expect(response.payload.url).toMatch(
+      /^http:\/\/localhost:3000\/api\/assets\/asset_123\?exp=\d+&sig=[A-Za-z0-9_-]+$/
     );
     expect(response.payload.assets).toEqual([
       {
         id: "asset_123",
-        url: "https://earlyaccess.livepeer.org/api/assets/asset_123",
+        url: expect.stringMatching(
+          /^http:\/\/localhost:3000\/api\/assets\/asset_123\?exp=\d+&sig=[A-Za-z0-9_-]+$/
+        ),
         media_type: "video",
       },
     ]);

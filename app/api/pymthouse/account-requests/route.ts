@@ -4,12 +4,12 @@ import { fetchAccountRequestsForExternalUser } from "@/lib/console/pymthouse-bff
 import { requireConsoleSession } from "@/lib/console/session-user";
 import { AccessError } from "@/lib/access/service";
 import { configuredPymthouseScope } from "@/lib/external-accounts/service";
+import { sanitizeBillingReceipt } from "@/lib/console/billing-receipts";
 import {
   existingRunGatewayIds,
   recordRunUsage,
   resolveRunOwner,
 } from "@/lib/runs/store";
-import type { JsonValue } from "@/lib/runs/types";
 import {
   PYMTHOUSE_NO_STORE_HEADERS,
   pymthouseErrorResponse,
@@ -67,38 +67,7 @@ export async function GET(request: NextRequest) {
       );
       await recordRunUsage(
         owner,
-        scoped
-          .map((item) => {
-            const metadata: Record<string, JsonValue> = {};
-            for (const key of [
-              "networkFeeUsdMicros",
-              "feeWei",
-              "ethUsdPrice",
-              "pixels",
-            ] as const) {
-              const value = item[key];
-              if (
-                typeof value === "string" &&
-                value.length <= 128 &&
-                /^\d+(?:\.\d+)?$/.test(value)
-              )
-                metadata[key] = value;
-            }
-            return {
-              eventId: item.eventId,
-              gatewayRequestId: item.gatewayRequestId,
-              metadata,
-            };
-          })
-          .filter(
-            (ticket) =>
-              typeof ticket.eventId === "string" &&
-              ticket.eventId.length > 0 &&
-              ticket.eventId.length <= 512 &&
-              typeof ticket.gatewayRequestId === "string" &&
-              ticket.gatewayRequestId.length > 0 &&
-              ticket.gatewayRequestId.length <= 512
-          )
+        scoped.map(sanitizeBillingReceipt).filter((ticket) => ticket !== null)
       );
       if (includeCorrelated) {
         return NextResponse.json(

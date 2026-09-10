@@ -26,7 +26,7 @@ export async function attachOutputsToTickets(
     return asset
       ? {
           ...item,
-          outputUrl: publicAssetUrl(asset.id),
+          outputUrl: publicAssetUrl(asset.id, principalId),
           providerRequestId: asset.providerRequestId,
         }
       : item;

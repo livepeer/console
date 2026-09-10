@@ -240,11 +240,15 @@ export async function executeDurableRun(
           }
         : {}),
     });
-    const persistedAssets = saved?.assets ?? [];
-    const assets = persistedAssets.map(publicAsset);
+    const persistedAssets = (saved?.assets ?? []).filter(
+      (asset) => asset.role !== "input"
+    );
+    const assets = persistedAssets.map((asset) =>
+      publicAsset(asset, owner.principalId)
+    );
     const capturedData = resultEnvelope(result.data).value;
     const publicData = persistedAssets.length
-      ? replaceAssetUrls(capturedData, persistedAssets)
+      ? replaceAssetUrls(capturedData, persistedAssets, owner.principalId)
       : removeAssetUrls(
           capturedData,
           outputs.map((output) => output.url)
@@ -255,7 +259,9 @@ export async function executeDurableRun(
       urlRaw && !isQueueControlUrl(urlRaw)
         ? persistedAssets.find((asset) => asset.url === urlRaw)
         : undefined;
-    const url = sourceAsset ? publicAsset(sourceAsset).url : null;
+    const url = sourceAsset
+      ? publicAsset(sourceAsset, owner.principalId).url
+      : null;
     return {
       payload: {
         capability: args.capability,

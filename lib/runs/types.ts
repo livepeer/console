@@ -32,6 +32,8 @@ export type RunAssetInput = {
 };
 export type RunAsset = RunAssetInput & {
   id: string;
+  /** Whether this asset was produced by this run or referenced as owned input. */
+  role?: "input" | "output";
   /** User-facing filename/title when known; history falls back to the asset id. */
   displayName?: string | null;
   createdAt: string;
@@ -80,7 +82,13 @@ export type RunRecord = RunOwner & {
   completedAt: string | null;
   email: string | null;
 };
+export type RunBillingSummary = {
+  /** Raw USD-micros decimal aggregated from distinct persisted receipts. */
+  networkFeeUsdMicros: string;
+  receiptCount: number;
+};
 export type RunDetail = RunRecord & {
+  billing: RunBillingSummary | null;
   /** Current provider metadata used to explain submitted inputs in user history. */
   inputSchema?: RunInputSchema | null;
   assets: RunAsset[];
@@ -128,7 +136,7 @@ export type RunListQuery = {
 export type RunSummary = Omit<
   RunRecord,
   "submittedArguments" | "result" | "captureRedactedPaths"
->;
+> & { billing: RunBillingSummary | null };
 export type RunPage = {
   items: RunSummary[];
   nextCursor: string | null;

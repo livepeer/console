@@ -169,7 +169,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       try {
         const assets = await listAssets(pid);
         return text({
-          assets: assets.map(serializeAsset),
+          assets: assets.map((asset) => serializeAsset(asset, pid)),
           count: assets.length,
         });
       } catch (err) {
@@ -190,7 +190,7 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
       try {
         const assets = await listAssets(pid, query);
         return text({
-          assets: assets.map(serializeAsset),
+          assets: assets.map((asset) => serializeAsset(asset, pid)),
           count: assets.length,
         });
       } catch (err) {

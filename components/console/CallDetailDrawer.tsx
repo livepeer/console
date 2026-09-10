@@ -8,12 +8,13 @@ import {
   type ReactNode,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import { createPortal } from "react-dom";
 import { ArrowUpRight, Info } from "lucide-react";
 import { formatCallMetric } from "@/lib/console/utils";
 import ModalityChip from "@/components/console/ModalityChip";
 import { LivepeerSymbol } from "@/components/design-system/LivepeerLogo";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -520,14 +521,14 @@ function FieldLabel({
     <div className="flex items-center gap-1.5">
       <p className="text-xs text-fg-muted">{field.label}</p>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <button
+        <TooltipTrigger
+          render={<button
             type="button"
             aria-label={`About ${field.label}`}
             className="inline-flex items-center justify-center text-foreground/25 transition-colors hover:text-foreground/45 focus-visible:rounded-full focus-visible:text-foreground/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
-          >
+          />}
+        >
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
         </TooltipTrigger>
         <TooltipContent
           side="right"
@@ -840,7 +841,7 @@ function UserHistoryDetails({
         ? field
         : { ...field, kind: "setting" as const }
     ),
-    ...(cost ? [{ label: "Price", value: cost }] : []),
+    ...(cost ? [{ label: "Cost", value: cost }] : []),
     ...(inferenceValue
       ? [{ label: "Render status", value: inferenceValue }]
       : []),
@@ -1108,9 +1109,6 @@ export default function CallDetailDrawer({
   onRetryDetail?: () => void;
   variant?: "user" | "admin";
 }) {
-  const [mounted, setMounted] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const previousActiveRef = useRef<HTMLElement | null>(null);
   const wheelDeltaRef = useRef(0);
   const lastWheelNavigationRef = useRef(0);
   const [selectedAsset, setSelectedAsset] = useState<{
@@ -1118,13 +1116,16 @@ export default function CallDetailDrawer({
     id: string;
   } | null>(null);
   const activeDetail = detail?.id === row?.id ? detail : null;
+  const outputAssets = activeDetail?.assets.filter(
+    (item) => item.role !== "input"
+  );
   const asset =
-    activeDetail?.assets.find(
+    outputAssets?.find(
       (item) =>
         selectedAsset &&
         selectedAsset.runId === row?.id &&
         item.id === selectedAsset.id
-    ) ?? activeDetail?.assets[0];
+    ) ?? outputAssets?.[0];
   let media = row
     ? mediaSpecForRow({
         ...row,
@@ -1176,62 +1177,8 @@ export default function CallDetailDrawer({
   const inferenceFields = returnedFields.filter(
     (field) => field.label === "Inference time"
   );
-  const billingEvent = activeDetail
-    ? [...activeDetail.events]
-        .reverse()
-        .find((event) => event.metadata.kind === "billing_usage")
-    : undefined;
-  const billedCost =
-    typeof billingEvent?.metadata.networkFeeUsdMicros === "string"
-      ? requestFeeDisplay({
-          networkFeeUsdMicros: billingEvent.metadata.networkFeeUsdMicros,
-          feeWei:
-            typeof billingEvent.metadata.feeWei === "string"
-              ? billingEvent.metadata.feeWei
-              : undefined,
-          ethUsdPrice:
-            typeof billingEvent.metadata.ethUsdPrice === "string"
-              ? billingEvent.metadata.ethUsdPrice
-              : undefined,
-        })
-      : null;
-  const costDisplay = billedCost?.display ?? row?.costDisplay;
-  const costExact = billedCost?.exact ?? row?.costExact;
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const original = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = original;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (open) {
-      previousActiveRef.current = document.activeElement as HTMLElement | null;
-      requestAnimationFrame(() =>
-        panelRef.current?.focus({ preventScroll: true })
-      );
-    } else if (previousActiveRef.current) {
-      previousActiveRef.current.focus?.({ preventScroll: true });
-      previousActiveRef.current = null;
-    }
-  }, [open]);
+  const costDisplay = row?.costDisplay;
+  const costExact = row?.costExact;
 
   const selectAdjacentRow = useCallback(
     (offset: number) => {
@@ -1273,48 +1220,34 @@ export default function CallDetailDrawer({
     wheelDeltaRef.current = 0;
   };
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black p-3 pt-14 transition-opacity duration-200 sm:p-6 sm:pt-16 ${
-        open ? "visible opacity-100" : "invisible opacity-0"
-      }`}
-      aria-hidden={!open}
-    >
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Close detail"
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        onWheel={handleWheel}
+        className="fixed inset-0 top-0 left-0 z-[100] flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 items-center justify-center gap-0 rounded-none bg-black p-3 pt-14 shadow-none ring-0 sm:max-w-none sm:p-6 sm:pt-16"
+      >
+      <DialogTitle className="sr-only">
+        {row ? `${row.model} detail` : "Run detail"}
+      </DialogTitle>
+      <Button
+        variant="ghost"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-transparent"
-      />
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute left-1/2 top-3 z-20 inline-flex -translate-x-1/2 items-center gap-1.5 text-sm font-medium text-white transition-colors hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:top-4"
+        className="absolute left-1/2 top-3 z-20 -translate-x-1/2 gap-1.5 text-sm font-medium text-white hover:bg-transparent hover:text-white/70 sm:top-4"
       >
         <span aria-hidden="true">&larr;</span>
         Return to dashboard
-      </button>
+      </Button>
 
       {row && media && (
         <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${row.model} detail`}
-          tabIndex={-1}
-          onWheel={handleWheel}
-          className={`relative z-10 flex max-h-[calc(100dvh-68px)] w-[min(1240px,calc(100vw-32px))] items-stretch gap-3 overflow-y-auto outline-none transition-[opacity,transform] duration-200 ease-out sm:max-h-[calc(100dvh-96px)] lg:h-[calc(100dvh-96px)] lg:max-h-[760px] lg:overflow-visible ${
-            open ? "scale-100 opacity-100" : "scale-[0.98] opacity-0"
-          }`}
+          className="relative z-10 flex max-h-[calc(100dvh-68px)] w-[min(1240px,calc(100vw-32px))] items-stretch gap-3 overflow-y-auto outline-none sm:max-h-[calc(100dvh-96px)] lg:h-[calc(100dvh-96px)] lg:max-h-[760px] lg:overflow-visible"
         >
           <div className="grid h-auto min-w-0 flex-1 grid-rows-[auto_auto] overflow-hidden rounded-sm bg-background shadow-2xl shadow-black/55 lg:h-full lg:grid-cols-[minmax(0,1fr)_350px] lg:grid-rows-none">
             <MediaStage
               key={`${row.id}-${asset?.id ?? "none"}`}
               media={media}
-              expiresAt={asset?.expiresAt ?? asset?.availableUntil}
+              expiresAt={asset?.expiresAt}
               unavailable={Boolean(asset?.unavailableAt)}
               allowDataPreview={variant === "admin"}
               loading={detailLoading}
@@ -1382,10 +1315,10 @@ export default function CallDetailDrawer({
                     <DetailRow label="Cost">
                       {costExact && costExact !== costDisplay ? (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help font-mono tabular-nums">
+                          <TooltipTrigger
+                            render={<span className="cursor-help font-mono tabular-nums" />}
+                          >
                               {costDisplay}
-                            </span>
                           </TooltipTrigger>
                           <TooltipContent side="left">
                             <span className="font-mono tabular-nums">
@@ -1597,7 +1530,7 @@ export default function CallDetailDrawer({
           />
         </div>
       )}
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }

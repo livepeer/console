@@ -49,6 +49,7 @@ const records: RunSummary[] = ["alex", "jamie"].map((name, index) => ({
   startedAt: "2026-09-01T12:00:00.000Z",
   completedAt: "2026-09-01T12:00:01.000Z",
   email: `${name}@example.invalid`,
+  billing: null,
 }));
 const fetcher = vi.fn();
 beforeEach(() => {

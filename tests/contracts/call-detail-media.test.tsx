@@ -50,6 +50,7 @@ function detail(assets: RunDetail["assets"]): RunDetail {
     modelId: "livepeer-example/fal-whisper-transcribe",
     endpoint: null,
     status: "succeeded",
+    billing: { networkFeeUsdMicros: "10000", receiptCount: 1 },
     submittedArguments: {
       inputs: {
         audio_url: "https://earlyaccess.livepeer.org/api/assets/asset-audio",
@@ -83,7 +84,7 @@ function renderWithTooltips(element: ReactElement) {
   return render(<TooltipProvider>{element}</TooltipProvider>);
 }
 
-it("never renders JSON or text results in the user media stage", () => {
+it("never renders JSON or text results in the user media stage", async () => {
   renderWithTooltips(
     <CallDetailDrawer
       row={row}
@@ -102,12 +103,12 @@ it("never renders JSON or text results in the user media stage", () => {
   expect(screen.queryByText("Modality")).toBeNull();
   expect(screen.getByText("Render status")).toBeTruthy();
   fireEvent.focus(screen.getByRole("button", { name: "About Render status" }));
-  expect(screen.getByRole("tooltip").textContent).toBe(
+  expect((await screen.findByRole("tooltip")).textContent).toBe(
     "Amount of time it took the model to generate your request."
   );
 });
 
-it("uses asset media type and shows its expiry countdown", () => {
+it("uses asset media type and shows its expiry countdown", async () => {
   const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
   renderWithTooltips(
     <CallDetailDrawer
@@ -138,7 +139,7 @@ it("uses asset media type and shows its expiry countdown", () => {
   ).toBeTruthy();
   expect(screen.getByText("Audio")).toBeTruthy();
   fireEvent.focus(screen.getByRole("button", { name: "About Audio" }));
-  expect(screen.getByRole("tooltip").textContent).toContain(
+  expect((await screen.findByRole("tooltip")).textContent).toContain(
     "upload or an earlier platform result"
   );
   expect(screen.getByRole("link", { name: "asset-audio" })).toHaveProperty(
@@ -206,7 +207,7 @@ it("keeps every asset in an input array as a compact URL-backed link", () => {
   }
 });
 
-it("groups each keyframe timestamp with its linked asset", () => {
+it("groups each keyframe timestamp with its linked asset", async () => {
   const run = detail([
     {
       id: "asset-frame",
@@ -259,9 +260,11 @@ it("groups each keyframe timestamp with its linked asset", () => {
       Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   expect(screen.queryByText("Timestamp Seconds")).toBeNull();
-  expect(screen.getByText("false").getAttribute("data-slot")).toBe("badge");
+  expect(screen.getAllByText("false")[0]?.getAttribute("data-slot")).toBe(
+    "badge"
+  );
   fireEvent.focus(screen.getByRole("button", { name: "About Loop" }));
-  const loopTooltip = screen.getByRole("tooltip");
+  const loopTooltip = await screen.findByRole("tooltip");
   expect(loopTooltip.textContent).toContain(
     "Makes the video repeat continuously. When set to true, the final frame transitions back to the first"
   );
@@ -274,7 +277,7 @@ it("groups each keyframe timestamp with its linked asset", () => {
   );
 });
 
-it("shows Flux Schnell image-size alternatives", () => {
+it("shows Flux Schnell image-size alternatives", async () => {
   const run = detail([]);
   run.submittedArguments = {
     inputs: { image_size: "landscape_16_9" },
@@ -330,7 +333,7 @@ it("shows Flux Schnell image-size alternatives", () => {
   );
 
   fireEvent.focus(screen.getByRole("button", { name: "About Image Size" }));
-  const tooltip = screen.getByRole("tooltip");
+  const tooltip = await screen.findByRole("tooltip");
   expect(tooltip.textContent).toContain("portrait_16_9");
   expect(tooltip.textContent).toContain("landscape_16_9");
   expect(
@@ -345,7 +348,7 @@ it("shows Flux Schnell image-size alternatives", () => {
     "landscape_4_3",
     "landscape_16_9",
   ]);
-  expect(screen.getByRole("tooltip").textContent).toContain(
+  expect((await screen.findByRole("tooltip")).textContent).toContain(
     "custom width and height"
   );
 });

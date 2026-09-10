@@ -100,10 +100,10 @@ export function mapAssetRow(row: {
   };
 }
 
-export function serializeAsset(asset: Asset) {
+export function serializeAsset(asset: Asset, principalId: string) {
   return {
     id: asset.id,
-    url: publicAssetUrl(asset.id),
+    url: publicAssetUrl(asset.id, principalId),
     capability: asset.capability,
     created_at: asset.createdAt,
     gateway_request_id: asset.gatewayRequestId,
@@ -114,9 +114,16 @@ export function serializeAsset(asset: Asset) {
 export async function getAssetSource(id: string): Promise<{
   url: string;
   mediaType: string | null;
+  principalId: string;
+  expiresAt: Date | null;
 } | null> {
   const [row] = await getDb()
-    .select({ url: mcpAssets.url, mediaType: mcpAssets.mediaType })
+    .select({
+      url: mcpAssets.url,
+      mediaType: mcpAssets.mediaType,
+      principalId: mcpAssets.principalId,
+      expiresAt: mcpAssets.expiresAt,
+    })
     .from(mcpAssets)
     .where(eq(mcpAssets.id, id))
     .limit(1);

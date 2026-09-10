@@ -31,6 +31,7 @@ const MOCK_OWNER = {
   principalId: "eu_devmock",
   userId: MOCK_USER_ID,
   externalAccountId: "account_devmock",
+  billing: null,
 };
 
 const MOCK_ASSET_PATHS: Record<string, string> = {

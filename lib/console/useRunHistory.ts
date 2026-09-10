@@ -168,8 +168,30 @@ export function useRunDetail(
           return response.json() as Promise<RunDetail>;
         })
         .then((detail) => {
-          if (!controller.signal.aborted)
+          if (!controller.signal.aborted) {
             setState({ key, detail, loading: false, error: null });
+            if (base !== "/api/console/runs") return;
+            void Promise.resolve(
+              fetch(`${base}/${encodeURIComponent(id)}/schema`, {
+                cache: "no-store",
+                signal: controller.signal,
+              })
+            )
+              .then(async (response) =>
+                response.ok
+                  ? (response.json() as Promise<Pick<RunDetail, "inputSchema">>)
+                  : null
+              )
+              .then((schema) => {
+                if (!schema || controller.signal.aborted) return;
+                setState((old) =>
+                  old.key === key && old.detail
+                    ? { ...old, detail: { ...old.detail, ...schema } }
+                    : old
+                );
+              })
+              .catch(() => undefined);
+          }
         })
         .catch((error: unknown) => {
           if (!controller.signal.aborted)

@@ -99,7 +99,7 @@ function HistoryCost({
   return (
     <span className="justify-self-end">
       <Tooltip>
-        <TooltipTrigger asChild>{amount}</TooltipTrigger>
+        <TooltipTrigger render={amount} />
         <TooltipContent side="left">
           <span className="font-mono tabular-nums">{row.costExact}</span>
         </TooltipContent>
