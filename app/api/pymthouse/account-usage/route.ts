@@ -5,6 +5,10 @@ import {
   PYMTHOUSE_NO_STORE_HEADERS,
   pymthouseErrorResponse,
 } from "@/app/api/pymthouse/route-helpers";
+import {
+  previewAccountUsage,
+  previewFixturesEnabled,
+} from "@/lib/runs/preview-fixtures";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +41,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const session = await requireConsoleSession();
+    if (previewFixturesEnabled()) {
+      return NextResponse.json(
+        previewAccountUsage({
+          externalUserId: session.externalUserId,
+          periodDays,
+          window,
+          includePrior,
+        }),
+        { headers: PYMTHOUSE_NO_STORE_HEADERS }
+      );
+    }
     const payload = await fetchAccountUsageForExternalUser({
       externalUserId: session.externalUserId,
       periodDays,

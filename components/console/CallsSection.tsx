@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import SectionHeader from "@/components/console/SectionHeader";
@@ -9,7 +9,6 @@ import { useAuth } from "@/components/console/AuthContext";
 import { useRunDetail, useRunHistory } from "@/lib/console/useRunHistory";
 import { runToActivity } from "@/lib/console/run-activity";
 import type { AccountActivityRow } from "@/lib/console/types";
-import { Button } from "@/components/ui/button";
 
 export default function CallsSection({
   query,
@@ -19,7 +18,6 @@ export default function CallsSection({
   onQueryChange: (next: string) => void;
 }) {
   const { isConnected, user } = useAuth();
-  const [seedingPreview, setSeedingPreview] = useState(false);
   const ownerKey = user ? `${user.canonicalUserId}:${user.id}` : undefined;
   const history = useRunHistory(
     "/api/console/runs",
@@ -44,9 +42,7 @@ export default function CallsSection({
     const openId =
       detail.detail?.id ??
       (requestId && ids.includes(requestId) ? requestId : null);
-    return openId
-      ? [openId, ...ids.filter((id) => id !== openId)]
-      : ids;
+    return openId ? [openId, ...ids.filter((id) => id !== openId)] : ids;
   }, [detail.detail?.id, history.page, requestId]);
   useEffect(() => {
     if (!isConnected || !ownerKey || !visibleRunIds.length) return;
@@ -76,11 +72,17 @@ export default function CallsSection({
       })
       .catch(() => undefined); // Billing availability never gates Neon history.
     return () => controller.abort();
-  }, [detail.detail?.id, detailReload, historyReload, isConnected, ownerKey, visibleRunIds]);
+  }, [
+    detail.detail?.id,
+    detailReload,
+    historyReload,
+    isConnected,
+    ownerKey,
+    visibleRunIds,
+  ]);
   const router = useRouter();
   const recorded = useMemo(
-    () =>
-      history.page?.items.map((run) => runToActivity(run)) ?? [],
+    () => history.page?.items.map((run) => runToActivity(run)) ?? [],
     [history.page]
   );
   const rows = recorded;
@@ -97,20 +99,6 @@ export default function CallsSection({
     router.push("/home?request=" + encodeURIComponent(row.id), {
       scroll: false,
     });
-  const seedPreview = async () => {
-    setSeedingPreview(true);
-    try {
-      const response = await fetch("/api/console/runs/preview-fixtures", {
-        method: "POST",
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("preview_fixture_failed");
-      synced.current.clear();
-      history.reload();
-    } finally {
-      setSeedingPreview(false);
-    }
-  };
   return (
     <>
       <SectionHeader
@@ -171,22 +159,9 @@ export default function CallsSection({
         />
         {!history.loading && !history.error && !recorded.length && (
           <div className="px-7 py-8 text-sm text-fg-faint">
-            <p>{query ? "No history matches this search." : "No history yet."}</p>
-            {!query &&
-              process.env.NEXT_PUBLIC_CONSOLE_PREVIEW_FIXTURES === "1" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  disabled={seedingPreview}
-                  onClick={() => void seedPreview()}
-                >
-                  {seedingPreview
-                    ? "Creating verification records…"
-                    : "Create preview verification records"}
-                </Button>
-              )}
+            <p>
+              {query ? "No history matches this search." : "No history yet."}
+            </p>
           </div>
         )}
         {history.page?.nextCursor && (

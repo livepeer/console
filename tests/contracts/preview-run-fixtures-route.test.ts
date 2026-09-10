@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 const mocks = vi.hoisted(() => ({
   owner: vi.fn(),
   ownedRuns: vi.fn(),
@@ -33,7 +35,9 @@ describe("POST /api/console/runs/preview-fixtures", () => {
       externalAccountId: "account_preview",
     });
     mocks.ownedRuns.mockResolvedValue([]);
-    mocks.createRun.mockImplementation(async (_owner, input) => ({ id: input.id }));
+    mocks.createRun.mockImplementation(async (_owner, input) => ({
+      id: input.id,
+    }));
     mocks.transitionRun.mockResolvedValue({});
     mocks.recordUsage.mockResolvedValue([]);
   });
@@ -56,10 +60,10 @@ describe("POST /api/console/runs/preview-fixtures", () => {
       })
     );
     expect(response.status).toBe(200);
-    expect((await response.json()).createdCount).toBe(3);
-    expect(mocks.createRun).toHaveBeenCalledTimes(3);
-    expect(mocks.transitionRun).toHaveBeenCalledTimes(3);
-    expect(mocks.recordUsage).toHaveBeenCalledTimes(2);
+    expect((await response.json()).createdCount).toBe(4);
+    expect(mocks.createRun).toHaveBeenCalledTimes(4);
+    expect(mocks.transitionRun).toHaveBeenCalledTimes(4);
+    expect(mocks.recordUsage).toHaveBeenCalledTimes(3);
     expect(mocks.recordUsage.mock.calls.flatMap((call) => call[1])).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
