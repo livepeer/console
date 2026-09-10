@@ -8,7 +8,7 @@ import {
   recordRunUsage,
   transitionRun,
 } from "./store";
-import type { RunOwner } from "./types";
+import type { RunOwner, RunPage } from "./types";
 
 const PREVIEW_GRANT_USD_MICROS = 5_000_000;
 
@@ -17,6 +17,25 @@ export function previewFixturesEnabled(): boolean {
     process.env.VERCEL_ENV === "preview" &&
     process.env.CONSOLE_PREVIEW_FIXTURES === "1"
   );
+}
+
+/** Keep superseded button-era fixtures out of preview without deleting data. */
+export function withoutLegacyPreviewFixtures(page: RunPage): RunPage {
+  const legacy = page.items.filter(
+    ({ id }) =>
+      id.startsWith("run_preview_") && !id.startsWith("run_preview_v2_")
+  );
+  if (!legacy.length) return page;
+  const counts = { ...page.counts };
+  for (const run of legacy) {
+    counts.total = Math.max(0, counts.total - 1);
+    counts[run.status] = Math.max(0, counts[run.status] - 1);
+  }
+  return {
+    ...page,
+    counts,
+    items: page.items.filter(({ id }) => !legacy.some((run) => run.id === id)),
+  };
 }
 
 function fixtureIds(owner: RunOwner) {

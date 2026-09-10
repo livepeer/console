@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   adminDetail: vi.fn(),
   seedPreview: vi.fn(),
   previewEnabled: vi.fn(() => false),
+  hideLegacy: vi.fn((page) => page),
 }));
 vi.mock("@/lib/console/session-user", () => ({
   requireConsoleSession: mocks.session,
@@ -25,6 +26,7 @@ vi.mock("@/lib/runs/store", () => ({
 vi.mock("@/lib/runs/preview-fixtures", () => ({
   ensurePreviewRunFixtures: mocks.seedPreview,
   previewFixturesEnabled: mocks.previewEnabled,
+  withoutLegacyPreviewFixtures: mocks.hideLegacy,
 }));
 import { GET as list } from "@/app/api/console/runs/route";
 import { GET as detail } from "@/app/api/console/runs/[id]/route";
@@ -71,6 +73,10 @@ it("automatically seeds owner-scoped preview history before listing", async () =
     "https://preview.example"
   );
   expect(mocks.list).toHaveBeenCalledAfter(mocks.seedPreview);
+  expect(mocks.hideLegacy).toHaveBeenCalledWith({
+    items: [],
+    nextCursor: null,
+  });
 });
 it("fails closed for mismatched canonical identity and invalid filters", async () => {
   mocks.owner.mockResolvedValue({ ...owner, userId: "other" });
