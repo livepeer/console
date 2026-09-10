@@ -533,27 +533,32 @@ function FieldLabel({
         <TooltipContent
           side="right"
           sideOffset={8}
-          className="z-[120] max-h-[min(70vh,28rem)] w-64 items-start gap-3 overflow-y-auto p-3 text-left leading-4 text-pretty"
+          className="z-[120] max-h-[min(70vh,28rem)] w-64 overflow-y-auto p-0 text-left leading-4 text-pretty"
         >
-          {help.description && (
-            <p className="min-w-0 flex-1">{help.description}</p>
-          )}
-          {help.options.length > 0 && (
-            <div
-              className="flex w-[7.5rem] flex-none flex-col items-start gap-1 self-start"
-              aria-label="Options"
-            >
-              {help.options.map((option) => (
-                <Badge
-                  key={option}
-                  variant="secondary"
-                  className="h-5 bg-white/10 px-1.5 text-[11px] font-normal text-white hover:bg-white/10"
-                >
-                  {option}
-                </Badge>
-              ))}
-            </div>
-          )}
+          <div
+            data-slot="tooltip-body"
+            className="flex w-full items-start gap-3 px-3 pt-3 pb-4"
+          >
+            {help.description && (
+              <p className="min-w-0 flex-1">{help.description}</p>
+            )}
+            {help.options.length > 0 && (
+              <div
+                className="flex w-[7.5rem] flex-none flex-col items-start gap-1 self-start"
+                aria-label="Options"
+              >
+                {help.options.map((option) => (
+                  <Badge
+                    key={option}
+                    variant="secondary"
+                    className="h-5 bg-white/10 px-1.5 text-[11px] font-normal text-white hover:bg-white/10"
+                  >
+                    {option}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
         </TooltipContent>
       </Tooltip>
     </div>
