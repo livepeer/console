@@ -277,6 +277,8 @@ it("groups each keyframe timestamp with its linked asset", async () => {
   const loopOptions = loopTooltip.querySelector('[aria-label="Options"]');
   expect(loopOptions).toBeTruthy();
   expect(loopOptions?.className).toContain("self-start");
+  expect(loopOptions?.className).toContain("flex-col");
+  expect(loopOptions?.className).toContain("w-[7.5rem]");
   expect(screen.getAllByText("true").at(-1)?.getAttribute("data-slot")).toBe(
     "badge"
   );

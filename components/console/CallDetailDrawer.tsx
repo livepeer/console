@@ -540,7 +540,7 @@ function FieldLabel({
           )}
           {help.options.length > 0 && (
             <div
-              className="flex shrink-0 flex-wrap items-start gap-1 self-start"
+              className="flex w-[7.5rem] flex-none flex-col items-start gap-1 self-start"
               aria-label="Options"
             >
               {help.options.map((option) => (
