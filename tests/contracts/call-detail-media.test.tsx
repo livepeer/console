@@ -103,9 +103,13 @@ it("never renders JSON or text results in the user media stage", async () => {
   expect(screen.queryByText("Modality")).toBeNull();
   expect(screen.getByText("Render status")).toBeTruthy();
   fireEvent.focus(screen.getByRole("button", { name: "About Render status" }));
-  expect((await screen.findByRole("tooltip")).textContent).toBe(
+  const tooltip = await screen.findByRole("tooltip");
+  expect(tooltip.textContent).toBe(
     "Amount of time it took the model to generate your request."
   );
+  expect(
+    tooltip.closest('[data-slot="tooltip-positioner"]')?.className
+  ).toContain("z-[130]");
 });
 
 it("uses asset media type and shows its expiry countdown", async () => {
