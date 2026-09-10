@@ -533,11 +533,16 @@ function FieldLabel({
         <TooltipContent
           side="right"
           sideOffset={8}
-          className="z-[120] max-h-[min(70vh,28rem)] w-64 overflow-y-auto text-left leading-4 text-pretty"
+          className="z-[120] max-h-[min(70vh,28rem)] w-64 items-start gap-3 overflow-y-auto p-3 text-left leading-4 text-pretty"
         >
-          {help.description && <p>{help.description}</p>}
+          {help.description && (
+            <p className="min-w-0 flex-1">{help.description}</p>
+          )}
           {help.options.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1" aria-label="Options">
+            <div
+              className="flex shrink-0 flex-wrap items-start gap-1 self-start"
+              aria-label="Options"
+            >
               {help.options.map((option) => (
                 <Badge
                   key={option}

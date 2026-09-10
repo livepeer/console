@@ -272,7 +272,11 @@ it("groups each keyframe timestamp with its linked asset", async () => {
   expect(loopTooltip.textContent).toContain(
     "Makes the video repeat continuously. When set to true, the final frame transitions back to the first"
   );
-  expect(loopTooltip.querySelector('[aria-label="Options"]')).toBeTruthy();
+  expect(loopTooltip.className).toContain("items-start");
+  expect(loopTooltip.className).toContain("p-3");
+  const loopOptions = loopTooltip.querySelector('[aria-label="Options"]');
+  expect(loopOptions).toBeTruthy();
+  expect(loopOptions?.className).toContain("self-start");
   expect(screen.getAllByText("true").at(-1)?.getAttribute("data-slot")).toBe(
     "badge"
   );
