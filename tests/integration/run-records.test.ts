@@ -111,6 +111,44 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             ],
           });
           expect(succeeded.assets).toHaveLength(2);
+          expect(
+            await tx
+              .select()
+              .from(schema.runAssetLinks)
+              .where(eq(schema.runAssetLinks.runId, created.id))
+          ).toHaveLength(2);
+          const reusedAsset = succeeded.assets[0]!;
+          const consumer = await createRun(owner, {
+            id: "run-consumer",
+            gatewayRequestId: "job-consumer",
+            capability: "image-to-image",
+            submittedArguments: {
+              inputs: {
+                reference_image: `https://preview.example/api/assets/${reusedAsset.id}?exp=9999999999&sig=fixture`,
+              },
+            },
+          });
+          expect(consumer.assets).toEqual([
+            expect.objectContaining({ id: reusedAsset.id, role: "input" }),
+          ]);
+          expect(
+            await tx
+              .select()
+              .from(schema.runAssetLinks)
+              .where(eq(schema.runAssetLinks.runId, consumer.id))
+          ).toEqual([
+            expect.objectContaining({
+              assetId: reusedAsset.id,
+              direction: "input",
+              role: "reference_image",
+              parameterPath: "inputs.reference_image",
+              ordinal: 0,
+            }),
+          ]);
+          await tx
+            .update(schema.runs)
+            .set({ createdAt: new Date("2023-01-01"), updatedAt: new Date() })
+            .where(eq(schema.runs.id, consumer.id));
           expect(succeeded.result?.value).toEqual(["a", { image: "b" }]);
           expect(
             (
@@ -165,7 +203,7 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
           const first = await listOwnRuns(owner, { limit: 1 });
           expect(first.items.map((row) => row.id)).toEqual(["run-1"]);
           expect(first.items[0]).not.toHaveProperty("submittedArguments");
-          expect(first.counts.total).toBe(2);
+          expect(first.counts.total).toBe(3);
           const next = await listOwnRuns(owner, {
             limit: 1,
             cursor: first.nextCursor!,
@@ -226,6 +264,12 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             networkFeeUsdMicros: "3",
             receiptCount: 2,
           });
+          expect(
+            await tx
+              .select()
+              .from(schema.runUsageReceipts)
+              .where(eq(schema.runUsageReceipts.runId, created.id))
+          ).toHaveLength(2);
           expect(
             (await listOwnRuns(owner, { limit: 10 })).items.find(
               (item) => item.id === created.id

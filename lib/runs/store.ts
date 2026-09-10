@@ -16,9 +16,11 @@ import { getDb } from "@/lib/db";
 import {
   externalAccounts,
   mcpAssets,
+  runAssetLinks,
   runEvents,
   runReadAudits,
   runReconciliationJobs,
+  runUsageReceipts,
   runs,
   userEmails,
 } from "@/lib/db/schema";
@@ -41,13 +43,51 @@ import type {
   RunTransition,
   JsonValue,
 } from "./types";
-import { billingSummaryFromEvents } from "./billing";
+import { billingSummaryFromReceipts } from "./billing";
 
 type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Reader = Database | Transaction;
 const terminal = new Set<RunStatus>(["succeeded", "failed", "cancelled"]);
 const iso = (value: Date | null) => value?.toISOString() ?? null;
+
+type AssetReference = {
+  id: string;
+  parameterPath: string;
+  role: string;
+  ordinal: number;
+};
+
+function assetReferences(value: JsonValue | undefined): AssetReference[] {
+  const found: AssetReference[] = [];
+  const visit = (item: JsonValue, path: (string | number)[]): void => {
+    if (typeof item === "string") {
+      try {
+        const match = new URL(item).pathname.match(/^\/api\/assets\/([^/]+)$/);
+        if (!match) return;
+        const field = [...path].reverse().find((part) => typeof part === "string");
+        const ordinal = [...path].reverse().find((part) => typeof part === "number");
+        found.push({
+          id: decodeURIComponent(match[1]!),
+          parameterPath: path.join("."),
+          role: typeof field === "string" ? field : "input",
+          ordinal: typeof ordinal === "number" ? ordinal : 0,
+        });
+      } catch {
+        // Captured strings need not be URLs.
+      }
+      return;
+    }
+    if (Array.isArray(item))
+      item.forEach((child, index) => visit(child, [...path, index]));
+    else if (item && typeof item === "object")
+      Object.entries(item).forEach(([key, child]) =>
+        visit(child, [...path, key])
+      );
+  };
+  if (value !== undefined) visit(value, []);
+  return found;
+}
 
 export async function resolveRunOwner(principalId: string): Promise<RunOwner> {
   const account = await findExternalAccountOwner({
@@ -84,22 +124,15 @@ async function detail(
   db: Reader,
   row: typeof runs.$inferSelect
 ): Promise<RunDetail> {
-  const referencedAssetIds = new Set<string>();
-  const collectAssetIds = (value: JsonValue | undefined): void => {
-    if (typeof value === "string") {
-      try {
-        const match = new URL(value).pathname.match(/^\/api\/assets\/([^/]+)$/);
-        if (match) referencedAssetIds.add(decodeURIComponent(match[1]!));
-      } catch {
-        // Captured strings need not be URLs.
-      }
-      return;
-    }
-    if (Array.isArray(value)) value.forEach(collectAssetIds);
-    else if (value && typeof value === "object")
-      Object.values(value).forEach(collectAssetIds);
-  };
-  collectAssetIds(row.submittedArguments ?? undefined);
+  const links = await db
+    .select()
+    .from(runAssetLinks)
+    .where(eq(runAssetLinks.runId, row.id))
+    .orderBy(asc(runAssetLinks.direction), asc(runAssetLinks.ordinal));
+  const referencedAssetIds = new Set([
+    ...assetReferences(row.submittedArguments ?? undefined).map(({ id }) => id),
+    ...links.map(({ assetId }) => assetId),
+  ]);
   const assetFilter = referencedAssetIds.size
     ? or(
         eq(mcpAssets.runId, row.id),
@@ -109,7 +142,7 @@ async function detail(
         )
       )
     : eq(mcpAssets.runId, row.id);
-  const [assets, events, emails] = await Promise.all([
+  const [assets, events, receipts, emails] = await Promise.all([
     db
       .select()
       .from(mcpAssets)
@@ -120,6 +153,11 @@ async function detail(
       .from(runEvents)
       .where(eq(runEvents.runId, row.id))
       .orderBy(asc(runEvents.createdAt), asc(runEvents.id)),
+    db
+      .select({ networkFeeUsdMicros: runUsageReceipts.networkFeeUsdMicros })
+      .from(runUsageReceipts)
+      .where(eq(runUsageReceipts.runId, row.id))
+      .orderBy(asc(runUsageReceipts.occurredAt), asc(runUsageReceipts.id)),
     db
       .select({ email: userEmails.email })
       .from(userEmails)
@@ -132,11 +170,16 @@ async function detail(
     ...event,
     createdAt: event.createdAt.toISOString(),
   }));
+  const linksByAsset = new Map(links.map((link) => [link.assetId, link]));
   return {
     ...record(row, emails[0]?.email ?? null),
     assets: assets.map((asset) => ({
       id: asset.id,
-      role: asset.runId === row.id ? "output" : "input",
+      role:
+        linksByAsset.get(asset.id)?.direction === "input" ||
+        asset.runId !== row.id
+          ? "input"
+          : "output",
       url: asset.url,
       mediaType: asset.mediaType,
       providerRequestId: asset.providerRequestId,
@@ -147,7 +190,7 @@ async function detail(
       createdAt: asset.createdAt.toISOString(),
     })),
     events: mappedEvents,
-    billing: billingSummaryFromEvents(mappedEvents),
+    billing: billingSummaryFromReceipts(receipts),
   };
 }
 
@@ -185,6 +228,31 @@ export async function createRun(
     await tx
       .insert(runEvents)
       .values({ runId: row.id, eventKey: "created", status: "queued" });
+    const references = assetReferences(row.submittedArguments ?? undefined);
+    if (references.length) {
+      const ownedAssets = await tx
+        .select({ id: mcpAssets.id })
+        .from(mcpAssets)
+        .where(
+          and(
+            eq(mcpAssets.principalId, owner.principalId),
+            inArray(mcpAssets.id, [...new Set(references.map(({ id }) => id))])
+          )
+        );
+      const ownedIds = new Set(ownedAssets.map(({ id }) => id));
+      const values = references
+        .filter(({ id }) => ownedIds.has(id))
+        .map((reference) => ({
+          runId: row.id,
+          assetId: reference.id,
+          direction: "input",
+          role: reference.role,
+          parameterPath: reference.parameterPath,
+          ordinal: reference.ordinal,
+        }));
+      if (values.length)
+        await tx.insert(runAssetLinks).values(values).onConflictDoNothing();
+    }
     return detail(tx, row);
   });
 }
@@ -260,7 +328,7 @@ export async function transitionRun(
       .where(eq(runs.id, id))
       .returning();
     if (change.assets?.length) {
-      for (const asset of change.assets) {
+      for (const [ordinal, asset] of change.assets.entries()) {
         const url = new URL(asset.url);
         if (
           !["https:", "http:"].includes(url.protocol) ||
@@ -268,7 +336,7 @@ export async function transitionRun(
           url.password
         )
           throw new Error("invalid_run_asset_url");
-        await tx
+        const [persisted] = await tx
           .insert(mcpAssets)
           .values({
             id: asset.id ?? randomUUID(),
@@ -285,13 +353,30 @@ export async function transitionRun(
               : null,
             expiresAt: asset.expiresAt ? new Date(asset.expiresAt) : null,
           })
-          .onConflictDoNothing({
+          .onConflictDoUpdate({
             target: [
               mcpAssets.principalId,
               mcpAssets.gatewayRequestId,
               mcpAssets.url,
             ],
-          });
+            set: {
+              providerRequestId: sql`coalesce(excluded.provider_request_id, ${mcpAssets.providerRequestId})`,
+              mediaType: sql`coalesce(excluded.media_type, ${mcpAssets.mediaType})`,
+            },
+          })
+          .returning({ id: mcpAssets.id });
+        if (persisted)
+          await tx
+            .insert(runAssetLinks)
+            .values({
+              runId: id,
+              assetId: persisted.id,
+              direction: "output",
+              role: "generated_output",
+              parameterPath: "result",
+              ordinal,
+            })
+            .onConflictDoNothing();
       }
     }
     await tx.insert(runEvents).values({
@@ -414,17 +499,25 @@ async function list(
     .orderBy(desc(runs.createdAt), desc(runs.id))
     .limit(limit + 1);
   const visibleRows = rows.slice(0, limit);
-  const billingEvents = visibleRows.length
+  const billingReceipts = visibleRows.length
     ? await db
-        .select({ runId: runEvents.runId, metadata: runEvents.metadata })
-        .from(runEvents)
-        .where(inArray(runEvents.runId, visibleRows.map(({ row }) => row.id)))
+        .select({
+          runId: runUsageReceipts.runId,
+          networkFeeUsdMicros: runUsageReceipts.networkFeeUsdMicros,
+        })
+        .from(runUsageReceipts)
+        .where(
+          inArray(runUsageReceipts.runId, visibleRows.map(({ row }) => row.id))
+        )
     : [];
-  const billingByRun = new Map<string, { metadata: Record<string, JsonValue> }[]>();
-  for (const event of billingEvents) {
-    const events = billingByRun.get(event.runId) ?? [];
-    events.push({ metadata: event.metadata });
-    billingByRun.set(event.runId, events);
+  const billingByRun = new Map<
+    string,
+    { networkFeeUsdMicros: string | null }[]
+  >();
+  for (const receipt of billingReceipts) {
+    const receipts = billingByRun.get(receipt.runId) ?? [];
+    receipts.push({ networkFeeUsdMicros: receipt.networkFeeUsdMicros });
+    billingByRun.set(receipt.runId, receipts);
   }
   const grouped = await db
     .select({ status: runs.status, count: sql<number>`count(*)::int` })
@@ -461,7 +554,7 @@ async function list(
     void _paths;
     return {
       ...summary,
-      billing: billingSummaryFromEvents(billingByRun.get(row.id) ?? []),
+      billing: billingSummaryFromReceipts(billingByRun.get(row.id) ?? []),
     };
   });
   const last = items.at(-1);
@@ -590,7 +683,36 @@ export async function recordRunUsage(
         )
         .for("update");
       if (!run) continue;
-      const inserted = await tx
+      const decimal = (key: string) => {
+        const value = ticket.metadata[key];
+        return typeof value === "string" ? value : null;
+      };
+      const timestamp = ticket.metadata.timestamp;
+      const insertedReceipt = await tx
+        .insert(runUsageReceipts)
+        .values({
+          eventId: ticket.eventId,
+          runId: run.id,
+          gatewayRequestId: ticket.gatewayRequestId,
+          occurredAt:
+            typeof timestamp === "string" ? new Date(timestamp) : null,
+          pipeline:
+            typeof ticket.metadata.pipeline === "string"
+              ? ticket.metadata.pipeline
+              : null,
+          modelId:
+            typeof ticket.metadata.modelId === "string"
+              ? ticket.metadata.modelId
+              : null,
+          networkFeeUsdMicros: decimal("networkFeeUsdMicros"),
+          feeWei: decimal("feeWei"),
+          pixels: decimal("pixels"),
+          ethUsdPrice: decimal("ethUsdPrice"),
+        })
+        .onConflictDoNothing({ target: runUsageReceipts.eventId })
+        .returning({ runId: runUsageReceipts.runId });
+      if (!insertedReceipt[0]) continue;
+      await tx
         .insert(runEvents)
         .values({
           runId: run.id,
@@ -602,9 +724,8 @@ export async function recordRunUsage(
             eventId: ticket.eventId,
           },
         })
-        .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] })
-        .returning({ runId: runEvents.runId });
-      if (inserted[0]) changed.add(inserted[0].runId);
+        .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] });
+      changed.add(insertedReceipt[0].runId);
     }
     return [...changed];
   });

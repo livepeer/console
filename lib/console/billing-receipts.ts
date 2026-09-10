@@ -24,6 +24,12 @@ export function sanitizeBillingReceipt(
     billingEventId: item.eventId,
     ticketGatewayRequestId: item.gatewayRequestId,
   };
+  for (const [key, value] of [
+    ["pipeline", item.pipeline],
+    ["modelId", item.modelId],
+  ] as const) {
+    if (typeof value === "string" && value.length <= 512) metadata[key] = value;
+  }
   for (const key of [
     "networkFeeUsdMicros",
     "feeWei",

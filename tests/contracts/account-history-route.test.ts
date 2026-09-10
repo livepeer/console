@@ -107,6 +107,8 @@ it("suppresses owned run tickets, persists fee-only evidence, and joins assets o
         metadata: {
           billingEventId: "event-owned",
           ticketGatewayRequestId: "owned",
+          pipeline: "image",
+          modelId: "model",
           networkFeeUsdMicros: "100",
           feeWei: "10",
           ethUsdPrice: "2000.25",

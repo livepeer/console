@@ -33,3 +33,17 @@ export function billingSummaryFromEvents(
   }
   return receiptCount ? { networkFeeUsdMicros: total, receiptCount } : null;
 }
+
+export function billingSummaryFromReceipts(
+  receipts: { networkFeeUsdMicros: string | null }[]
+): RunBillingSummary | null {
+  let total = "0";
+  let receiptCount = 0;
+  for (const receipt of receipts) {
+    const value = receipt.networkFeeUsdMicros;
+    if (!value || !DECIMAL.test(value)) continue;
+    total = addDecimalStrings(total, value);
+    receiptCount += 1;
+  }
+  return receiptCount ? { networkFeeUsdMicros: total, receiptCount } : null;
+}

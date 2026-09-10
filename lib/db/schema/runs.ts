@@ -4,6 +4,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -133,6 +134,46 @@ export const runEvents = pgTable(
   (table) => [
     uniqueIndex("run_events_key_unique").on(table.runId, table.eventKey),
     index("run_events_run_created_idx").on(table.runId, table.createdAt),
+  ]
+);
+
+/** Queryable, idempotent billing evidence. A matching immutable run event is
+ * written in the same transaction so the lifecycle timeline stays complete. */
+export const runUsageReceipts = pgTable(
+  "run_usage_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: text("event_id").notNull(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "restrict" }),
+    gatewayRequestId: text("gateway_request_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
+    source: text("source").default("pymthouse").notNull(),
+    pipeline: text("pipeline"),
+    modelId: text("model_id"),
+    networkFeeUsdMicros: numeric("network_fee_usd_micros", {
+      precision: 78,
+      scale: 18,
+    }),
+    feeWei: numeric("fee_wei", { precision: 78, scale: 0 }),
+    pixels: numeric("pixels", { precision: 78, scale: 18 }),
+    ethUsdPrice: numeric("eth_usd_price", { precision: 78, scale: 18 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("run_usage_receipts_event_unique").on(table.eventId),
+    index("run_usage_receipts_run_occurred_idx").on(
+      table.runId,
+      table.occurredAt
+    ),
+    index("run_usage_receipts_gateway_idx").on(table.gatewayRequestId),
+    check(
+      "run_usage_receipts_source_check",
+      sql`${table.source} in ('pymthouse')`
+    ),
   ]
 );
 

@@ -104,6 +104,8 @@ describe("POST /api/console/runs/billing-sync", () => {
           metadata: {
             billingEventId: "receipt_exact",
             ticketGatewayRequestId: "job_exact",
+            pipeline: "fixed",
+            modelId: "fal-ai/flux/schnell",
             networkFeeUsdMicros: "1.25",
             feeWei: "10",
             ethUsdPrice: "2000",

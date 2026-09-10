@@ -139,15 +139,22 @@ and keyset pagination. It does not render the upstream billing feed as a second
 section. Admin uses the same presentation/detail components, with user-email
 search and status filters. Billing events do not prove successful execution.
 
-Owned billing receipts are appended idempotently to run events with reviewed
-billing identifiers, numeric fee fields, and receipt timestamp only. History
-sync accepts at most 50 owned run IDs and attaches receipts only when PymtHouse
-returns the exact caller-supplied `job_*` gateway request ID. Costs are summed
-from distinct persisted events with decimal-safe arithmetic; the table and
-drawer read the same Neon-derived summary. Unmatched receipts display `—` and
-model/time proximity is never authoritative. Saved runs remain readable when
-billing is unavailable. PymtHouse deployment of exact gateway-ID propagation is
-a release prerequisite for this UI.
+Owned billing receipts are upserted idempotently into normalized
+`run_usage_receipts` rows, while a matching immutable `billing_usage` event
+keeps the run timeline complete. History sync accepts at most 50 owned run IDs
+and attaches receipts only when PymtHouse returns the exact caller-supplied
+`job_*` gateway request ID. Costs are summed from distinct normalized receipts
+with decimal-safe arithmetic; the table and drawer read the same Neon-derived
+summary. Unmatched receipts display `—` and model/time proximity is never
+authoritative. Saved runs remain readable when billing is unavailable.
+PymtHouse deployment of exact gateway-ID propagation is a release prerequisite
+for this UI.
+
+Generated assets retain their stable `mcp_assets.id`, and `run_asset_links`
+stores canonical input/output lineage. At submission, first-party asset URLs
+are resolved only within the authenticated principal and retain parameter path,
+role, and ordinal. Provider billing data enriches a run by `job_*`; it never
+manufactures or authorizes an asset ID.
 
 Asset URLs are one-hour HMAC links bound to asset ID, stored principal, and
 expiry. Deployed environments require `ASSET_URL_SIGNING_SECRET` and
@@ -155,6 +162,11 @@ expiry. Deployed environments require `ASSET_URL_SIGNING_SECRET` and
 range behavior, and never caches beyond the link or exact provider expiry.
 `available_until` remains a minimum availability guarantee, not a hard expiry.
 Client history state is scoped to the authenticated account.
+
+An authenticated preview-only fixture operation can populate representative
+Neon-backed rows for the current reviewer when both `VERCEL_ENV=preview` and
+`CONSOLE_PREVIEW_FIXTURES=1` are set. It is unavailable in production and is
+intended only for the disposable PR database.
 
 ## Fresh-start history
 
