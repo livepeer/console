@@ -190,10 +190,16 @@ function publicEventMetadata(
   return clean;
 }
 
+function publicErrorMessage(value: string | null): string | null {
+  if (typeof value !== "string") return null;
+  return stripControlUrls(value) || null;
+}
+
 /** Keep durable records while exposing only owner-bound first-party media. */
 export function publicRunDetail(detail: RunDetail): RunDetail {
   return {
     ...detail,
+    errorMessage: publicErrorMessage(detail.errorMessage),
     assets: detail.assets.map((asset) =>
       publicAsset(asset, detail.principalId)
     ),

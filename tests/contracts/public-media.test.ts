@@ -50,6 +50,25 @@ it("rewrites owned media but removes unmatched media even with partial persisten
     "https://preview.example/api/assets/owned?exp="
   );
 });
+it("strips provider URLs from public error messages and drops empty leftovers", () => {
+  const queue = "https://queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const signed = "https://v3b.fal.media/files/output.mp4?token=secret";
+  const clean = publicRunDetail({
+    principalId: "eu_test",
+    assets: [],
+    errorMessage: `upstream failed ${queue} then ${signed}`,
+    result: { value: { text: "ok" } },
+  } as unknown as RunDetail);
+  expect(clean.errorMessage).toBe("upstream failed then");
+  expect(JSON.stringify(clean)).not.toMatch(/queue\.fal\.run|fal\.media/);
+  expect(
+    publicRunDetail({
+      principalId: "eu_test",
+      assets: [],
+      errorMessage: queue,
+    } as unknown as RunDetail).errorMessage
+  ).toBeNull();
+});
 it("strips provider queue URLs from public event keys and metadata", () => {
   const queue = "https://queue.fal.run/fal-ai/flux/requests/req-1/status";
   const relative = "//queue.fal.run/fal-ai/flux/requests/req-1/status";
