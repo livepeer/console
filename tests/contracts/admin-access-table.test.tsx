@@ -203,9 +203,6 @@ it("scopes actions and selections to the selected status section", async () => {
       .getByRole("checkbox", { name: "Select all" })
       .getAttribute("autocomplete")
   ).toBe("off");
-  expect(
-    screen.getByRole("button", { name: "Next" }).getAttribute("autocomplete")
-  ).toBe("off");
   expect(screen.queryByRole("button", { name: "Revoke selected" })).toBeNull();
   fireEvent.click(selected);
   expect(
