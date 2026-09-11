@@ -97,6 +97,72 @@ it("fails closed for mismatched canonical identity and invalid filters", async (
   ).toBe(400);
   expect(mocks.list).not.toHaveBeenCalled();
 });
+it("strips provider queue URLs from user and admin run detail", async () => {
+  const queue = "https://queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const leaky = {
+    principalId: owner.principalId,
+    userId: owner.userId,
+    externalAccountId: owner.externalAccountId,
+    id: "run_1",
+    gatewayRequestId: "job_1",
+    providerRequestId: null,
+    provider: "fal",
+    source: "mcp",
+    capability: "fal-ai/flux",
+    modelId: null,
+    endpoint: null,
+    status: "running",
+    submittedArguments: { prompt: "portrait" },
+    result: null,
+    captureVersion: 1,
+    captureRedactedPaths: [],
+    errorCode: null,
+    errorMessage: null,
+    version: 1,
+    createdAt: "2026-09-11T00:00:00.000Z",
+    updatedAt: "2026-09-11T00:00:00.000Z",
+    startedAt: "2026-09-11T00:00:00.000Z",
+    completedAt: null,
+    email: null,
+    billing: null,
+    assets: [],
+    events: [
+      {
+        id: "evt_progress",
+        eventKey: `progress:IN_QUEUE:req-1:${queue}`,
+        status: "running",
+        createdAt: "2026-09-11T00:00:00.000Z",
+        metadata: {
+          providerStatus: "IN_QUEUE",
+          queue: { statusUrl: queue },
+        },
+      },
+    ],
+  };
+  mocks.detail.mockResolvedValue(leaky);
+  const user = await detail(new Request("https://console.invalid"), {
+    params: Promise.resolve({ id: "run_1" }),
+  });
+  const actor = { userId: "admin", adminGrantId: "grant", signupId: "signup" };
+  mocks.admin.mockResolvedValue(actor);
+  mocks.adminDetail.mockResolvedValue(leaky);
+  const admin = await adminDetail(new Request("https://console.invalid"), {
+    params: Promise.resolve({ id: "run_1" }),
+  });
+  expect(user.status).toBe(200);
+  expect(admin.status).toBe(200);
+  for (const response of [user, admin]) {
+    const body = await response.json();
+    expect(JSON.stringify(body)).not.toContain("queue.fal.run");
+    expect(body.events[0]).toEqual({
+      id: "evt_progress",
+      eventKey: "progress:IN_QUEUE:req-1",
+      status: "running",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      metadata: { providerStatus: "IN_QUEUE" },
+    });
+  }
+});
 it("does not expose foreign or missing runs and masks driver failures", async () => {
   mocks.detail.mockResolvedValue(null);
   expect(

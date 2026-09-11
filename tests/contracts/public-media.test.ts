@@ -50,6 +50,67 @@ it("rewrites owned media but removes unmatched media even with partial persisten
     "https://preview.example/api/assets/owned?exp="
   );
 });
+it("strips provider queue URLs from public event keys and metadata", () => {
+  const queue = "https://queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const clean = publicRunDetail({
+    principalId: "eu_test",
+    billing: { networkFeeUsdMicros: "2982", manifestCount: 1 },
+    assets: [],
+    submittedArguments: { prompt: "portrait" },
+    result: { value: { text: "ok" } },
+    events: [
+      {
+        id: "evt_progress",
+        eventKey: `progress:IN_QUEUE:req-1:${queue}`,
+        status: "running",
+        createdAt: "2026-09-11T00:00:00.000Z",
+        metadata: {
+          providerStatus: "IN_QUEUE",
+          queue: {
+            statusUrl: queue,
+            resultUrl: queue.replace(/\/status$/, ""),
+          },
+          recoveryHandle: queue,
+        },
+        runId: "run_hidden",
+      } as never,
+      {
+        id: "evt_usage",
+        eventKey: "usage:receipt",
+        status: "succeeded",
+        createdAt: "2026-09-11T00:00:01.000Z",
+        metadata: {
+          kind: "billing_usage",
+          networkFeeUsdMicros: "2982",
+          feeWei: "1",
+        },
+      },
+    ],
+  } as unknown as RunDetail);
+  expect(JSON.stringify(clean)).not.toMatch(
+    /queue\.fal\.run|statusUrl|run_hidden/
+  );
+  expect(clean.events).toEqual([
+    {
+      id: "evt_progress",
+      eventKey: "progress:IN_QUEUE:req-1",
+      status: "running",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      metadata: { providerStatus: "IN_QUEUE" },
+    },
+    {
+      id: "evt_usage",
+      eventKey: "usage:receipt",
+      status: "succeeded",
+      createdAt: "2026-09-11T00:00:01.000Z",
+      metadata: {
+        kind: "billing_usage",
+        networkFeeUsdMicros: "2982",
+        feeWei: "1",
+      },
+    },
+  ]);
+});
 it("keeps unavailable asset lineage and billing in public history", () => {
   const unavailableAt = "2026-09-11T00:00:00Z";
   const detail = {

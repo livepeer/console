@@ -137,6 +137,48 @@ export function removeAssetUrls(value: JsonValue, urls: string[]): JsonValue {
   return visit(value) ?? null;
 }
 
+const PUBLIC_EVENT_METADATA = new Set([
+  "kind",
+  "eventId",
+  "billingEventId",
+  "ticketGatewayRequestId",
+  "networkFeeUsdMicros",
+  "feeWei",
+  "ethUsdPrice",
+  "pixels",
+  "pipeline",
+  "modelId",
+  "timestamp",
+  "providerStatus",
+  "phase",
+  "inferenceTimeMs",
+  "retryable",
+  "reason",
+]);
+
+function publicEventKey(eventKey: string): string {
+  return eventKey
+    .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, "")
+    .replace(/:+$/g, "")
+    .replace(/:{2,}/g, ":");
+}
+
+function publicEventMetadata(
+  metadata: Record<string, JsonValue> | undefined,
+  assets: Pick<RunAsset, "id" | "url">[],
+  principalId: string
+): Record<string, JsonValue> {
+  const picked = Object.fromEntries(
+    Object.entries(metadata ?? {}).filter(([key]) =>
+      PUBLIC_EVENT_METADATA.has(key)
+    )
+  );
+  const clean = sanitizePublicMedia(picked, assets, principalId);
+  return clean && typeof clean === "object" && !Array.isArray(clean)
+    ? (clean as Record<string, JsonValue>)
+    : {};
+}
+
 /** Keep durable records while exposing only owner-bound first-party media. */
 export function publicRunDetail(detail: RunDetail): RunDetail {
   return {
@@ -161,5 +203,16 @@ export function publicRunDetail(detail: RunDetail): RunDetail {
           ),
         }
       : null,
+    events: (detail.events ?? []).map((event) => ({
+      id: event.id,
+      eventKey: publicEventKey(event.eventKey),
+      status: event.status,
+      createdAt: event.createdAt,
+      metadata: publicEventMetadata(
+        event.metadata,
+        detail.assets,
+        detail.principalId
+      ),
+    })),
   };
 }
