@@ -1,0 +1,4 @@
+# Drizzle Kit writes a full schema dump per migration, not a delta.
+# Keep the files for generate/migrate; collapse them in GitHub review.
+drizzle-baseline/meta/*_snapshot.json linguist-generated=true
+drizzle/meta/*_snapshot.json linguist-generated=true
