@@ -7,6 +7,7 @@ import {
 import { runInference } from "./gateway";
 import type { McpPrincipal } from "./jwt";
 import { executeDurableRun } from "@/lib/runs/execute";
+import { refreshOwnedRunBillingByJob } from "@/lib/runs/manifest-billing";
 import * as runStore from "@/lib/runs/store";
 import { fetchMcpUsage } from "./pymthouse-spend";
 import { assertSpendable } from "./pymthouse-usage";
@@ -301,6 +302,14 @@ export function buildRawMcpServer(principal: McpPrincipal): McpServer {
             infer: (request) => runInference(principal, request),
             onProgress: (info) =>
               sendRunProgress(extra, info.elapsedMs, `queue ${info.status}`),
+            refreshBilling: async ({ owner, runId }) => {
+              await refreshOwnedRunBillingByJob({
+                owner,
+                runId,
+                externalUserId: principal.externalUserId,
+                email: principal.email,
+              });
+            },
           }
         );
         return text(result.payload, result.isError);

@@ -406,3 +406,48 @@ it("persists explicit expiry and sanitizes all returned media with partial captu
   );
   expect(JSON.stringify(result.payload)).toContain("/api/assets/owned");
 });
+
+it("writes usage after inference and does not fail the job when billing refresh throws", async () => {
+  const deps = fixture();
+  deps.refreshBilling = vi.fn().mockRejectedValue(new Error("usage lag"));
+  const reply = await executeDurableRun(
+    principal,
+    { capability: "test" },
+    deps
+  );
+  expect(reply.isError).toBe(false);
+  expect(reply.payload.run_id).toBe("run_test");
+  expect(deps.refreshBilling).toHaveBeenCalledWith({
+    owner,
+    runId: "run_test",
+    gatewayRequestId: vi.mocked(deps.infer).mock.calls[0][0].gatewayRequestId,
+  });
+});
+
+it("does not refresh billing when execution was never dispatched", async () => {
+  const deps = fixture();
+  deps.refreshBilling = vi.fn();
+  vi.mocked(deps.store.createRun).mockRejectedValue(new Error("db"));
+  await executeDurableRun(principal, { capability: "test" }, deps);
+  expect(deps.refreshBilling).not.toHaveBeenCalled();
+});
+
+it("refreshes billing after an interrupted paid attempt", async () => {
+  const deps = fixture();
+  deps.refreshBilling = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(deps.infer).mockImplementation(async ({ onPayment }) => {
+    await onPayment({ manifestId: "manifest-1", phase: "accepted" });
+    throw new Error("provider unavailable");
+  });
+  const reply = await executeDurableRun(
+    principal,
+    { capability: "test" },
+    deps
+  );
+  expect(reply.isError).toBe(true);
+  expect(deps.refreshBilling).toHaveBeenCalledWith({
+    owner,
+    runId: "run_test",
+    gatewayRequestId: vi.mocked(deps.infer).mock.calls[0][0].gatewayRequestId,
+  });
+});

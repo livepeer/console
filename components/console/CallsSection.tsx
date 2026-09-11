@@ -50,7 +50,6 @@ export default function CallsSection({
   useEffect(() => {
     if (!isConnected || !ownerKey || !visibleRunKey) return;
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const refresh = async () => {
       try {
         const response = await fetch("/api/console/runs/billing-sync", {
@@ -63,7 +62,6 @@ export default function CallsSection({
         if (!response.ok) throw new Error("billing_unavailable");
         const result = (await response.json()) as {
           changedRunIds: string[];
-          pending?: boolean;
         };
         if (controller.signal.aborted) return;
         if (result.changedRunIds.length) {
@@ -72,19 +70,12 @@ export default function CallsSection({
           if (openId && result.changedRunIds.includes(openId))
             detailReloadRef.current();
         }
-        // Usage ingestion is asynchronous. Refresh aggregates, not pages of receipts.
-        if (result.pending) timer = setTimeout(() => void refresh(), 30_000);
       } catch {
-        // Preserve saved History during an outage; retry while this view remains open.
-        if (!controller.signal.aborted)
-          timer = setTimeout(() => void refresh(), 30_000);
+        // Preserve saved History during an outage; the job writes usage.
       }
     };
     void refresh();
-    return () => {
-      controller.abort();
-      clearTimeout(timer);
-    };
+    return () => controller.abort();
   }, [historyReload, isConnected, ownerKey, visibleRunKey]);
   const router = useRouter();
   const recorded = useMemo(

@@ -13,7 +13,7 @@ import {
   resultEnvelope,
   validatePublicFalQueue,
 } from "./reconcile";
-import type { JsonValue, RunDetail, RunTransition } from "./types";
+import type { JsonValue, RunDetail, RunOwner, RunTransition } from "./types";
 import { publicAsset, replaceAssetUrls } from "@/lib/assets/public";
 
 export type RunArguments = {
@@ -46,6 +46,12 @@ export type ExecutionDependencies = {
     }) => Promise<void>;
   }) => Promise<InferenceResult>;
   onProgress?: (info: QueueProgress) => Promise<void>;
+  /** After dispatch; usage may still be missing. Failures must not fail the job. */
+  refreshBilling?: (input: {
+    owner: RunOwner;
+    runId: string;
+    gatewayRequestId: string;
+  }) => Promise<void>;
 };
 
 /** Persist retries never contain or repeat inference dispatch. */
@@ -121,6 +127,17 @@ export async function executeDurableRun(
   }
   const record = (change: RunTransition) =>
     recordWithRetry(() => deps.store.transitionRun(owner, run.id, change));
+  const refreshBilling = async () => {
+    try {
+      await deps.refreshBilling?.({
+        owner,
+        runId: run.id,
+        gatewayRequestId,
+      });
+    } catch {
+      /* Usage is eventually consistent; do not fail a completed or interrupted job. */
+    }
+  };
   let mode: string | undefined;
   try {
     await deps.checkSpend();
@@ -282,6 +299,7 @@ export async function executeDurableRun(
     const url = sourceAsset
       ? publicAsset(sourceAsset, owner.principalId).url
       : null;
+    await refreshBilling();
     return {
       payload: {
         capability: args.capability,
@@ -314,6 +332,7 @@ export async function executeDurableRun(
         "Execution was interrupted after dispatch; the provider outcome is not confirmed.",
       ...(lastQueue ? { queue: lastQueue, provider: "fal" } : {}),
     });
+    await refreshBilling();
     return {
       payload: {
         ...runCapabilityFailurePayload(error, gatewayRequestId),

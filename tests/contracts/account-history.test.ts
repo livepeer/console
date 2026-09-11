@@ -86,4 +86,5 @@ it("does not label History with media expiry or a seven-day limit", () => {
   const source = readFileSync("components/console/CallsSection.tsx", "utf8");
   expect(source).toContain('title="History"');
   expect(source).not.toMatch(/Last 7 days|expir/i);
+  expect(source).not.toMatch(/setTimeout\(\(\) => void refresh\(\), 30_000\)/);
 });

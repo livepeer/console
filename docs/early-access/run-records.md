@@ -147,23 +147,28 @@ manifest is unique within its external account and cannot be attached to two
 runs. Caller `job_*` IDs and provider request IDs remain separate identifiers.
 
 `run_payment_manifests` stores this lineage and replaceable cumulative usage
-snapshots. History sync accepts at most 50 owned run IDs and calls the existing
-Bearer-scoped `/api/v1/user/usage?groupBy=manifest` endpoint over a date range
-covering the captured manifests, including month boundaries. Exact manifest
-matches update saved totals; unrelated manifests are ignored. Older concurrent
-responses cannot overwrite newer observations, missing rows do not erase known
-costs, and repeated refreshes do not add charges. The table and drawer share this
+snapshots. After inference returns (or is interrupted), the job reads
+Bearer-scoped `/api/v1/user/usage?groupBy=manifest` over a short window around
+the accepted payment(s) and persists exact `manifestId` matches. OpenMeter
+app totals do not isolate one `job_*`, so a job-id total is never stamped
+onto a run. Missing rows are retried in the job; a billing-refresh failure
+does not fail the job. History is not required to price a completed run.
+History may POST at most 50 owned run IDs once when the visible page changes,
+so a later Home load can fill usage that was not yet in the aggregate when the
+job finished. It does not retry on a timer. Exact manifest matches update saved
+totals; unrelated manifests are ignored. Older concurrent responses cannot
+overwrite newer observations, missing rows do not erase known costs, and
+repeated refreshes do not add charges. The table and drawer share this
 Neon-derived network-cost summary. Missing totals for accepted payment attempts
 remain unmatched rather than displaying a partial total as complete.
 
-This replaces the ten-page raw-ticket scan. The UI retries aggregate reads every
-30 seconds while a run is active, accepted usage is missing, or final usage may
-still be arriving within two minutes of a run update. Fresh snapshots are reused
-for 30 seconds. Usage is eventually consistent; this is not an invoice-finality
-signal. Raw `run_usage_receipts` remain separate evidence, not aggregate
-snapshots. Historical and preview runs without manifests may still use their
-previously persisted exact receipts, but no model/time match or manifest is
-invented for them.
+This replaces the ten-page raw-ticket scan. Fresh snapshots are reused for 30
+seconds. Usage is eventually consistent; this is not an invoice-finality
+signal. The execution reconcile worker remains public-provider GET only and
+does not poll PymtHouse. Raw `run_usage_receipts` remain separate evidence, not
+aggregate snapshots. Historical and preview runs without manifests may still
+use their previously persisted exact receipts, but no model/time match or
+manifest is invented for them.
 
 Apply additive migration `0002_run_payment_manifests.sql` before serving this
 revision. The environment's Console runtime role needs SELECT, INSERT and UPDATE
@@ -338,9 +343,11 @@ the real signed-in preview checks are complete after authorized deployment.
 
 ### Follow-up review fixes (2026-09-11)
 
-Billing refresh activity is evaluated across every owned run requested by the UI,
-including runs that have not yet captured a payment manifest. Cached observations
-without an accepted manifest's fee remain pending.
+The job writes usage for the run it just executed by exact payment-manifest
+match. History's billing-sync is an optional one-shot backfill for older
+visible rows, including a deep-linked run off the first page, not a
+pending-driven poll and not required to price a new run. Cached observations
+without an accepted manifest's fee stay unmatched.
 
 The preview list excludes obsolete fixture IDs in the database before pagination
 and counting. Cursors retain database microsecond timestamp precision so rows
