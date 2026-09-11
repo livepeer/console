@@ -108,9 +108,12 @@ it("strips compound provider URL keys including credentialed values", () => {
     sanitizePublicMedia(
       {
         output_url: token,
+        outputUrl: token,
         preview_url: token,
+        previewUrl: token,
         download_url: token,
         status_url: queue,
+        statusUrl: queue,
         response_url: "https://queue.fal.run/fal-ai/flux/requests/id",
         prompt: `see ${token}`,
         website: "https://example.com",
