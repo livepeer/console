@@ -47,3 +47,23 @@ export function billingSummaryFromReceipts(
   }
   return receiptCount ? { networkFeeUsdMicros: total, receiptCount } : null;
 }
+
+/** Manifest snapshots replace prior observations; receipts are not added to these totals. */
+export function billingSummaryFromManifests(
+  manifests: { networkFeeUsdMicros: string | null; accepted: boolean }[]
+): RunBillingSummary | null {
+  const priced = manifests.filter((m) => m.networkFeeUsdMicros !== null);
+  if (!priced.length) return null;
+  const pending = manifests.filter(
+    (m) => m.accepted && m.networkFeeUsdMicros === null
+  ).length;
+  // Do not present a partial paid-attempt total as the run's complete cost.
+  if (pending) return null;
+  return {
+    networkFeeUsdMicros: priced.reduce(
+      (sum, m) => addDecimalStrings(sum, m.networkFeeUsdMicros!),
+      "0"
+    ),
+    manifestCount: priced.length,
+  };
+}

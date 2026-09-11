@@ -29,7 +29,10 @@ export type RunArguments = {
 export type ExecutionDependencies = {
   store: Pick<
     typeof import("./store"),
-    "resolveRunOwner" | "createRun" | "transitionRun"
+    | "resolveRunOwner"
+    | "createRun"
+    | "transitionRun"
+    | "recordRunPaymentManifest"
   >;
   checkSpend: () => Promise<void>;
   describe: () => Promise<{ mode?: string } | null>;
@@ -41,6 +44,10 @@ export type ExecutionDependencies = {
     timeoutMs: number;
     gatewayRequestId: string;
     onProgress: (info: QueueProgress) => Promise<void>;
+    onPayment: (payment: {
+      manifestId: string;
+      phase: "prepared" | "accepted";
+    }) => Promise<void>;
   }) => Promise<InferenceResult>;
   onProgress?: (info: QueueProgress) => Promise<void>;
 };
@@ -177,6 +184,10 @@ export async function executeDurableRun(
       endpoint: mode === "persistent" ? args.endpoint : undefined,
       timeoutMs: 780_000,
       gatewayRequestId,
+      onPayment: async (payment) => {
+        // Failure propagates to the SDK as a non-retryable error, never another charge.
+        await deps.store.recordRunPaymentManifest(owner, run.id, payment);
+      },
       onProgress: async (info) => {
         providerRequestId = info.requestId ?? providerRequestId;
         lastQueue = validatePublicFalQueue(info.statusUrl) ?? lastQueue;

@@ -1,13 +1,9 @@
-import { configuredPymthouseScope } from "@/lib/external-accounts/service";
-import { fetchAccountRequestsForExternalUser } from "@/lib/console/pymthouse-bff";
-import {
-  sanitizeBillingReceipt,
-  type SanitizedBillingReceipt,
-} from "@/lib/console/billing-receipts";
+import { fetchManifestUsage } from "@/lib/console/manifest-usage";
 import { requireConsoleSession } from "@/lib/console/session-user";
 import {
+  ownedPaymentManifests,
   ownedRunsByIds,
-  recordRunUsage,
+  recordManifestUsage,
   resolveRunOwner,
 } from "@/lib/runs/store";
 import { runError, RUN_HEADERS } from "@/lib/runs/http";
@@ -24,50 +20,68 @@ export async function POST(request: Request) {
       body.runIds.some((id) => typeof id !== "string" || !id || id.length > 160)
     )
       throw new Error("invalid_run_query");
-
     const session = await requireConsoleSession();
     const owner = await resolveRunOwner(session.externalUserId);
     if (owner.userId !== session.canonicalUserId)
       throw new Error("run_owner_mismatch");
-    const owned = await ownedRunsByIds(owner, body.runIds as string[]);
-    const wanted = new Set(owned.map((run) => run.gatewayRequestId));
-    const appId = configuredPymthouseScope().appId;
-    const receipts: SanitizedBillingReceipt[] = [];
-    let cursor: string | null | undefined;
-
-    // The API is newest-first. Bound work while allowing visible current-month
-    // runs to be found beyond the first page.
-    for (let page = 0; page < 10 && wanted.size; page += 1) {
-      const payload = await fetchAccountRequestsForExternalUser({
-        externalUserId: session.externalUserId,
-        email: session.email,
-        cursor,
-        limit: 50,
-        recentWindow: true,
-      });
-      if (
-        payload.externalUserId !== session.externalUserId ||
-        payload.clientId !== appId
-      )
-        throw new Error("run_owner_mismatch");
-      for (const item of payload.items) {
-        if (
-          item.externalUserId !== session.externalUserId ||
-          item.clientId !== appId ||
-          !wanted.has(item.gatewayRequestId)
-        )
-          continue;
-        const receipt = sanitizeBillingReceipt(item);
-        if (receipt) receipts.push(receipt);
-      }
-      if (!payload.nextCursor || payload.nextCursor === cursor) break;
-      cursor = payload.nextCursor;
+    const ids = [...new Set(body.runIds as string[])];
+    const owned = await ownedPaymentManifests(owner, ids);
+    const reply = (changedRunIds: string[], pending: boolean) =>
+      Response.json(
+        {
+          changedRunIds,
+          changedCount: changedRunIds.length,
+          pending,
+        },
+        { headers: RUN_HEADERS }
+      );
+    // Historical runs without a captured manifest are not guessed from model/time.
+    if (!owned.length) {
+      const runs = await ownedRunsByIds(owner, ids);
+      return reply(
+        [],
+        runs.some(({ status }) => ["queued", "running"].includes(status))
+      );
     }
-
-    const changedRunIds = await recordRunUsage(owner, receipts);
-    return Response.json(
-      { changedRunIds, changedCount: changedRunIds.length },
-      { headers: RUN_HEADERS }
+    const now = new Date();
+    const active = owned.some(
+      ({ status, updatedAt }) =>
+        ["queued", "running", "unknown"].includes(status) ||
+        now.getTime() - updatedAt.getTime() < 120_000
+    );
+    if (
+      owned.every(
+        ({ manifest }) =>
+          manifest.observedAt &&
+          now.getTime() - manifest.observedAt.getTime() < 30_000
+      )
+    )
+      return reply([], active);
+    // Each snapshot covers the manifest's entire lifetime, including month boundaries.
+    const first = new Date(
+      Math.min(...owned.map(({ manifest }) => manifest.createdAt.getTime()))
+    );
+    const start = new Date(
+      Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1)
+    );
+    const end = new Date(now);
+    end.setUTCHours(23, 59, 59, 999);
+    const aggregates = await fetchManifestUsage({
+      externalUserId: session.externalUserId,
+      email: session.email,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    });
+    const wanted = new Set(owned.map(({ manifest }) => manifest.manifestId));
+    const matched = aggregates.filter((row) => wanted.has(row.manifestId));
+    const changed = await recordManifestUsage(owner, ids, matched, now);
+    const found = new Set(matched.map((row) => row.manifestId));
+    return reply(
+      changed,
+      active ||
+        owned.some(
+          ({ manifest }) => manifest.accepted && !found.has(manifest.manifestId)
+        )
     );
   } catch (error) {
     return runError(error);

@@ -21,6 +21,7 @@ import {
   runReadAudits,
   runReconciliationJobs,
   runUsageReceipts,
+  runPaymentManifests,
   runs,
   userEmails,
 } from "@/lib/db/schema";
@@ -43,7 +44,11 @@ import type {
   RunTransition,
   JsonValue,
 } from "./types";
-import { billingSummaryFromReceipts } from "./billing";
+import {
+  addDecimalStrings,
+  billingSummaryFromReceipts,
+  billingSummaryFromManifests,
+} from "./billing";
 
 type Database = ReturnType<typeof getDb>;
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -65,8 +70,12 @@ function assetReferences(value: JsonValue | undefined): AssetReference[] {
       try {
         const match = new URL(item).pathname.match(/^\/api\/assets\/([^/]+)$/);
         if (!match) return;
-        const field = [...path].reverse().find((part) => typeof part === "string");
-        const ordinal = [...path].reverse().find((part) => typeof part === "number");
+        const field = [...path]
+          .reverse()
+          .find((part) => typeof part === "string");
+        const ordinal = [...path]
+          .reverse()
+          .find((part) => typeof part === "number");
         found.push({
           id: decodeURIComponent(match[1]!),
           parameterPath: path.join("."),
@@ -142,7 +151,7 @@ async function detail(
         )
       )
     : eq(mcpAssets.runId, row.id);
-  const [assets, events, receipts, emails] = await Promise.all([
+  const [assets, events, receipts, emails, manifests] = await Promise.all([
     db
       .select()
       .from(mcpAssets)
@@ -165,6 +174,10 @@ async function detail(
         and(eq(userEmails.userId, row.userId), eq(userEmails.isPrimary, true))
       )
       .limit(1),
+    db
+      .select()
+      .from(runPaymentManifests)
+      .where(eq(runPaymentManifests.runId, row.id)),
   ]);
   const mappedEvents = events.map((event) => ({
     ...event,
@@ -190,7 +203,9 @@ async function detail(
       createdAt: asset.createdAt.toISOString(),
     })),
     events: mappedEvents,
-    billing: billingSummaryFromReceipts(receipts),
+    billing: manifests.length
+      ? billingSummaryFromManifests(manifests)
+      : billingSummaryFromReceipts(receipts),
   };
 }
 
@@ -507,7 +522,10 @@ async function list(
         })
         .from(runUsageReceipts)
         .where(
-          inArray(runUsageReceipts.runId, visibleRows.map(({ row }) => row.id))
+          inArray(
+            runUsageReceipts.runId,
+            visibleRows.map(({ row }) => row.id)
+          )
         )
     : [];
   const billingByRun = new Map<
@@ -518,6 +536,23 @@ async function list(
     const receipts = billingByRun.get(receipt.runId) ?? [];
     receipts.push({ networkFeeUsdMicros: receipt.networkFeeUsdMicros });
     billingByRun.set(receipt.runId, receipts);
+  }
+  const manifests = visibleRows.length
+    ? await db
+        .select()
+        .from(runPaymentManifests)
+        .where(
+          inArray(
+            runPaymentManifests.runId,
+            visibleRows.map(({ row }) => row.id)
+          )
+        )
+    : [];
+  const manifestsByRun = new Map<string, typeof manifests>();
+  for (const manifest of manifests) {
+    const group = manifestsByRun.get(manifest.runId) ?? [];
+    group.push(manifest);
+    manifestsByRun.set(manifest.runId, group);
   }
   const grouped = await db
     .select({ status: runs.status, count: sql<number>`count(*)::int` })
@@ -554,7 +589,9 @@ async function list(
     void _paths;
     return {
       ...summary,
-      billing: billingSummaryFromReceipts(billingByRun.get(row.id) ?? []),
+      billing: manifestsByRun.has(row.id)
+        ? billingSummaryFromManifests(manifestsByRun.get(row.id)!)
+        : billingSummaryFromReceipts(billingByRun.get(row.id) ?? []),
     };
   });
   const last = items.at(-1);
@@ -735,7 +772,11 @@ export async function ownedRunsByIds(owner: RunOwner, ids: string[]) {
   const unique = [...new Set(ids)].slice(0, 50);
   if (!unique.length) return [];
   return getDb()
-    .select({ id: runs.id, gatewayRequestId: runs.gatewayRequestId })
+    .select({
+      id: runs.id,
+      gatewayRequestId: runs.gatewayRequestId,
+      status: runs.status,
+    })
     .from(runs)
     .where(and(ownerWhere(owner), inArray(runs.id, unique)));
 }
@@ -891,4 +932,121 @@ export async function releaseReconciliationJob(
         eq(runReconciliationJobs.leaseToken, job.leaseToken)
       )
     );
+}
+
+/** Capture before paying, then mark accepted; neither phase claims execution success. */
+export async function recordRunPaymentManifest(
+  owner: RunOwner,
+  runId: string,
+  payment: { manifestId: string; phase: "prepared" | "accepted" }
+): Promise<void> {
+  if (
+    !payment.manifestId ||
+    payment.manifestId.length > 512 ||
+    /\s/.test(payment.manifestId)
+  )
+    throw new Error("invalid_payment_manifest");
+  await getDb().transaction(async (tx) => {
+    const [run] = await tx
+      .select({ id: runs.id })
+      .from(runs)
+      .where(and(ownerWhere(owner), eq(runs.id, runId)))
+      .for("update");
+    if (!run) throw new Error("run_owner_mismatch");
+    const [saved] = await tx
+      .insert(runPaymentManifests)
+      .values({
+        runId,
+        externalAccountId: owner.externalAccountId,
+        manifestId: payment.manifestId,
+        accepted: payment.phase === "accepted",
+      })
+      .onConflictDoUpdate({
+        target: [
+          runPaymentManifests.externalAccountId,
+          runPaymentManifests.manifestId,
+        ],
+        set: {
+          accepted: sql`${runPaymentManifests.accepted} or ${payment.phase === "accepted"}`,
+        },
+        setWhere: eq(runPaymentManifests.runId, runId),
+      })
+      .returning({ id: runPaymentManifests.id });
+    if (!saved) throw new Error("payment_manifest_already_linked");
+  });
+}
+
+export async function ownedPaymentManifests(owner: RunOwner, ids: string[]) {
+  const unique = [...new Set(ids)].slice(0, 50);
+  if (!unique.length) return [];
+  return getDb()
+    .select({
+      manifest: runPaymentManifests,
+      status: runs.status,
+      updatedAt: runs.updatedAt,
+    })
+    .from(runPaymentManifests)
+    .innerJoin(runs, eq(runs.id, runPaymentManifests.runId))
+    .where(
+      and(
+        ownerWhere(owner),
+        eq(runPaymentManifests.externalAccountId, owner.externalAccountId),
+        inArray(runs.id, unique)
+      )
+    );
+}
+
+/** Replace cumulative snapshots, never append them as charge receipts. */
+export async function recordManifestUsage(
+  owner: RunOwner,
+  runIds: string[],
+  aggregates: {
+    manifestId: string;
+    networkFeeUsdMicros: string;
+    feeWei: string | null;
+  }[],
+  observedAt: Date
+): Promise<string[]> {
+  const changed = new Set<string>();
+  await getDb().transaction(async (tx) => {
+    const owned = await tx
+      .select({ manifest: runPaymentManifests })
+      .from(runPaymentManifests)
+      .innerJoin(runs, eq(runs.id, runPaymentManifests.runId))
+      .where(
+        and(
+          ownerWhere(owner),
+          eq(runPaymentManifests.externalAccountId, owner.externalAccountId),
+          inArray(runs.id, runIds)
+        )
+      )
+      .orderBy(asc(runPaymentManifests.id))
+      .for("update", { of: runPaymentManifests });
+    const byId = new Map(aggregates.map((row) => [row.manifestId, row]));
+    for (const { manifest } of owned) {
+      const value = byId.get(manifest.manifestId);
+      if (!value || (manifest.observedAt && manifest.observedAt >= observedAt))
+        continue;
+      if (
+        !/^\d{1,30}(?:\.\d{1,18})?$/.test(value.networkFeeUsdMicros) ||
+        (value.feeWei !== null && !/^\d{1,128}$/.test(value.feeWei))
+      )
+        throw new Error("invalid_manifest_usage");
+      const sameFee =
+        manifest.networkFeeUsdMicros !== null &&
+        addDecimalStrings(manifest.networkFeeUsdMicros, "0") ===
+          addDecimalStrings(value.networkFeeUsdMicros, "0");
+      await tx
+        .update(runPaymentManifests)
+        .set({
+          networkFeeUsdMicros: value.networkFeeUsdMicros,
+          feeWei: value.feeWei,
+          observedAt,
+        })
+        .where(eq(runPaymentManifests.id, manifest.id));
+      if (!sameFee || manifest.feeWei !== value.feeWei)
+        changed.add(manifest.runId);
+    }
+  });
+  return [...changed];
 }

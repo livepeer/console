@@ -15,6 +15,10 @@ vi.mock("@/lib/external-accounts/service", () => ({
   }),
   findExternalAccountOwner: vi.fn(),
 }));
+import {
+  recordRunPaymentManifest,
+  recordManifestUsage,
+} from "@/lib/runs/store";
 import { getDb } from "@/lib/db";
 import {
   claimReconciliationJobs,
@@ -277,6 +281,100 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
           ).toEqual({ networkFeeUsdMicros: "3", receiptCount: 2 });
           expect(afterUsage?.version).toBe(beforeUsage?.version);
           expect(afterUsage?.status).toBe("succeeded");
+          // Snapshot refresh replaces amounts and must never add receipt totals again.
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "prepared",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "accepted",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "prepared",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-2",
+            phase: "accepted",
+          });
+          await expect(
+            recordRunPaymentManifest(
+              { ...owner, userId: randomUUID() },
+              created.id,
+              { manifestId: "foreign", phase: "prepared" }
+            )
+          ).rejects.toThrow("run_owner_mismatch");
+          await expect(
+            recordRunPaymentManifest(owner, "run-2", {
+              manifestId: "paid-1",
+              phase: "prepared",
+            })
+          ).rejects.toThrow("payment_manifest_already_linked");
+          const snapshots = [
+            {
+              manifestId: "paid-1",
+              networkFeeUsdMicros: "2982",
+              feeWei: "123",
+            },
+            { manifestId: "paid-2", networkFeeUsdMicros: "10", feeWei: "1" },
+          ];
+          expect(
+            await recordManifestUsage(
+              owner,
+              [created.id],
+              snapshots.slice(0, 1),
+              new Date("2026-09-11T00:00:00Z")
+            )
+          ).toEqual([created.id]);
+          expect((await getOwnRun(owner, created.id))?.billing).toBeNull();
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            snapshots,
+            new Date("2026-09-11T00:01:00Z")
+          );
+          expect(
+            await recordManifestUsage(
+              owner,
+              [created.id],
+              snapshots,
+              new Date("2026-09-11T00:02:00Z")
+            )
+          ).toEqual([]);
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            [{ ...snapshots[0], networkFeeUsdMicros: "1" }],
+            new Date("2026-09-10")
+          );
+          expect((await getOwnRun(owner, created.id))?.billing).toEqual({
+            networkFeeUsdMicros: "2992",
+            manifestCount: 2,
+          });
+          expect(
+            (await listOwnRuns(owner, { limit: 100 })).items.find(
+              (r) => r.id === created.id
+            )?.billing
+          ).toEqual({ networkFeeUsdMicros: "2992", manifestCount: 2 });
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            [{ ...snapshots[0], networkFeeUsdMicros: "3000" }],
+            new Date("2026-09-11T00:03:00Z")
+          );
+          expect(
+            (await getOwnRun(owner, created.id))?.billing?.networkFeeUsdMicros
+          ).toBe("3010");
+          await recordManifestUsage(
+            { ...owner, userId: randomUUID() },
+            [created.id],
+            snapshots,
+            new Date("2026-09-12")
+          );
+          expect(
+            (await getOwnRun(owner, created.id))?.billing?.networkFeeUsdMicros
+          ).toBe("3010");
           const stale = await createRun(owner, {
             id: "stale",
             gatewayRequestId: "job-stale",

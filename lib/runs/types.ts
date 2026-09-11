@@ -1,17 +1,7 @@
 export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type RunStatus =
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled"
-  | "unknown";
+  "queued" | "running" | "succeeded" | "failed" | "cancelled" | "unknown";
 export type RunOwner = {
   principalId: string;
   userId: string;
@@ -83,9 +73,10 @@ export type RunRecord = RunOwner & {
   email: string | null;
 };
 export type RunBillingSummary = {
-  /** Raw USD-micros decimal aggregated from distinct persisted receipts. */
+  /** PymtHouse network cost, in decimal USD micros. */
   networkFeeUsdMicros: string;
-  receiptCount: number;
+  receiptCount?: number;
+  manifestCount?: number;
 };
 export type RunDetail = RunRecord & {
   billing: RunBillingSummary | null;

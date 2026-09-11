@@ -38,7 +38,7 @@ describe("full baseline transition", () => {
     const manifest = JSON.parse(
       readFileSync("drizzle-baseline/source-manifest.json", "utf8")
     );
-    expect(active).toHaveLength(2);
+    expect(active).toHaveLength(3);
     expect(
       legacy.map((m) => ({ sha256: m.hash, when: m.folderMillis }))
     ).toEqual(
@@ -97,10 +97,10 @@ describe("full baseline transition", () => {
     const chain = [...active, future];
     expect(classifyJournal(entries(chain), legacy, chain)).toEqual({
       kind: "baseline",
-      applied: 3,
+      applied: 4,
     });
     expect(
       classifyJournal(entries([...legacy, ...chain]), legacy, chain)
-    ).toEqual({ kind: "adopted", applied: 3 });
+    ).toEqual({ kind: "adopted", applied: 4 });
   });
 });

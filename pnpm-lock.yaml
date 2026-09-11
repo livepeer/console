@@ -7,6 +7,11 @@ settings:
 overrides:
   esbuild@<0.25.0: ^0.25.12
 
+patchedDependencies:
+  '@pymthouse/gateway-web@0.3.4':
+    hash: 0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7
+    path: patches/@pymthouse__gateway-web@0.3.4.patch
+
 importers:
 
   .:
@@ -25,7 +30,7 @@ importers:
         version: 0.6.5
       '@pymthouse/gateway-web':
         specifier: 0.3.4
-        version: 0.3.4
+        version: 0.3.4(patch_hash=0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -4443,7 +4448,7 @@ snapshots:
     dependencies:
       oauth4webapi: 3.8.8
 
-  '@pymthouse/gateway-web@0.3.4':
+  '@pymthouse/gateway-web@0.3.4(patch_hash=0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7)':
     dependencies:
       undici: 7.29.1
 

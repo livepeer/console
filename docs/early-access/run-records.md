@@ -139,16 +139,39 @@ and keyset pagination. It does not render the upstream billing feed as a second
 section. Admin uses the same presentation/detail components, with user-email
 search and status filters. Billing events do not prove successful execution.
 
-Owned billing receipts are upserted idempotently into normalized
-`run_usage_receipts` rows, while a matching immutable `billing_usage` event
-keeps the run timeline complete. History sync accepts at most 50 owned run IDs
-and attaches receipts only when PymtHouse returns the exact caller-supplied
-`job_*` gateway request ID. Costs are summed from distinct normalized receipts
-with decimal-safe arithmetic; the table and drawer read the same Neon-derived
-summary. Unmatched receipts display `—` and model/time proximity is never
-authoritative. Saved runs remain readable when billing is unavailable.
-PymtHouse deployment of exact gateway-ID propagation is a release prerequisite
-for this UI.
+New runs capture PymtHouse payment manifest IDs before the SDK pays, then mark
+accepted payments before waiting for provider completion. The pinned pnpm SDK
+patch threads an awaited `onPayment` callback through single-shot, persistent,
+and failover paths. Persistence errors abort without a new paid attempt. A
+manifest is unique within its external account and cannot be attached to two
+runs. Caller `job_*` IDs and provider request IDs remain separate identifiers.
+
+`run_payment_manifests` stores this lineage and replaceable cumulative usage
+snapshots. History sync accepts at most 50 owned run IDs and calls the existing
+Bearer-scoped `/api/v1/user/usage?groupBy=manifest` endpoint over a date range
+covering the captured manifests, including month boundaries. Exact manifest
+matches update saved totals; unrelated manifests are ignored. Older concurrent
+responses cannot overwrite newer observations, missing rows do not erase known
+costs, and repeated refreshes do not add charges. The table and drawer share this
+Neon-derived network-cost summary. Missing totals for accepted payment attempts
+remain unmatched rather than displaying a partial total as complete.
+
+This replaces the ten-page raw-ticket scan. The UI retries aggregate reads every
+30 seconds while a run is active, accepted usage is missing, or final usage may
+still be arriving within two minutes of a run update. Fresh snapshots are reused
+for 30 seconds. Usage is eventually consistent; this is not an invoice-finality
+signal. Raw `run_usage_receipts` remain separate evidence, not aggregate
+snapshots. Historical and preview runs without manifests may still use their
+previously persisted exact receipts, but no model/time match or manifest is
+invented for them.
+
+Apply additive migration `0002_run_payment_manifests.sql` before serving this
+revision. The environment's Console runtime role needs SELECT, INSERT and UPDATE
+on `run_payment_manifests`; production migration/deployment is a separate release
+step. No downstream change to PymtHouse's ID propagation is required for this
+manifest integration. Instrumented live verification on 2026-09-11 captured
+manifest `bdcd8fdd` at payment time and matched it to both the authenticated
+aggregate (2982 USD micros) and receipt (event ID `4096f6f3`).
 
 Generated assets retain their stable `mcp_assets.id`, and `run_asset_links`
 stores canonical input/output lineage. At submission, first-party asset URLs

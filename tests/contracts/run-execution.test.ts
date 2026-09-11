@@ -22,6 +22,7 @@ function fixture() {
   const run = { ...owner, id: "run_test" } as RunDetail;
   const deps: ExecutionDependencies = {
     store: {
+      recordRunPaymentManifest: vi.fn().mockResolvedValue(undefined),
       resolveRunOwner: vi.fn().mockResolvedValue(owner),
       createRun: vi.fn().mockResolvedValue(run),
       transitionRun: vi.fn().mockResolvedValue(run),
@@ -266,5 +267,22 @@ describe("durable MCP execution", () => {
       expect(final).not.toHaveProperty("queue");
       expect(deps.infer).toHaveBeenCalledTimes(1);
     }
+  );
+});
+
+it("records every payment phase against the run even when inference fails afterward", async () => {
+  const deps = fixture();
+  vi.mocked(deps.infer).mockImplementation(async ({ onPayment }) => {
+    for (const manifestId of ["failed-attempt", "successful-attempt"])
+      for (const phase of ["prepared", "accepted"] as const)
+        await onPayment({ manifestId, phase });
+    throw new Error("provider unavailable");
+  });
+  await executeDurableRun(principal, { capability: "test" }, deps);
+  expect(deps.store.recordRunPaymentManifest).toHaveBeenCalledTimes(4);
+  expect(deps.store.recordRunPaymentManifest).toHaveBeenLastCalledWith(
+    owner,
+    "run_test",
+    { manifestId: "successful-attempt", phase: "accepted" }
   );
 });

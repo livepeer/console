@@ -1,132 +1,133 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 const mocks = vi.hoisted(() => ({
   session: vi.fn(),
-  fetchRequests: vi.fn(),
-  ownedRuns: vi.fn(),
-  recordUsage: vi.fn(),
-  resolveOwner: vi.fn(),
+  fetchUsage: vi.fn(),
+  manifests: vi.fn(),
+  record: vi.fn(),
+  owner: vi.fn(),
+  runs: vi.fn(),
 }));
-
 vi.mock("@/lib/console/session-user", () => ({
   requireConsoleSession: mocks.session,
 }));
-vi.mock("@/lib/console/pymthouse-bff", () => ({
-  fetchAccountRequestsForExternalUser: mocks.fetchRequests,
-}));
-vi.mock("@/lib/external-accounts/service", () => ({
-  configuredPymthouseScope: () => ({ appId: "app_test" }),
+vi.mock("@/lib/console/manifest-usage", () => ({
+  fetchManifestUsage: mocks.fetchUsage,
 }));
 vi.mock("@/lib/runs/store", () => ({
-  ownedRunsByIds: mocks.ownedRuns,
-  recordRunUsage: mocks.recordUsage,
-  resolveRunOwner: mocks.resolveOwner,
+  ownedPaymentManifests: mocks.manifests,
+  recordManifestUsage: mocks.record,
+  resolveRunOwner: mocks.owner,
+  ownedRunsByIds: mocks.runs,
 }));
 vi.mock("@/lib/runs/http", () => ({
-  RUN_HEADERS: { "cache-control": "no-store" },
-  runError: (error: unknown) =>
+  RUN_HEADERS: {},
+  runError: (e: Error) =>
     Response.json(
-      { error: "request_failed" },
-      { status: (error as Error).message === "invalid_run_query" ? 400 : 503 }
+      {},
+      { status: e.message === "invalid_run_query" ? 400 : 503 }
     ),
 }));
-
 import { POST } from "@/app/api/console/runs/billing-sync/route";
-
-describe("POST /api/console/runs/billing-sync", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.session.mockResolvedValue({
-      externalUserId: "eu_test",
-      canonicalUserId: "user_test",
-      email: "user@example.test",
-    });
-    mocks.resolveOwner.mockResolvedValue({
-      principalId: "eu_test",
-      userId: "user_test",
-      externalAccountId: "account_test",
-    });
-    mocks.ownedRuns.mockResolvedValue([
-      { id: "run_1", gatewayRequestId: "job_exact" },
-    ]);
-    mocks.recordUsage.mockResolvedValue(["run_1"]);
-    mocks.fetchRequests.mockResolvedValue({
-      items: [
-        {
-          eventId: "receipt_exact",
-          gatewayRequestId: "job_exact",
-          time: "2026-09-10T12:00:00Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "fixed",
-          modelId: "fal-ai/flux/schnell",
-          networkFeeUsdMicros: "1.25",
-          feeWei: "10",
-          ethUsdPrice: "2000",
-          pixels: "512",
-        },
-        {
-          eventId: "receipt_nearby",
-          gatewayRequestId: "abcd1234",
-          time: "2026-09-10T12:00:01Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "fixed",
-          modelId: "fal-ai/flux/schnell",
-          networkFeeUsdMicros: "99",
-        },
-      ],
-      nextCursor: null,
-      openMeterConfigured: true,
-      clientId: "app_test",
-      externalUserId: "eu_test",
-    });
+const post = (ids: string[]) =>
+  POST(
+    new Request("https://test/api", {
+      method: "POST",
+      body: JSON.stringify({ runIds: ids }),
+    })
+  );
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.session.mockResolvedValue({
+    externalUserId: "eu",
+    canonicalUserId: "user",
   });
-
-  it("persists only exact owned gateway matches and returns changed run IDs", async () => {
-    const response = await POST(
-      new Request("http://localhost/api/console/runs/billing-sync", {
-        method: "POST",
-        body: JSON.stringify({ runIds: ["run_1", "foreign_run"] }),
-      })
-    );
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      changedRunIds: ["run_1"],
+  mocks.owner.mockResolvedValue({
+    userId: "user",
+    externalAccountId: "account",
+  });
+  mocks.manifests.mockResolvedValue([
+    {
+      manifest: {
+        manifestId: "mid",
+        accepted: true,
+        createdAt: new Date("2026-08-31"),
+        observedAt: null,
+      },
+      status: "succeeded",
+      updatedAt: new Date("2026-01-01"),
+    },
+  ]);
+  mocks.fetchUsage.mockResolvedValue([
+    { manifestId: "mid", networkFeeUsdMicros: "2982", feeWei: "123" },
+    { manifestId: "unrelated", networkFeeUsdMicros: "999", feeWei: null },
+  ]);
+  mocks.record.mockResolvedValue(["run"]);
+  mocks.runs.mockResolvedValue([]);
+});
+describe("manifest billing sync", () => {
+  it("queries one lifetime aggregate interval and persists only exact owned manifests", async () => {
+    const r = await post(["run"]);
+    expect(await r.json()).toEqual({
+      changedRunIds: ["run"],
       changedCount: 1,
+      pending: false,
     });
-    expect(mocks.recordUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ principalId: "eu_test" }),
-      [
-        {
-          eventId: "receipt_exact",
-          gatewayRequestId: "job_exact",
-          metadata: {
-            billingEventId: "receipt_exact",
-            ticketGatewayRequestId: "job_exact",
-            pipeline: "fixed",
-            modelId: "fal-ai/flux/schnell",
-            networkFeeUsdMicros: "1.25",
-            feeWei: "10",
-            ethUsdPrice: "2000",
-            pixels: "512",
-            timestamp: "2026-09-10T12:00:00.000Z",
-          },
-        },
-      ]
-    );
-  });
-
-  it("rejects more than 50 run IDs before upstream access", async () => {
-    const response = await POST(
-      new Request("http://localhost/api/console/runs/billing-sync", {
-        method: "POST",
-        body: JSON.stringify({
-          runIds: Array.from({ length: 51 }, (_, index) => `run_${index}`),
-        }),
+    expect(mocks.fetchUsage).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        externalUserId: "eu",
+        startDate: "2026-08-01T00:00:00.000Z",
       })
     );
-    expect(response.status).toBe(400);
-    expect(mocks.fetchRequests).not.toHaveBeenCalled();
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.anything(),
+      ["run"],
+      [{ manifestId: "mid", networkFeeUsdMicros: "2982", feeWei: "123" }],
+      expect.any(Date)
+    );
+  });
+  it("does not infer manifests for historical runs", async () => {
+    mocks.manifests.mockResolvedValue([]);
+    expect((await post(["old"])).status).toBe(200);
+    expect(mocks.fetchUsage).not.toHaveBeenCalled();
+  });
+  it("retries when a running run has not yet reached payment", async () => {
+    mocks.manifests.mockResolvedValue([]);
+    mocks.runs.mockResolvedValue([{ status: "running" }]);
+    expect((await (await post(["run"])).json()).pending).toBe(true);
+  });
+  it("keeps missing accepted usage pending without fabricating zero receipts", async () => {
+    mocks.fetchUsage.mockResolvedValue([]);
+    expect((await (await post(["run"])).json()).pending).toBe(true);
+    expect(mocks.record.mock.calls[0][2]).toEqual([]);
+  });
+  it("does not repeatedly fetch a fresh terminal snapshot", async () => {
+    mocks.manifests.mockResolvedValue([
+      {
+        manifest: { observedAt: new Date() },
+        status: "succeeded",
+        updatedAt: new Date("2026-01-01"),
+      },
+    ]);
+    await post(["run"]);
+    expect(mocks.fetchUsage).not.toHaveBeenCalled();
+  });
+  it("refreshes a recently completed run while final usage may still be arriving", async () => {
+    mocks.manifests.mockResolvedValue([
+      {
+        manifest: { observedAt: new Date() },
+        status: "succeeded",
+        updatedAt: new Date(),
+      },
+    ]);
+    expect((await (await post(["run"])).json()).pending).toBe(true);
+  });
+  it("rejects oversized requests and mismatched owners before upstream calls", async () => {
+    expect(
+      (await post(Array.from({ length: 51 }, (_, i) => String(i)))).status
+    ).toBe(400);
+    mocks.owner.mockResolvedValue({ userId: "foreign" });
+    expect((await post(["run"])).status).toBe(503);
+    expect(mocks.fetchUsage).not.toHaveBeenCalled();
   });
 });

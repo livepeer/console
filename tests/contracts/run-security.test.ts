@@ -192,6 +192,7 @@ it("keeps a late queue receipt despite repeated provider status and broken clien
   };
   const record = { ...owner, id: "run-test" } as RunDetail;
   const store = {
+    recordRunPaymentManifest: vi.fn().mockResolvedValue(undefined),
     resolveRunOwner: vi.fn().mockResolvedValue(owner),
     createRun: vi.fn().mockResolvedValue(record),
     transitionRun: vi.fn().mockResolvedValue(record),

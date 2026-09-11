@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import SectionHeader from "@/components/console/SectionHeader";
@@ -36,7 +36,6 @@ export default function CallsSection({
   );
   const historyReload = history.reload;
   const detailReload = detail.reload;
-  const synced = useRef(new Set<string>());
   const visibleRunIds = useMemo(() => {
     const ids = history.page?.items.map((run) => run.id) ?? [];
     const openId =
@@ -44,41 +43,54 @@ export default function CallsSection({
       (requestId && ids.includes(requestId) ? requestId : null);
     return openId ? [openId, ...ids.filter((id) => id !== openId)] : ids;
   }, [detail.detail?.id, history.page, requestId]);
+  const visibleRunKey = visibleRunIds.slice(0, 50).join(",");
   useEffect(() => {
-    if (!isConnected || !ownerKey || !visibleRunIds.length) return;
-    const key = `${ownerKey}:${visibleRunIds.join(",")}`;
-    if (synced.current.has(key)) return;
-    synced.current.add(key);
+    if (!isConnected || !ownerKey || !visibleRunKey) return;
     const controller = new AbortController();
-    void fetch("/api/console/runs/billing-sync", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ runIds: visibleRunIds.slice(0, 50) }),
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{ changedRunIds: string[] }>;
-      })
-      .then((result) => {
-        if (!result?.changedRunIds.length || controller.signal.aborted) return;
-        historyReload();
-        if (
-          detail.detail?.id &&
-          result.changedRunIds.includes(detail.detail.id)
-        )
-          detailReload();
-      })
-      .catch(() => undefined); // Billing availability never gates Neon history.
-    return () => controller.abort();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/console/runs/billing-sync", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ runIds: visibleRunKey.split(",") }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("billing_unavailable");
+        const result = (await response.json()) as {
+          changedRunIds: string[];
+          pending?: boolean;
+        };
+        if (controller.signal.aborted) return;
+        if (result.changedRunIds.length) {
+          historyReload();
+          if (
+            detail.detail?.id &&
+            result.changedRunIds.includes(detail.detail.id)
+          )
+            detailReload();
+        }
+        // Usage ingestion is asynchronous. Refresh aggregates, not pages of receipts.
+        if (result.pending) timer = setTimeout(() => void refresh(), 30_000);
+      } catch {
+        // Preserve saved History during an outage; retry while this view remains open.
+        if (!controller.signal.aborted)
+          timer = setTimeout(() => void refresh(), 30_000);
+      }
+    };
+    void refresh();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
   }, [
     detail.detail?.id,
     detailReload,
     historyReload,
     isConnected,
     ownerKey,
-    visibleRunIds,
+    visibleRunKey,
   ]);
   const router = useRouter();
   const recorded = useMemo(

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -228,6 +229,42 @@ export const runReadAudits = pgTable(
     check(
       "run_read_audits_action_check",
       sql`${table.action} in ('list', 'detail')`
+    ),
+  ]
+);
+
+/** One payment manifest belongs to one run within its PymtHouse account. */
+export const runPaymentManifests = pgTable(
+  "run_payment_manifests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "restrict" }),
+    externalAccountId: uuid("external_account_id")
+      .notNull()
+      .references(() => externalAccounts.id, { onDelete: "restrict" }),
+    manifestId: text("manifest_id").notNull(),
+    accepted: boolean("accepted").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    networkFeeUsdMicros: numeric("network_fee_usd_micros", {
+      precision: 48,
+      scale: 18,
+    }),
+    feeWei: text("fee_wei"),
+    observedAt: timestamp("observed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("run_payment_manifests_account_manifest_unique").on(
+      table.externalAccountId,
+      table.manifestId
+    ),
+    index("run_payment_manifests_run_idx").on(table.runId),
+    check(
+      "run_payment_manifests_nonnegative_fee",
+      sql`${table.networkFeeUsdMicros} >= 0`
     ),
   ]
 );
