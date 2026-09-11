@@ -140,9 +140,9 @@ section. Admin uses the same presentation/detail components, with user-email
 search and status filters. Billing events do not prove successful execution.
 
 New runs capture PymtHouse payment manifest IDs before the SDK pays, then mark
-accepted payments before waiting for provider completion. The pinned pnpm SDK
-patch threads an awaited `onPayment` callback through single-shot, persistent,
-and failover paths. Persistence errors abort without a new paid attempt. A
+accepted payments before waiting for provider completion. `@pymthouse/gateway-web`
+threads an awaited `onPayment` callback through single-shot, persistent, and
+failover paths. Persistence errors abort without a new paid attempt. A
 manifest is unique within its external account and cannot be attached to two
 runs. Caller `job_*` IDs and provider request IDs remain separate identifiers.
 

@@ -7,11 +7,6 @@ settings:
 overrides:
   esbuild@<0.25.0: ^0.25.12
 
-patchedDependencies:
-  '@pymthouse/gateway-web@0.3.4':
-    hash: 0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7
-    path: patches/@pymthouse__gateway-web@0.3.4.patch
-
 importers:
 
   .:
@@ -29,8 +24,8 @@ importers:
         specifier: ^0.6.5
         version: 0.6.5
       '@pymthouse/gateway-web':
-        specifier: 0.3.4
-        version: 0.3.4(patch_hash=0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7)
+        specifier: 0.3.5
+        version: 0.3.5
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1031,8 +1026,8 @@ packages:
     resolution: {integrity: sha512-oWQC3y7vTqOKG+fEaZRc7TtbIMJaLZZoS6kCqBzF5M4489wGS31LlE2gwhYDEuVNAeyoJwaK/Uu+mfEe8TwGFw==}
     engines: {node: '>=20'}
 
-  '@pymthouse/gateway-web@0.3.4':
-    resolution: {integrity: sha512-tsxjD9P12LSsRZ6vGpVAjLd/imbuVq3aaynqggQhTpilJshYvyLHvpsO2WuG8+k8Nb5x7C3uACRIlyNmmZ1PNw==}
+  '@pymthouse/gateway-web@0.3.5':
+    resolution: {integrity: sha512-qir87lWY7qi+1lGDUCyqC5kK7A148nn7TMYcOI/FoTFkO3CPO0YhdL55fmeBIH0/Jj0AIQkZbg1nzGeR9O6lsw==}
     engines: {node: '>=20'}
 
   '@reduxjs/toolkit@2.12.0':
@@ -4448,7 +4443,7 @@ snapshots:
     dependencies:
       oauth4webapi: 3.8.8
 
-  '@pymthouse/gateway-web@0.3.4(patch_hash=0477cb60b12e57e144c4f49ae3a82166dea026cf0b2f4513b4d4d3e5a30835b7)':
+  '@pymthouse/gateway-web@0.3.5':
     dependencies:
       undici: 7.29.1
 

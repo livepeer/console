@@ -22,7 +22,7 @@
     "@base-ui/react": "^1.8.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@pymthouse/builder-sdk": "^0.6.5",
-    "@pymthouse/gateway-web": "0.3.4",
+    "@pymthouse/gateway-web": "0.3.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -66,9 +66,6 @@
   "pnpm": {
     "overrides": {
       "esbuild@<0.25.0": "^0.25.12"
-    },
-    "patchedDependencies": {
-      "@pymthouse/gateway-web@0.3.4": "patches/@pymthouse__gateway-web@0.3.4.patch"
     }
   }
 }
