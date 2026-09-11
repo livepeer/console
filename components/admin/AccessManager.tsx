@@ -531,6 +531,7 @@ export default function AccessManager() {
         <button
           type="button"
           className={control}
+          autoComplete="off"
           disabled={working || selecting || loading || page <= 1}
           onClick={() => setPage((value) => value - 1)}
         >
@@ -542,6 +543,7 @@ export default function AccessManager() {
         <button
           type="button"
           className={control}
+          autoComplete="off"
           disabled={working || selecting || loading || page >= pages}
           onClick={() => setPage((value) => value + 1)}
         >

@@ -10,7 +10,8 @@ type Props = Omit<
   indeterminate?: boolean;
 };
 
-/** Native checkbox semantics with a stable, explicit checkmark color. */
+/** Native checkbox semantics with a stable, explicit checkmark color.
+ * `autoComplete="off"` stops Firefox from restoring `disabled` across reload. */
 export default function SelectionCheckbox({
   checked,
   indeterminate = false,
@@ -27,6 +28,7 @@ export default function SelectionCheckbox({
         type="checkbox"
         checked={checked}
         disabled={disabled}
+        autoComplete="off"
         ref={(node) => {
           if (node) node.indeterminate = indeterminate;
         }}

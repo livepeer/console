@@ -156,27 +156,37 @@ const PUBLIC_EVENT_METADATA = new Set([
   "reason",
 ]);
 
-function publicEventKey(eventKey: string): string {
-  return eventKey
+function stripControlUrls(value: string): string {
+  return value
     .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, "")
-    .replace(/:+$/g, "")
-    .replace(/:{2,}/g, ":");
+    .replace(/\/\/\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function publicEventKey(eventKey: string): string {
+  if (eventKey.startsWith("progress:")) {
+    const [, status = "", requestId = ""] = eventKey.split(":");
+    return `progress:${status}:${requestId}`;
+  }
+  return stripControlUrls(eventKey).replace(/:+$/g, "").replace(/:{2,}/g, ":");
 }
 
 function publicEventMetadata(
-  metadata: Record<string, JsonValue> | undefined,
-  assets: Pick<RunAsset, "id" | "url">[],
-  principalId: string
+  metadata: Record<string, JsonValue> | undefined
 ): Record<string, JsonValue> {
-  const picked = Object.fromEntries(
-    Object.entries(metadata ?? {}).filter(([key]) =>
-      PUBLIC_EVENT_METADATA.has(key)
-    )
-  );
-  const clean = sanitizePublicMedia(picked, assets, principalId);
-  return clean && typeof clean === "object" && !Array.isArray(clean)
-    ? (clean as Record<string, JsonValue>)
-    : {};
+  const clean: Record<string, JsonValue> = {};
+  for (const [key, value] of Object.entries(metadata ?? {})) {
+    if (!PUBLIC_EVENT_METADATA.has(key)) continue;
+    if (typeof value === "string") {
+      const text = stripControlUrls(value);
+      if (text) clean[key] = text;
+      continue;
+    }
+    if (value !== null && typeof value === "object") continue;
+    clean[key] = value;
+  }
+  return clean;
 }
 
 /** Keep durable records while exposing only owner-bound first-party media. */
@@ -208,11 +218,7 @@ export function publicRunDetail(detail: RunDetail): RunDetail {
       eventKey: publicEventKey(event.eventKey),
       status: event.status,
       createdAt: event.createdAt,
-      metadata: publicEventMetadata(
-        event.metadata,
-        detail.assets,
-        detail.principalId
-      ),
+      metadata: publicEventMetadata(event.metadata),
     })),
   };
 }

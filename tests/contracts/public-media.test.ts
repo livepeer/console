@@ -52,6 +52,19 @@ it("rewrites owned media but removes unmatched media even with partial persisten
 });
 it("strips provider queue URLs from public event keys and metadata", () => {
   const queue = "https://queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const relative = "//queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const bare = "queue.fal.run/fal-ai/flux/requests/req-1/status";
+  const event = (
+    id: string,
+    eventKey: string,
+    metadata: Record<string, unknown> = { providerStatus: "IN_QUEUE" }
+  ) => ({
+    id,
+    eventKey,
+    status: "running" as const,
+    createdAt: "2026-09-11T00:00:00.000Z",
+    metadata,
+  });
   const clean = publicRunDetail({
     principalId: "eu_test",
     billing: { networkFeeUsdMicros: "2982", manifestCount: 1 },
@@ -60,10 +73,7 @@ it("strips provider queue URLs from public event keys and metadata", () => {
     result: { value: { text: "ok" } },
     events: [
       {
-        id: "evt_progress",
-        eventKey: `progress:IN_QUEUE:req-1:${queue}`,
-        status: "running",
-        createdAt: "2026-09-11T00:00:00.000Z",
+        ...event("evt_progress", `progress:IN_QUEUE:req-1:${queue}`),
         metadata: {
           providerStatus: "IN_QUEUE",
           queue: {
@@ -73,7 +83,10 @@ it("strips provider queue URLs from public event keys and metadata", () => {
           recoveryHandle: queue,
         },
         runId: "run_hidden",
-      } as never,
+      },
+      event("evt_empty_id", `progress:IN_QUEUE::${queue}`),
+      event("evt_relative", `progress:IN_QUEUE:req-1:${relative}`),
+      event("evt_bare", `progress:IN_QUEUE:req-1:${bare}`),
       {
         id: "evt_usage",
         eventKey: "usage:receipt",
@@ -83,6 +96,10 @@ it("strips provider queue URLs from public event keys and metadata", () => {
           kind: "billing_usage",
           networkFeeUsdMicros: "2982",
           feeWei: "1",
+          pipeline: "fal-ai/flux/schnell",
+          modelId: "fal-ai/flux/schnell",
+          reason: queue,
+          providerStatus: `IN_QUEUE ${relative}`,
         },
       },
     ],
@@ -99,6 +116,27 @@ it("strips provider queue URLs from public event keys and metadata", () => {
       metadata: { providerStatus: "IN_QUEUE" },
     },
     {
+      id: "evt_empty_id",
+      eventKey: "progress:IN_QUEUE:",
+      status: "running",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      metadata: { providerStatus: "IN_QUEUE" },
+    },
+    {
+      id: "evt_relative",
+      eventKey: "progress:IN_QUEUE:req-1",
+      status: "running",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      metadata: { providerStatus: "IN_QUEUE" },
+    },
+    {
+      id: "evt_bare",
+      eventKey: "progress:IN_QUEUE:req-1",
+      status: "running",
+      createdAt: "2026-09-11T00:00:00.000Z",
+      metadata: { providerStatus: "IN_QUEUE" },
+    },
+    {
       id: "evt_usage",
       eventKey: "usage:receipt",
       status: "succeeded",
@@ -107,6 +145,9 @@ it("strips provider queue URLs from public event keys and metadata", () => {
         kind: "billing_usage",
         networkFeeUsdMicros: "2982",
         feeWei: "1",
+        pipeline: "fal-ai/flux/schnell",
+        modelId: "fal-ai/flux/schnell",
+        providerStatus: "IN_QUEUE",
       },
     },
   ]);
