@@ -243,6 +243,60 @@ it("reloads the Neon cost after an exact billing sync", async () => {
   expect(screen.queryByText("legacy-only-model")).toBeNull();
 });
 
+it("does not restart billing sync when run detail arrives", async () => {
+  records.push({
+    id: "saved-run",
+    principalId: "external",
+    userId: "user",
+    externalAccountId: "account",
+    gatewayRequestId: "job_saved",
+    providerRequestId: null,
+    provider: null,
+    source: "mcp",
+    capability: "text-generation",
+    modelId: "saved-model",
+    endpoint: null,
+    status: "succeeded",
+    captureVersion: 1,
+    errorCode: null,
+    errorMessage: null,
+    version: 2,
+    createdAt: "2026-09-01T12:00:00Z",
+    updatedAt: "2026-09-01T12:00:01Z",
+    startedAt: "2026-09-01T12:00:00Z",
+    completedAt: "2026-09-01T12:00:01Z",
+    email: null,
+    billing: null,
+  });
+  navigation.search = "request=saved-run";
+  fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({ changedRunIds: [], changedCount: 0 });
+    if (input === "/api/console/runs/saved-run") {
+      return Response.json({
+        ...records[0],
+        submittedArguments: null,
+        result: null,
+        captureRedactedPaths: [],
+        assets: [],
+        events: [],
+      });
+    }
+    if (String(input).startsWith("/api/console/runs"))
+      return Response.json({ items: records, nextCursor: null });
+    return Response.json({ error: "not found" }, { status: 404 });
+  });
+  renderCallsSection();
+  await waitFor(() => expect(screen.getByTestId("detail-cost")).toBeTruthy());
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.filter(
+        ([url]) => url === "/api/console/runs/billing-sync"
+      )
+    ).toHaveLength(1)
+  );
+});
+
 it("searches the same Postgres history rather than a separate loaded billing list", async () => {
   renderCallsSection("flux");
   await screen.findByText("No history matches this search.");

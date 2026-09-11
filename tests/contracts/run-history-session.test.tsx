@@ -29,6 +29,32 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+it("keeps the current run list visible while reload fetches a newer page", async () => {
+  const next = deferred<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(page("run-a"))
+      .mockReturnValueOnce(next.promise)
+  );
+  const hook = renderHook(() => useRunHistory("/api/console/runs", true, {}));
+  await waitFor(() =>
+    expect(hook.result.current.page?.items[0].id).toBe("run-a")
+  );
+  act(() => {
+    hook.result.current.reload();
+  });
+  expect(hook.result.current.page?.items[0].id).toBe("run-a");
+  expect(hook.result.current.loading).toBe(false);
+  await act(async () => {
+    next.resolve(page("run-b"));
+  });
+  await waitFor(() =>
+    expect(hook.result.current.page?.items[0].id).toBe("run-b")
+  );
+});
+
 it("invalidates run list data when the enabled account changes", async () => {
   const next = deferred<Response>();
   vi.stubGlobal(

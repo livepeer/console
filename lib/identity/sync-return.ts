@@ -17,8 +17,3 @@ export function safeIdentityReturnTo(value: string | null): string {
     return "/";
   }
 }
-
-export function identitySyncPath(returnTo: string): string {
-  const safeReturnTo = safeIdentityReturnTo(returnTo);
-  return `/api/identity/sync?returnTo=${encodeURIComponent(safeReturnTo)}`;
-}

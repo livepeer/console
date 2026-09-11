@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { authLoginHref, safeReturnTo } from "@/lib/console/auth-login";
 import LoginPage from "@/components/console/LoginPage";
-import { identitySyncPath } from "@/lib/identity/sync-return";
+import { signedInLandingPath } from "@/lib/identity/signed-in-landing";
 
 import type { Metadata } from "next";
 
@@ -26,7 +26,9 @@ export default async function LoginRoute({
 
   const identity = await getAuthenticatedIdentity();
   if (identity)
-    redirect(identitySyncPath(mcpOauth ? MCP_CALLBACK_PATH : returnTo));
+    redirect(
+      await signedInLandingPath(mcpOauth ? MCP_CALLBACK_PATH : returnTo)
+    );
 
   // MCP flow must go directly to Auth0 — no interactive UI step.
   if (mcpOauth) {
