@@ -18,16 +18,20 @@ const FORWARDED_HEADERS = [
 
 const MEDIA_CONTENT_TYPE = /^(?:image|video|audio)\/[a-z0-9.+-]+$/i;
 
-/** Provider media types pass through. HTML/JS never does; Chrome's player cannot sandbox a video document. */
+function isPlayableMediaType(type: string): boolean {
+  return MEDIA_CONTENT_TYPE.test(type) && !/^image\/svg\b/i.test(type);
+}
+
+/** Provider media types pass through. HTML/JS/SVG never do; Chrome's player cannot sandbox a video document. */
 function mediaContentType(
   upstream: string | null,
   stored: string | null
 ): string | null {
   const offered = (upstream ?? "").split(";")[0]!.trim().toLowerCase();
-  if (MEDIA_CONTENT_TYPE.test(offered)) return offered;
+  if (isPlayableMediaType(offered)) return offered;
   if (offered && offered !== "application/octet-stream") return null;
   const kind = (stored ?? "").trim().toLowerCase();
-  if (MEDIA_CONTENT_TYPE.test(kind)) return kind;
+  if (isPlayableMediaType(kind)) return kind;
   if (kind === "video") return "video/mp4";
   if (kind === "image") return "image/jpeg";
   if (kind === "audio") return "audio/mpeg";

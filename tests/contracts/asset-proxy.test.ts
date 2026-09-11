@@ -283,6 +283,40 @@ it("does not forward a provider HTML type as playable media", async () => {
   expect(blocked.headers.get("content-security-policy")).toContain("sandbox");
 });
 
+it("sandboxes SVG so a signed script cannot run on the console origin", async () => {
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () =>
+      new Response("<svg><script></script></svg>", {
+        headers: { "content-type": "image/svg+xml" },
+      })
+  );
+  const fromUpstream = await GET(signedRequest(), context);
+  expect(fromUpstream.headers.get("content-type")).not.toBe("image/svg+xml");
+  expect(fromUpstream.headers.get("content-security-policy")).toContain(
+    "sandbox"
+  );
+
+  vi.mocked(getAssetSource).mockResolvedValue({
+    ...source,
+    mediaType: "image/svg+xml",
+  });
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () =>
+      new Response("<svg>", {
+        headers: { "content-type": "application/octet-stream" },
+      })
+  );
+  const fromStored = await GET(signedRequest(), context);
+  expect(fromStored.headers.get("content-type")).not.toBe("image/svg+xml");
+  expect(fromStored.headers.get("content-security-policy")).toContain(
+    "sandbox"
+  );
+});
+
 it("serves only owner-bound synthetic fixtures without widening the proxy host allowlist", async () => {
   vi.stubEnv("VERCEL_ENV", "preview");
   vi.stubEnv("CONSOLE_PREVIEW_FIXTURES", "1");
