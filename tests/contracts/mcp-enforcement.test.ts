@@ -90,12 +90,10 @@ vi.mock("@/lib/mcp/as", () => ({
 }));
 vi.mock("@/lib/console/mcp-internal-mint", () => ({
   mintMcpUserTokens: mocks.mint,
-  BillingAppMismatchError: class extends Error {},
 }));
 vi.mock("@/lib/console/mcp-oauth-login-bridge", () => ({
   redeemMcpRefreshToken: mocks.refresh,
   issueMcpRefreshToken: () => "mcp_rt_unchanged",
-  billingAppMismatch: () => null,
 }));
 vi.mock("@/lib/console/pymthouse-bff", () => ({
   mintEndUserAccessToken: mocks.upstreamMint,

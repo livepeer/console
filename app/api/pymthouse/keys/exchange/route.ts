@@ -11,7 +11,6 @@ import {
 import { verifyMcpUserJwt } from "@/lib/mcp/jwt";
 import { requireApprovedMcpAccount } from "@/lib/mcp/access";
 import { AccessError } from "@/lib/access/service";
-import { billingAppMismatch } from "@/lib/console/mcp-oauth-login-bridge";
 
 const TOKEN_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange";
 const ACCESS_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token";
@@ -185,13 +184,6 @@ function errorResponse(error: unknown): Response {
 }
 
 export async function POST(request: Request) {
-  const mismatch = billingAppMismatch();
-  if (mismatch) {
-    return Response.json(mismatch, {
-      status: 503,
-      headers: { "Cache-Control": "no-store" },
-    });
-  }
   const config = readApiKeyExchangeConfig();
   if (!config) {
     return Response.json(

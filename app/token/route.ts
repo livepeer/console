@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedMcpResource } from "@/lib/mcp/oauth";
 import { validateAuthorizationCodeGrant } from "@/lib/mcp/token-grant";
-import {
-  mintMcpUserTokens,
-  BillingAppMismatchError,
-} from "@/lib/console/mcp-internal-mint";
+import { mintMcpUserTokens } from "@/lib/console/mcp-internal-mint";
 import { redeemMcpRefreshToken } from "@/lib/console/mcp-oauth-login-bridge";
 import { AccessError } from "@/lib/access/service";
 import { requireApprovedMcpAccount } from "@/lib/mcp/access";
@@ -58,11 +55,8 @@ async function mintTokens(
       ...(minted.scope ? { scope: minted.scope } : {}),
     });
   } catch (error) {
-    if (
-      error instanceof AccessError ||
-      error instanceof BillingAppMismatchError
-    ) {
-      return json(req, error instanceof AccessError ? error.status : 503, {
+    if (error instanceof AccessError) {
+      return json(req, error.status, {
         error: error.code,
         error_description: error.message,
       });

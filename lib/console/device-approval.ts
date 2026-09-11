@@ -6,7 +6,6 @@ import { parseDeviceInitiateParams as parseDeviceInitiateParamsWithClient } from
 import { createPmtHouseClientForPublicApp } from "@/lib/console/pymthouse-bff";
 import { readPublicClientId } from "@/lib/console/pymthouse-http";
 import { requireApprovedMcpAccount } from "@/lib/mcp/access";
-import { billingAppMismatch } from "@/lib/console/mcp-oauth-login-bridge";
 
 export { isDeviceReturnTo } from "@/lib/console/device-initiate";
 
@@ -25,13 +24,6 @@ export async function approveDevice(input: {
   externalUserId: string;
   email?: string;
 }): Promise<void> {
-  const mismatch = billingAppMismatch();
-  if (mismatch) {
-    throw new PmtHouseError(mismatch.error_description, {
-      status: 503,
-      code: mismatch.error,
-    });
-  }
   const publicClientId = readPublicClientId();
   if (input.clientId !== publicClientId) {
     throw new PmtHouseError(

@@ -147,10 +147,9 @@ The endpoint uses the same 401/403/503 authorization semantics as protected APIs
 Read-only Vercel environment export verified production is
 `https://pymthouse.com/api/v1/oidc` / `app_98575870d7ae33589a3f0660`, whereas preview
 is `https://staging.pymthouse.com/api/v1/oidc` / `app_088f2082a8f1161d60179431`.
-The previous nonproduction RS2 guard hardcoded the production app and is not an
-acceptable preview safety boundary. Preview minting must enforce the staging
-issuer and app together; never change preview credentials to production to satisfy
-the obsolete guard. Existing production identifiers and token formats stay intact.
+Preview and local mint use whatever `PYMTHOUSE_ISSUER_URL` /
+`PYMTHOUSE_PUBLIC_CLIENT_ID` are configured; there is no hardcoded staging-app
+gate. Existing production identifiers and token formats stay intact.
 
 ## Contract amendment 3 — single-use OAuth code redemption
 
