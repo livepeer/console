@@ -127,8 +127,9 @@ coordinator and a database marker. Specialists have no remote credentials.
 Preview email/subscription providers default to capture/no external dispatch;
 dedicated preview test emails are retrievable only by administrators. Real
 Resend contact writes require an independently isolated account, not merely a
-segment within the production audience. Credentialed PymtHouse preview tests use
-only the explicitly verified staging issuer/app scope (amendment 2 below).
+segment within the production audience. Credentialed PymtHouse preview and local
+mint use whatever `PYMTHOUSE_ISSUER_URL` / `PYMTHOUSE_PUBLIC_CLIENT_ID` are
+configured; there is no hardcoded staging pair (amendment 2 below).
 
 Grandfather dry-run sources are the production PymtHouse app user inventory plus
 trusted app-specific identity evidence, with explicit cutoff and checksums. Do
@@ -149,7 +150,8 @@ Read-only Vercel environment export verified production is
 is `https://staging.pymthouse.com/api/v1/oidc` / `app_088f2082a8f1161d60179431`.
 Preview and local mint use whatever `PYMTHOUSE_ISSUER_URL` /
 `PYMTHOUSE_PUBLIC_CLIENT_ID` are configured; there is no hardcoded staging-app
-gate. Existing production identifiers and token formats stay intact.
+gate. Operator env is `.env.example`. Existing production identifiers and token
+formats stay intact.
 
 ## Contract amendment 3 — single-use OAuth code redemption
 
