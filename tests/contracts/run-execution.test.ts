@@ -357,10 +357,13 @@ it("persists explicit expiry and sanitizes all returned media with partial captu
       ],
       output_url: "https://provider.example/download?token=private",
       outputUrl: "https://provider.example/download?token=private",
+      outputURL: "https://provider.example/download?token=private",
       preview_url: "https://provider.example/preview?token=private",
       previewUrl: "https://provider.example/preview?token=private",
       status_url: "https://queue.fal.run/fal-ai/flux/requests/id/status",
       statusUrl: "https://queue.fal.run/fal-ai/flux/requests/id/status",
+      responseURI: "https://queue.fal.run/fal-ai/flux/requests/id",
+      asset2Url: "https://provider.example/signed?token=private",
     },
   } as unknown as Awaited<ReturnType<ExecutionDependencies["infer"]>>);
   vi.mocked(deps.store.transitionRun).mockResolvedValue({
