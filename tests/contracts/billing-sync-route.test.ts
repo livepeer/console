@@ -113,6 +113,9 @@ describe("manifest billing sync", () => {
     expect(mocks.fetchUsage).not.toHaveBeenCalled();
   });
   it("refreshes a recently completed run while final usage may still be arriving", async () => {
+    mocks.runs.mockResolvedValue([
+      { status: "succeeded", updatedAt: new Date() },
+    ]);
     mocks.manifests.mockResolvedValue([
       {
         manifest: { observedAt: new Date() },
@@ -130,4 +133,43 @@ describe("manifest billing sync", () => {
     expect((await post(["run"])).status).toBe(503);
     expect(mocks.fetchUsage).not.toHaveBeenCalled();
   });
+});
+
+it.each([false, true])(
+  "keeps a manifest-free active run pending beside a settled run (cached=%s)",
+  async (cached) => {
+    mocks.runs.mockResolvedValue([
+      { id: "settled", status: "succeeded", updatedAt: new Date("2026-01-01") },
+      { id: "waiting", status: "running", updatedAt: new Date() },
+    ]);
+    mocks.manifests.mockResolvedValue([
+      {
+        status: "succeeded",
+        updatedAt: new Date("2026-01-01"),
+        manifest: {
+          manifestId: "mid",
+          accepted: true,
+          networkFeeUsdMicros: "2982",
+          createdAt: new Date("2026-08-01"),
+          observedAt: cached ? new Date() : null,
+        },
+      },
+    ]);
+    expect((await (await post(["settled", "waiting"])).json()).pending).toBe(
+      true
+    );
+    if (cached) expect(mocks.fetchUsage).not.toHaveBeenCalled();
+  }
+);
+it("does not treat a recent observation without a fee as settled", async () => {
+  mocks.manifests.mockResolvedValue([
+    {
+      manifest: {
+        accepted: true,
+        networkFeeUsdMicros: null,
+        observedAt: new Date(),
+      },
+    },
+  ]);
+  expect((await (await post(["run"])).json()).pending).toBe(true);
 });

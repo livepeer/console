@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/assets/transport", () => ({ fetchPinnedAsset: vi.fn() }));
@@ -129,14 +130,12 @@ describe("first-party asset proxy", () => {
     vi.mocked(lookup).mockResolvedValue([
       { address: "203.0.113.10", family: 4 },
     ] as never);
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(null, {
-          status: 302,
-          headers: { location: "https://evil.example/file" },
-        })
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://evil.example/file" },
+      })
+    );
     vi.mocked(fetchPinnedAsset).mockImplementation(fetcher);
     const response = await GET(
       new Request(publicAssetUrl("asset_123", "eu_test")),
@@ -248,4 +247,56 @@ it("forwards HEAD and an abortable signal without a response body", async () => 
     [{ address: "8.8.8.8", family: 4 }],
     expect.objectContaining({ method: "HEAD", signal: expect.any(AbortSignal) })
   );
+});
+
+it("serves only owner-bound synthetic fixtures without widening the proxy host allowlist", async () => {
+  vi.stubEnv("VERCEL_ENV", "preview");
+  vi.stubEnv("CONSOLE_PREVIEW_FIXTURES", "1");
+  try {
+    const suffix = createHash("sha256")
+      .update("eu_test")
+      .digest("hex")
+      .slice(0, 12);
+    const id = `asset_preview_v2_${suffix}_portrait`;
+    vi.mocked(getAssetSource).mockResolvedValue({
+      ...source,
+      url: "https://old-preview.example/images/console/explore/flux-schnell.webp",
+    });
+    vi.mocked(lookup).mockClear();
+    vi.mocked(fetchPinnedAsset).mockClear();
+    const response = await GET(new Request(publicAssetUrl(id, "eu_test")), {
+      params: Promise.resolve({ id }),
+    });
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "/images/console/explore/flux-schnell.webp"
+    );
+    expect(lookup).not.toHaveBeenCalled();
+    expect(fetchPinnedAsset).not.toHaveBeenCalled();
+    vi.mocked(getAssetSource).mockResolvedValue({
+      ...source,
+      unavailableAt: new Date(),
+    });
+    expect(
+      (
+        await GET(new Request(publicAssetUrl(id, "eu_test")), {
+          params: Promise.resolve({ id }),
+        })
+      ).status
+    ).toBe(404);
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.mocked(getAssetSource).mockResolvedValue({
+      ...source,
+      url: "https://old-preview.example/file",
+    });
+    expect(
+      (
+        await GET(new Request(publicAssetUrl(id, "eu_test")), {
+          params: Promise.resolve({ id }),
+        })
+      ).status
+    ).toBe(502);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

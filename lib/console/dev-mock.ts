@@ -35,6 +35,10 @@ const MOCK_OWNER = {
 };
 
 const MOCK_ASSET_PATHS: Record<string, string> = {
+  asset_user_upload_interview_audio: "/fixtures/history/sample-tone.wav",
+  asset_dev_3d_glb: "/fixtures/history/octahedron.glb",
+  asset_dev_3d_texture: "/images/console/explore/flux-schnell.webp",
+  asset_dev_3d_preview: "/images/console/explore/flux-schnell.webp",
   asset_dev_video: "/media-2026-08-08-150247/crab-beach.mp4",
   asset_user_upload_forest_reference:
     "/livepeer-ui-2026-08-08/network/network-8.webp",
@@ -1017,6 +1021,10 @@ export function devMockResponse(
         headers: { location: new URL(target, requestUrl).toString() },
       });
     }
+    return new Response("Mock media unavailable", {
+      status: 404,
+      headers: { "cache-control": "no-store" },
+    });
   }
 
   if (pathname === "/api/console/session") {

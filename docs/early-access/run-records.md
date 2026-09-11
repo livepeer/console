@@ -335,3 +335,22 @@ After separately authorizing the push/deployment:
 
 The concurrency gate is closed. Do not label the release fully accepted until
 the real signed-in preview checks are complete after authorized deployment.
+
+### Follow-up review fixes (2026-09-11)
+
+Billing refresh activity is evaluated across every owned run requested by the UI,
+including runs that have not yet captured a payment manifest. Cached observations
+without an accepted manifest's fee remain pending.
+
+The preview list excludes obsolete fixture IDs in the database before pagination
+and counting. Cursors retain database microsecond timestamp precision so rows
+created in the same transaction are not skipped. Synthetic preview images use a signature-checked redirect to a fixed
+bundled image path, gated by the preview fixture flag and the owner-derived asset
+ID. They do not require a deployment hostname in the provider proxy allowlist;
+ordinary assets retain the DNS-pinned HTTPS path.
+
+Output capture includes 3D models, textures and preview images. The drawer prefers
+a renderable media output for its default stage; models remain downloadable asset
+records. Development mocks serve every declared asset locally, using synthetic
+WAV/GLB files and bundled placeholder images, and reject unknown mock IDs without
+falling through to a real database route.

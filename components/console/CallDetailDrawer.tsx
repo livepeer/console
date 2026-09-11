@@ -1140,7 +1140,7 @@ export default function CallDetailDrawer({
         selectedAsset &&
         selectedAsset.runId === row?.id &&
         item.id === selectedAsset.id
-    ) ?? outputAssets?.[0];
+    ) ?? outputAssets?.find((item) => /^(?:image|video|audio)(?:\/|$)/i.test(item.mediaType ?? "")) ?? outputAssets?.[0];
   let media = row
     ? mediaSpecForRow({
         ...row,

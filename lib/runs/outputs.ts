@@ -4,7 +4,7 @@ export type CapturedOutput = {
   url: string;
   availableUntil?: string;
   expiresAt?: string;
-  mediaKind: "image" | "video" | "audio" | "unknown";
+  mediaKind: "image" | "video" | "audio" | "model" | "unknown";
 };
 
 /** Only documented media fields, never prompt URLs or arbitrary nested links. */
@@ -65,6 +65,12 @@ export function extractRunOutputs(result: unknown): CapturedOutput[] {
     }
     const row = value as Record<string, unknown>;
     for (const [key, kind] of [
+      ["model", "model"],
+      ["model_url", "model"],
+      ["modelUrl", "model"],
+      ["model_mesh", "model"],
+      ["preview_image", "image"],
+      ["previewImage", "image"],
       ["image", "image"],
       ["imageUrl", "image"],
       ["image_url", "image"],
@@ -81,6 +87,7 @@ export function extractRunOutputs(result: unknown): CapturedOutput[] {
       );
     if (row.url) add(row, "unknown");
     for (const [key, kind] of [
+      ["textures", "image"],
       ["images", "image"],
       ["image_urls", "image"],
       ["videos", "video"],

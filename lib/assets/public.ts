@@ -81,7 +81,7 @@ export function sanitizePublicMedia(
 ): JsonValue {
   const byUrl = new Map(assets.map((asset) => [asset.url, asset.id]));
   const mediaKey = (key: string) =>
-    /(?:image|video|audio|mask|media|thumbnail|reference|attachment|file)/i.test(
+    /(?:image|video|audio|mask|media|thumbnail|reference|attachment|file|model|mesh|texture)/i.test(
       key
     ) || /^(?:url|urls|uri|uris)$/.test(key);
   const visit = (item: JsonValue, media = false): JsonValue | undefined => {
@@ -89,8 +89,7 @@ export function sanitizePublicMedia(
       const id = byUrl.get(item) ?? ownedAssetReference(item, assets);
       if (id) return publicAssetUrl(id, principalId);
       // Only entire URL values in media fields are removed, not prose or prompts.
-      if (media && /^(?:https?:|data:|blob:|\/\/)/i.test(item))
-        return undefined;
+      if (media && /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(item)) return undefined;
       return item;
     }
     if (Array.isArray(item))
@@ -102,7 +101,7 @@ export function sanitizePublicMedia(
         Object.entries(item).flatMap(([key, child]) => {
           const result = visit(
             child,
-            /prompt|caption|description|text/i.test(key)
+            /prompt|caption|description|^(?:text|texts)$/i.test(key)
               ? false
               : mediaKey(key) || media
           );

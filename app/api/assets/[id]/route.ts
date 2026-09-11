@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { fetchPinnedAsset } from "@/lib/assets/transport";
 import { isIP } from "node:net";
@@ -144,6 +144,29 @@ async function proxy(request: Request, id: string): Promise<Response> {
     (asset.expiresAt && asset.expiresAt.getTime() <= Date.now())
   )
     return notFound();
+
+  // Synthetic fixtures are bundled public images, never arbitrary proxy origins.
+  if (
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.CONSOLE_PREVIEW_FIXTURES === "1"
+  ) {
+    const suffix = createHash("sha256")
+      .update(asset.principalId)
+      .digest("hex")
+      .slice(0, 12);
+    const fixturePaths: Record<string, string> = {
+      [`asset_preview_v2_${suffix}_portrait`]:
+        "/images/console/explore/flux-schnell.webp",
+      [`asset_preview_v2_${suffix}_variation`]:
+        "/images/console/explore/img2img-sdxl.webp",
+    };
+    const location = fixturePaths[id];
+    if (location)
+      return new Response(null, {
+        status: 307,
+        headers: { location, "cache-control": "private, no-store" },
+      });
+  }
 
   try {
     let target = await assertPublicHttps(asset.url);

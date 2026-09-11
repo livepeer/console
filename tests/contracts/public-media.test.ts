@@ -100,3 +100,21 @@ it("captures distinct explicit expiries, keeps availability guarantees separate,
       ?.expiresAt
   ).toBe(a);
 });
+
+it("drops unsupported 3D media URLs without removing ordinary model identifiers", () => {
+  expect(
+    sanitizePublicMedia(
+      {
+        model: "fal-ai/model",
+        model_mesh: "ftp://provider.example/a.glb",
+        textures: [
+          "ftp://p.example/a.png",
+          { url: "https://p.example/b?token=secret" },
+        ],
+        preview_image: { url: "https://p.example/c?token=secret" },
+      },
+      [],
+      "eu_test"
+    )
+  ).toEqual({ model: "fal-ai/model", textures: [{}], preview_image: {} });
+});

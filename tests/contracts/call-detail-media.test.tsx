@@ -451,3 +451,41 @@ it("labels mixed lineage and lets keyboard users inspect admin exact costs", asy
   fireEvent.focus(cost);
   expect((await screen.findByRole("tooltip")).textContent).toBe("$0.01000025");
 });
+
+it("prefers a renderable 3D preview over the model download", () => {
+  const d = detail([
+    {
+      id: "model",
+      url: "https://preview.example/api/assets/model",
+      mediaType: "model",
+      role: "output",
+      createdAt: row.timestamp,
+      providerRequestId: null,
+      unavailableAt: null,
+      hiddenAt: null,
+    },
+    {
+      id: "preview",
+      url: "https://preview.example/api/assets/preview",
+      mediaType: "image",
+      role: "output",
+      createdAt: row.timestamp,
+      providerRequestId: null,
+      unavailableAt: null,
+      hiddenAt: null,
+    },
+  ]);
+  renderWithTooltips(
+    <CallDetailDrawer
+      row={row}
+      rows={[row]}
+      open
+      onClose={() => {}}
+      detail={d}
+      variant="user"
+    />
+  );
+  expect(document.querySelector("img")?.getAttribute("src")).toBe(
+    "https://preview.example/api/assets/preview"
+  );
+});

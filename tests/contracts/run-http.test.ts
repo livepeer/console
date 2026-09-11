@@ -55,12 +55,16 @@ it("derives ownership from session and ignores submitted identity", async () => 
   expect(response.status).toBe(200);
   expect(response.headers.get("cache-control")).toBe("no-store");
   expect(mocks.owner).toHaveBeenCalledWith("external");
-  expect(mocks.list).toHaveBeenCalledWith(owner, {
-    limit: 2,
-    status: "unknown",
-    cursor: undefined,
-    search: undefined,
-  });
+  expect(mocks.list).toHaveBeenCalledWith(
+    owner,
+    {
+      limit: 2,
+      status: "unknown",
+      cursor: undefined,
+      search: undefined,
+    },
+    { excludeLegacyPreview: false }
+  );
 });
 it("automatically seeds owner-scoped preview history before listing", async () => {
   mocks.previewEnabled.mockReturnValue(true);
@@ -73,9 +77,8 @@ it("automatically seeds owner-scoped preview history before listing", async () =
     "https://preview.example"
   );
   expect(mocks.list).toHaveBeenCalledAfter(mocks.seedPreview);
-  expect(mocks.hideLegacy).toHaveBeenCalledWith({
-    items: [],
-    nextCursor: null,
+  expect(mocks.list).toHaveBeenCalledWith(owner, expect.anything(), {
+    excludeLegacyPreview: true,
   });
 });
 it("fails closed for mismatched canonical identity and invalid filters", async () => {

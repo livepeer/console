@@ -1,0 +1,1 @@
+Synthetic local History fixtures: a one-second 440 Hz mono WAV and an untextured octahedron GLB. Generated for testing; no third-party media. The 3D preview/texture mock intentionally reuses an existing bundled image.

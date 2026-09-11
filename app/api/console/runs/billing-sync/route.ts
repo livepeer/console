@@ -25,7 +25,10 @@ export async function POST(request: Request) {
     if (owner.userId !== session.canonicalUserId)
       throw new Error("run_owner_mismatch");
     const ids = [...new Set(body.runIds as string[])];
-    const owned = await ownedPaymentManifests(owner, ids);
+    const [owned, runs] = await Promise.all([
+      ownedPaymentManifests(owner, ids),
+      ownedRunsByIds(owner, ids),
+    ]);
     const reply = (changedRunIds: string[], pending: boolean) =>
       Response.json(
         {
@@ -35,20 +38,14 @@ export async function POST(request: Request) {
         },
         { headers: RUN_HEADERS }
       );
-    // Historical runs without a captured manifest are not guessed from model/time.
-    if (!owned.length) {
-      const runs = await ownedRunsByIds(owner, ids);
-      return reply(
-        [],
-        runs.some(({ status }) => ["queued", "running"].includes(status))
-      );
-    }
     const now = new Date();
-    const active = owned.some(
+    const active = runs.some(
       ({ status, updatedAt }) =>
         ["queued", "running", "unknown"].includes(status) ||
         now.getTime() - updatedAt.getTime() < 120_000
     );
+    // Historical runs without a manifest are never guessed from model/time.
+    if (!owned.length) return reply([], active);
     if (
       owned.every(
         ({ manifest }) =>
@@ -56,7 +53,14 @@ export async function POST(request: Request) {
           now.getTime() - manifest.observedAt.getTime() < 30_000
       )
     )
-      return reply([], active);
+      return reply(
+        [],
+        active ||
+          owned.some(
+            ({ manifest }) =>
+              manifest.accepted && manifest.networkFeeUsdMicros === null
+          )
+      );
     // Each snapshot covers the manifest's entire lifetime, including month boundaries.
     const first = new Date(
       Math.min(...owned.map(({ manifest }) => manifest.createdAt.getTime()))

@@ -525,6 +525,50 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             (await tx.select().from(schema.runReconciliationJobs))[0]
               .completedAt
           ).not.toBeNull();
+          // Filter obsolete preview records before both pagination and totals.
+          for (const id of [
+            "run_preview_v2_page_1",
+            "run_preview_v2_page_2",
+            "run_preview_v2_page_3",
+            "run_preview_legacy_1",
+            "run_preview_legacy_2",
+          ]) {
+            await createRun(owner, {
+              id,
+              gatewayRequestId: `job_${id}`,
+              capability: "pagination-regression",
+              submittedArguments: {},
+            });
+          }
+          const firstPage = await listOwnRuns(
+            owner,
+            { limit: 2, search: "pagination-regression" },
+            { excludeLegacyPreview: true }
+          );
+          expect(firstPage.items).toHaveLength(2);
+          expect(firstPage.counts.total).toBe(3);
+          expect(firstPage.nextCursor).not.toBeNull();
+          const lastPage = await listOwnRuns(
+            owner,
+            {
+              limit: 2,
+              search: "pagination-regression",
+              cursor: firstPage.nextCursor!,
+            },
+            { excludeLegacyPreview: true }
+          );
+          expect(lastPage.items).toHaveLength(1);
+          expect(lastPage.counts.total).toBe(3);
+          expect(lastPage.nextCursor).toBeNull();
+          expect(
+            new Set(
+              [...firstPage.items, ...lastPage.items].map((item) => item.id)
+            ).size
+          ).toBe(3);
+          expect(
+            (await listOwnRuns(owner, { search: "pagination-regression" }))
+              .counts.total
+          ).toBe(5);
           throw rollback;
         })
       ).rejects.toBe(rollback);

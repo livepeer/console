@@ -504,7 +504,7 @@ export async function getOwnRun(
   return row ? detail(db, row) : null;
 }
 
-function decodeCursor(cursor: string): { createdAt: Date; id: string } {
+function decodeCursor(cursor: string): { createdAt: string; id: string } {
   try {
     const parsed = JSON.parse(
       Buffer.from(cursor, "base64url").toString("utf8")
@@ -518,7 +518,13 @@ function decodeCursor(cursor: string): { createdAt: Date; id: string } {
     const createdAt = new Date(parsed.createdAt);
     if (!Number.isFinite(createdAt.getTime()) || cursor.length > 1024)
       throw new Error();
-    return { createdAt, id: parsed.id };
+    if (
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(
+        parsed.createdAt
+      )
+    )
+      throw new Error();
+    return { createdAt: parsed.createdAt, id: parsed.id };
   } catch {
     throw new Error("invalid_run_cursor");
   }
@@ -542,14 +548,21 @@ async function list(
     const cursor = decodeCursor(query.cursor);
     filters.push(
       or(
-        lt(runs.createdAt, cursor.createdAt),
-        and(eq(runs.createdAt, cursor.createdAt), lt(runs.id, cursor.id))
+        sql`${runs.createdAt} < ${cursor.createdAt}::timestamptz`,
+        and(
+          sql`${runs.createdAt} = ${cursor.createdAt}::timestamptz`,
+          lt(runs.id, cursor.id)
+        )
       )
     );
   }
   const limit = Math.max(1, Math.min(100, Math.trunc(query.limit ?? 25) || 25));
   const rows = await db
-    .select({ row: runs, email: userEmails.email })
+    .select({
+      row: runs,
+      email: userEmails.email,
+      cursorCreatedAt: sql<string>`to_char(${runs.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+    })
     .from(runs)
     .leftJoin(
       userEmails,
@@ -639,14 +652,14 @@ async function list(
         : billingSummaryFromReceipts(billingByRun.get(row.id) ?? []),
     };
   });
-  const last = items.at(-1);
+  const last = visibleRows.at(-1);
   return {
     items,
     counts,
     nextCursor:
       rows.length > limit && last
         ? Buffer.from(
-            JSON.stringify({ createdAt: last.createdAt, id: last.id })
+            JSON.stringify({ createdAt: last.cursorCreatedAt, id: last.row.id })
           ).toString("base64url")
         : null,
   };
@@ -654,9 +667,16 @@ async function list(
 
 export function listOwnRuns(
   owner: RunOwner,
-  query: RunListQuery = {}
+  query: RunListQuery = {},
+  options: { excludeLegacyPreview?: boolean } = {}
 ): Promise<RunPage> {
-  return list(getDb(), ownerWhere(owner), query);
+  const scope = options.excludeLegacyPreview
+    ? and(
+        ownerWhere(owner),
+        sql`(left(${runs.id}, 12) <> 'run_preview_' or left(${runs.id}, 15) = 'run_preview_v2_')`
+      )!
+    : ownerWhere(owner);
+  return list(getDb(), scope, query);
 }
 
 async function validateAdmin(actor: AdminPrincipal): Promise<string> {
@@ -830,6 +850,7 @@ export async function ownedRunsByIds(owner: RunOwner, ids: string[]) {
       id: runs.id,
       gatewayRequestId: runs.gatewayRequestId,
       status: runs.status,
+      updatedAt: runs.updatedAt,
     })
     .from(runs)
     .where(and(ownerWhere(owner), inArray(runs.id, unique)));
@@ -1215,6 +1236,7 @@ export async function withPreviewRunFixtures<T>(
             id: runs.id,
             gatewayRequestId: runs.gatewayRequestId,
             status: runs.status,
+            updatedAt: runs.updatedAt,
           })
           .from(runs)
           .where(and(ownerWhere(owner), inArray(runs.id, requested)));
