@@ -32,7 +32,6 @@ export function useRunHistory(
   const generation = useRef(0);
   const busy = useRef(false);
   const appendController = useRef<AbortController | null>(null);
-  const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     const id = ++generation.current;
     const controller = new AbortController();
@@ -79,7 +78,7 @@ export function useRunHistory(
       appendController.current?.abort();
       generation.current = id + 1;
     };
-  }, [key, url, enabled, refresh]);
+  }, [key, url, enabled]);
 
   const loadMore = useCallback(async () => {
     if (
@@ -131,7 +130,50 @@ export function useRunHistory(
       if (generation.current === id) busy.current = false;
     }
   }, [state, key, url, enabled]);
-  const reload = useCallback(() => setRefresh((value) => value + 1), []);
+  const reload = useCallback(() => {
+    if (!enabled) return;
+    const id = ++generation.current;
+    appendController.current?.abort();
+    appendController.current = null;
+    busy.current = false;
+    const controller = new AbortController();
+    setState((old) => (old.key === key ? { ...old, loadingMore: false } : old));
+    void fetch(url, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw Error("Could not load run history.");
+        return response.json() as Promise<RunPage>;
+      })
+      .then((page) => {
+        if (generation.current === id)
+          setState((old) =>
+            old.key === key
+              ? {
+                  ...old,
+                  page,
+                  loading: false,
+                  loadingMore: false,
+                  error: null,
+                }
+              : old
+          );
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted && generation.current === id)
+          setState((old) =>
+            old.key === key
+              ? {
+                  ...old,
+                  loading: false,
+                  loadingMore: false,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "Could not load run history.",
+                }
+              : old
+          );
+      });
+  }, [enabled, key, url]);
   return {
     ...(enabled && state.key === key
       ? state
@@ -168,8 +210,30 @@ export function useRunDetail(
           return response.json() as Promise<RunDetail>;
         })
         .then((detail) => {
-          if (!controller.signal.aborted)
+          if (!controller.signal.aborted) {
             setState({ key, detail, loading: false, error: null });
+            if (base !== "/api/console/runs") return;
+            void Promise.resolve(
+              fetch(`${base}/${encodeURIComponent(id)}/schema`, {
+                cache: "no-store",
+                signal: controller.signal,
+              })
+            )
+              .then(async (response) =>
+                response.ok
+                  ? (response.json() as Promise<Pick<RunDetail, "inputSchema">>)
+                  : null
+              )
+              .then((schema) => {
+                if (!schema || controller.signal.aborted) return;
+                setState((old) =>
+                  old.key === key && old.detail
+                    ? { ...old, detail: { ...old.detail, ...schema } }
+                    : old
+                );
+              })
+              .catch(() => undefined);
+          }
         })
         .catch((error: unknown) => {
           if (!controller.signal.aborted)

@@ -22,6 +22,10 @@ import {
 } from "@/lib/console/usage-capability-display";
 import { historyRange } from "@/lib/console/history-range";
 import { isUserNotFoundError } from "@/lib/console/pymthouse-errors";
+import {
+  cachedEndUserAccessToken,
+  endUserTokenCacheKey,
+} from "@/lib/console/end-user-token-cache";
 
 export type {
   AccountRequestsPayload,
@@ -54,7 +58,7 @@ export async function ensureDashboardAppUser(
   });
 }
 
-export async function mintEndUserAccessToken(
+async function mintEndUserAccessTokenUncached(
   externalUserId: string,
   email?: string
 ): Promise<{
@@ -80,6 +84,45 @@ export async function mintEndUserAccessToken(
     }
     throw error;
   }
+}
+
+function tokenCacheKey(externalUserId: string): string {
+  return endUserTokenCacheKey(readPublicClientId(), externalUserId);
+}
+
+/** MCP sign-in. Always mints and stores. */
+export async function mintEndUserAccessToken(
+  externalUserId: string,
+  email?: string
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  scope: string;
+}> {
+  return cachedEndUserAccessToken(
+    tokenCacheKey(externalUserId),
+    () => mintEndUserAccessTokenUncached(externalUserId, email),
+    Date.now(),
+    { force: true }
+  );
+}
+
+/** Console session and usage. Reuses a live token; remints after restart or expiry. */
+export async function getEndUserAccessToken(
+  externalUserId: string,
+  email?: string
+): Promise<{
+  access_token: string;
+  refresh_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  scope: string;
+}> {
+  return cachedEndUserAccessToken(tokenCacheKey(externalUserId), () =>
+    mintEndUserAccessTokenUncached(externalUserId, email)
+  );
 }
 
 /** Last `days` UTC calendar days inclusive of today — not a trailing clock window. */
@@ -254,18 +297,23 @@ export async function fetchAccountRequestsForExternalUser(input: {
   email?: string;
   cursor?: string | null;
   limit?: number;
+  /**
+   * Cost lookups must not send a 365-day window. OpenMeter lists cap at 100
+   * events, so a year-long range drops the ticket Home is trying to price.
+   * Omitting from/to uses the current UTC month on `/me/usage/requests`.
+   */
+  recentWindow?: boolean;
 }): Promise<AccountRequestsPayload> {
   const publicClientId = readPublicClientId();
-  const minted = await mintEndUserAccessToken(
-    input.externalUserId,
-    input.email
-  );
+  const minted = await getEndUserAccessToken(input.externalUserId, input.email);
   const accessToken = minted.access_token;
 
   const url = new URL(`${issuerOriginFromConfig()}/api/v1/user/usage/requests`);
-  const range = historyRange();
-  url.searchParams.set("from", range.from);
-  url.searchParams.set("to", range.to);
+  if (!input.recentWindow) {
+    const range = historyRange();
+    url.searchParams.set("from", range.from);
+    url.searchParams.set("to", range.to);
+  }
   if (input.cursor) url.searchParams.set("cursor", input.cursor);
   if (input.limit != null) url.searchParams.set("limit", String(input.limit));
 

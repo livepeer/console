@@ -74,7 +74,7 @@ beforeEach(() => {
     email: "fixture@example.invalid",
   } as never);
   vi.mocked(resolveRunOwner).mockResolvedValue(owner);
-  vi.mocked(recordRunUsage).mockResolvedValue(undefined);
+  vi.mocked(recordRunUsage).mockResolvedValue([]);
   vi.mocked(existingRunGatewayIds).mockResolvedValue([]);
   vi.mocked(attachOutputsToTickets).mockImplementation(
     async (_principal, items) => items
@@ -105,10 +105,15 @@ it("suppresses owned run tickets, persists fee-only evidence, and joins assets o
         eventId: "event-owned",
         gatewayRequestId: "owned",
         metadata: {
+          billingEventId: "event-owned",
+          ticketGatewayRequestId: "owned",
+          pipeline: "image",
+          modelId: "model",
           networkFeeUsdMicros: "100",
           feeWei: "10",
           ethUsdPrice: "2000.25",
           pixels: "512",
+          timestamp: "2020-01-01T00:00:00.000Z",
         },
       },
     ])
@@ -139,6 +144,13 @@ it("returns scoped matched receipts when Home explicitly requests correlation", 
   expect(result.items).toEqual([row("owned")]);
   expect(result.nextCursor).toBe("next");
   expect(recordRunUsage).toHaveBeenCalledTimes(1);
+  expect(fetchAccountRequestsForExternalUser).toHaveBeenCalledWith({
+    externalUserId: "eu_fixture",
+    email: "fixture@example.invalid",
+    cursor: undefined,
+    limit: 50,
+    recentWindow: true,
+  });
   expect(JSON.stringify(vi.mocked(recordRunUsage).mock.calls)).not.toContain(
     "event-other"
   );
@@ -239,3 +251,24 @@ it("returns an independent billing error without creating fabricated execution h
   expect(recordRunUsage).not.toHaveBeenCalled();
   expect(attachOutputsToTickets).not.toHaveBeenCalled();
 });
+
+it.each(["", "?includeCorrelated=1"])(
+  "sanitizes asset URLs on account requests %s",
+  async (query) => {
+    vi.mocked(fetchAccountRequestsForExternalUser).mockResolvedValue(
+      payload(
+        [{ ...row("legacy"), outputUrl: "https://provider.example/a" }],
+        null
+      )
+    );
+    vi.mocked(attachOutputsToTickets).mockImplementation(
+      async (_owner, items) =>
+        items.map((item) => ({ ...item, outputUrl: null }))
+    );
+    const response = await GET(
+      new NextRequest(`http://localhost/api/pymthouse/account-requests${query}`)
+    );
+    expect((await response.json()).items[0].outputUrl).toBeNull();
+    expect(attachOutputsToTickets).toHaveBeenCalledTimes(1);
+  }
+);

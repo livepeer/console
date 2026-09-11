@@ -7,6 +7,7 @@ import {
 } from "@/lib/external-accounts/service";
 import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
 import { AccessError, requireApprovedUser } from "@/lib/access/service";
+import { getEndUserAccessToken } from "@/lib/console/pymthouse-bff";
 
 export class SessionRequiredError extends Error {
   readonly status = 401;
@@ -54,6 +55,13 @@ export async function requireConsoleSession() {
       userId: canonical.userId,
       identityId: canonical.identityId,
     });
+    try {
+      await getEndUserAccessToken(account.externalUserId, identity.email);
+    } catch (error) {
+      console.error("end_user_token_mint_failed", {
+        errorType: error instanceof Error ? error.name : "unknown",
+      });
+    }
     return {
       externalUserId: account.externalUserId,
       canonicalUserId: canonical.userId,

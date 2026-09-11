@@ -47,7 +47,7 @@ test("exact gateway_request_id wins over time matching", () => {
   assert.equal(matched.get("job_abc")?.providerRequestId, "req-fal");
 });
 
-test("orchestrator 8-hex tickets join MCP job_* assets by capability and time", () => {
+test("orchestrator 8-hex tickets do not infer an MCP job_* asset", () => {
   const items = [
     ticket({
       gatewayRequestId: "41dfff3c",
@@ -66,10 +66,7 @@ test("orchestrator 8-hex tickets join MCP job_* assets by capability and time", 
       providerRequestId: "01a06f36-d5fe-7351-a8d1-ce8fa3c11004",
     },
   ]);
-  assert.equal(
-    matched.get("41dfff3c")?.url,
-    "https://v3b.fal.media/files/b/cube.jpg"
-  );
+  assert.equal(matched.has("41dfff3c"), false);
 });
 
 test("time match does not attach a different capability", () => {
@@ -92,7 +89,7 @@ test("time match does not attach a different capability", () => {
   assert.equal(matched.has("83493a58"), false);
 });
 
-test("each asset attaches to at most one ticket", () => {
+test("non-exact tickets cannot consume an asset", () => {
   const items = [
     ticket({
       gatewayRequestId: "aaaa1111",
@@ -114,7 +111,7 @@ test("each asset attaches to at most one ticket", () => {
       gatewayRequestId: "job_one",
     },
   ]);
-  assert.equal(matched.size, 1);
+  assert.equal(matched.size, 0);
 });
 
 test("ambiguous same-capability assets in the window are not attached", () => {

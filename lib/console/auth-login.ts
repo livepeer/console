@@ -1,5 +1,3 @@
-import { identitySyncPath } from "@/lib/identity/sync-return";
-
 /** SDK login route. Must be a full navigation (`<a>` / `location.assign`),
  *  not a Next.js client transition — proxy.ts mounts `/auth/*`. */
 export const AUTH_LOGIN_PATH = "/auth/login";
@@ -41,7 +39,7 @@ export function authLoginHref(options?: {
   const params = new URLSearchParams();
   if (options?.signup) params.set("screen_hint", "signup");
   const returnTo = safeReturnTo(options?.returnTo);
-  params.set("returnTo", identitySyncPath(returnTo));
+  params.set("returnTo", consoleSignInHref({ returnTo }));
   if (options?.loginHint) params.set("login_hint", options.loginHint);
   if (options?.connection) params.set("connection", options.connection);
   return `${AUTH_LOGIN_PATH}?${params.toString()}`;

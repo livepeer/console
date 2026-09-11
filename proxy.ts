@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { AUTH_SIGNIN_HREF } from "@/lib/console/auth-login";
 import { devMockResponse } from "@/lib/console/dev-mock";
-import { identitySyncPath } from "@/lib/identity/sync-return";
 
 function copyAuthCookies(from: NextResponse, to: NextResponse): NextResponse {
   from.cookies.getAll().forEach((cookie) => {
@@ -30,7 +29,10 @@ export async function proxy(request: NextRequest) {
     const mocked = devMockResponse(
       request.nextUrl.pathname,
       request.nextUrl.searchParams,
-      request.url
+      new URL(
+        `${request.nextUrl.pathname}${request.nextUrl.search}`,
+        `${request.nextUrl.protocol}//${request.headers.get("host") ?? request.nextUrl.host}`
+      ).href
     );
     if (mocked) return mocked;
   }
@@ -64,10 +66,10 @@ export async function proxy(request: NextRequest) {
         ? redirectTo(AUTH_SIGNIN_HREF)
         : authRes;
     }
-    // `/` is a pure redirect in both auth states; resolve it here too so the
-    // signed-in case resolves admission and admin landing in Node, not Edge.
+    // `/` is a pure redirect in both auth states. Admission and admin landing
+    // run on `/login` after Auth0 and on `/home` via requireConsolePage.
     if (pathname === "/") {
-      return redirectTo(devMock ? "/home" : identitySyncPath("/home"));
+      return redirectTo("/home");
     }
   } catch {
     return authRes;

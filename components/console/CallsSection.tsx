@@ -1,12 +1,11 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import SectionHeader from "@/components/console/SectionHeader";
 import CallsTable from "@/components/console/CallsTable";
 import CallDetailDrawer from "@/components/console/CallDetailDrawer";
 import { useAuth } from "@/components/console/AuthContext";
-import { useAccountRequests } from "@/lib/console/useAccountRequests";
 import { useRunDetail, useRunHistory } from "@/lib/console/useRunHistory";
 import { runToActivity } from "@/lib/console/run-activity";
 import type { AccountActivityRow } from "@/lib/console/types";
@@ -28,48 +27,70 @@ export default function CallsSection({
     },
     ownerKey
   );
-  // Correlate billing receipts with saved runs; billing is not a second history feed.
-  const billing = useAccountRequests(isConnected, ownerKey, true);
-  const billingRows = billing.status === "ready" ? billing.rows : null;
-  const feeByGateway = useMemo(() => {
-    const fees = new Map<string, { costDisplay: string; costExact?: string }>();
-    if (!billingRows) return fees;
-    for (const row of billingRows) {
-      if (!row.gatewayRequestId || row.costDisplay === "—") continue;
-      fees.set(row.gatewayRequestId, {
-        costDisplay: row.costDisplay,
-        ...(row.costExact ? { costExact: row.costExact } : {}),
-      });
-    }
-    return fees;
-  }, [billingRows]);
-  const router = useRouter();
   const requestId = useSearchParams().get("request");
-  const recorded = useMemo(
-    () =>
-      history.page?.items.map((run) =>
-        runToActivity(run, feeByGateway.get(run.gatewayRequestId))
-      ) ?? [],
-    [history.page, feeByGateway]
-  );
-  const rows = recorded;
-  const found = rows.find(
-    (row) => row.id === requestId || row.gatewayRequestId === requestId
-  );
   const detail = useRunDetail(
     "/api/console/runs",
     requestId,
     ownerKey,
     isConnected
   );
+  const historyReload = history.reload;
+  const detailReload = detail.reload;
+  const visibleRunIds = useMemo(() => {
+    const ids = history.page?.items.map((run) => run.id) ?? [];
+    return requestId
+      ? [requestId, ...ids.filter((id) => id !== requestId)]
+      : ids;
+  }, [history.page, requestId]);
+  const visibleRunKey = visibleRunIds.slice(0, 50).join(",");
+  const openDetailIdRef = useRef<string | null>(null);
+  const detailReloadRef = useRef(detailReload);
+  openDetailIdRef.current = detail.detail?.id ?? null;
+  detailReloadRef.current = detailReload;
+  useEffect(() => {
+    if (!isConnected || !ownerKey || !visibleRunKey) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/console/runs/billing-sync", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ runIds: visibleRunKey.split(",") }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("billing_unavailable");
+        const result = (await response.json()) as {
+          changedRunIds: string[];
+        };
+        if (controller.signal.aborted) return;
+        if (result.changedRunIds.length) {
+          historyReload();
+          const openId = openDetailIdRef.current;
+          if (openId && result.changedRunIds.includes(openId))
+            detailReloadRef.current();
+        }
+      } catch {
+        // Preserve saved History during an outage; the job writes usage.
+      }
+    };
+    void refresh();
+    return () => controller.abort();
+  }, [historyReload, isConnected, ownerKey, visibleRunKey]);
+  const router = useRouter();
+  const recorded = useMemo(
+    () => history.page?.items.map((run) => runToActivity(run)) ?? [],
+    [history.page]
+  );
+  const rows = recorded;
+  const found = rows.find(
+    (row) => row.id === requestId || row.gatewayRequestId === requestId
+  );
   const openRow =
     detail.detail &&
     (detail.detail.id === requestId ||
       detail.detail.gatewayRequestId === requestId)
-      ? runToActivity(
-          detail.detail,
-          feeByGateway.get(detail.detail.gatewayRequestId)
-        )
+      ? runToActivity(detail.detail)
       : (found ?? null);
   const select = (row: AccountActivityRow) =>
     router.push("/home?request=" + encodeURIComponent(row.id), {
@@ -134,9 +155,11 @@ export default function CallsSection({
           onSelectRow={select}
         />
         {!history.loading && !history.error && !recorded.length && (
-          <p className="px-7 py-8 text-sm text-fg-faint">
-            {query ? "No history matches this search." : "No history yet."}
-          </p>
+          <div className="px-7 py-8 text-sm text-fg-faint">
+            <p>
+              {query ? "No history matches this search." : "No history yet."}
+            </p>
+          </div>
         )}
         {history.page?.nextCursor && (
           <div className="flex justify-center py-3">

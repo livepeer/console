@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { mcpAssets } from "@/lib/db/schema";
+import { publicAssetUrl } from "@/lib/assets/public";
 
 export type Asset = {
   id: string;
@@ -99,15 +100,36 @@ export function mapAssetRow(row: {
   };
 }
 
-export function serializeAsset(asset: Asset) {
+export function serializeAsset(asset: Asset, principalId: string) {
   return {
     id: asset.id,
-    url: asset.url,
+    url: publicAssetUrl(asset.id, principalId),
     capability: asset.capability,
     created_at: asset.createdAt,
     gateway_request_id: asset.gatewayRequestId,
     provider_request_id: asset.providerRequestId ?? null,
   };
+}
+
+export async function getAssetSource(id: string): Promise<{
+  url: string;
+  mediaType: string | null;
+  principalId: string;
+  expiresAt: Date | null;
+  unavailableAt: Date | null;
+} | null> {
+  const [row] = await getDb()
+    .select({
+      url: mcpAssets.url,
+      mediaType: mcpAssets.mediaType,
+      principalId: mcpAssets.principalId,
+      expiresAt: mcpAssets.expiresAt,
+      unavailableAt: mcpAssets.unavailableAt,
+    })
+    .from(mcpAssets)
+    .where(eq(mcpAssets.id, id))
+    .limit(1);
+  return row ?? null;
 }
 
 export async function rememberAsset(

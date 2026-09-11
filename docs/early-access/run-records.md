@@ -139,14 +139,81 @@ and keyset pagination. It does not render the upstream billing feed as a second
 section. Admin uses the same presentation/detail components, with user-email
 search and status filters. Billing events do not prove successful execution.
 
-Owned billing receipts are appended idempotently to run events with numeric fee
-fields only. The detail drawer labels these **Observed usage**, not a guaranteed
-final bill. A background billing read correlates owned receipts without adding
-displayed rows. It is not a platform history backfill: history starts with newly
-captured Console MCP runs. Any old test-only upstream records remain untouched
-and are not shown as separate history. Saved runs remain readable when billing
-is unavailable.
+New runs capture PymtHouse payment manifest IDs before the SDK pays, then mark
+accepted payments before waiting for provider completion. `@pymthouse/gateway-web`
+threads an awaited `onPayment` callback through single-shot, persistent, and
+failover paths. Persistence errors abort without a new paid attempt. A
+manifest is unique within its external account and cannot be attached to two
+runs. Caller `job_*` IDs and provider request IDs remain separate identifiers.
+
+`run_payment_manifests` stores this lineage and replaceable cumulative usage
+snapshots. After inference returns (or is interrupted), the job reads
+Bearer-scoped `/api/v1/user/usage?groupBy=manifest` over a short window around
+the accepted payment(s) and persists exact `manifestId` matches. OpenMeter
+app totals do not isolate one `job_*`, so a job-id total is never stamped
+onto a run. Missing rows are retried in the job; a billing-refresh failure
+does not fail the job. History is not required to price a completed run.
+History may POST at most 50 owned run IDs once when the visible page changes,
+so a later Home load can fill usage that was not yet in the aggregate when the
+job finished. It does not retry on a timer. Exact manifest matches update saved
+totals; unrelated manifests are ignored. Older concurrent responses cannot
+overwrite newer observations, missing rows do not erase known costs, and
+repeated refreshes do not add charges. The table and drawer share this
+Neon-derived network-cost summary. Missing totals for accepted payment attempts
+remain unmatched rather than displaying a partial total as complete.
+
+This replaces the ten-page raw-ticket scan. Fresh snapshots are reused for 30
+seconds. Usage is eventually consistent; this is not an invoice-finality
+signal. The execution reconcile worker remains public-provider GET only and
+does not poll PymtHouse. Raw `run_usage_receipts` remain separate evidence, not
+aggregate snapshots. Historical and preview runs without manifests may still
+use their previously persisted exact receipts, but no model/time match or
+manifest is invented for them.
+
+Apply additive migration `0002_run_payment_manifests.sql` before serving this
+revision. The environment's Console runtime role needs SELECT, INSERT and UPDATE
+on `run_payment_manifests`; production migration/deployment is a separate release
+step. No downstream change to PymtHouse's ID propagation is required for this
+manifest integration. Instrumented live verification on 2026-09-11 captured
+manifest `bdcd8fdd` at payment time and matched it to both the authenticated
+aggregate (2982 USD micros) and receipt (event ID `4096f6f3`).
+
+Generated assets retain their stable `mcp_assets.id`, and `run_asset_links`
+stores canonical input/output lineage. At submission, first-party asset URLs
+are resolved only within the authenticated principal and retain parameter path,
+role, and ordinal. Provider billing data enriches a run by `job_*`; it never
+manufactures or authorizes an asset ID.
+
+Asset URLs are one-hour HMAC links bound to asset ID, stored principal, and
+expiry. Deployed environments require `ASSET_URL_SIGNING_SECRET` and
+`ASSET_PROXY_ALLOWED_HOSTS`. Each HTTPS connection uses a validated DNS address,
+including redirects, while preserving TLS hostname verification and byte ranges.
+Playback rejects `unavailable_at` and hard `expires_at` before upstream delivery;
+History still retains the asset, lineage, captured parameters, and cost.
+Successful responses cache for at most 60 seconds, bounded further by signature
+and exact provider expiry; failed responses are not cached. Unknown expiry stays
+playable. Transient delivery errors do not permanently mark an asset unavailable.
+Execution and queued reconciliation propagate explicit output expiry; upserts
+preserve known expiry when later observations omit it.
+`available_until` remains a minimum availability guarantee, not a hard expiry.
 Client history state is scoped to the authenticated account.
+
+Public media sanitization is independent from durable output capture, so signed
+or redacted provider URLs and reference/mask inputs cannot bypass it. Owned media
+is rewritten to Console URLs; unmatched media is removed from execution, detail,
+and both account-requests response paths. Prompt text and unrelated links remain.
+
+Preview fixture seeding uses an owner-scoped database lock and one transaction.
+It checks every durable stage, skips complete fixtures, and repairs partial
+fixtures without changing ordinary terminal-run protections. The runtime preview
+has both `0001` and `0002` applied with the required table grants as of 2026-09-11;
+production migration remains a separate release step. No additional migration
+is needed for these review fixes.
+
+An authenticated preview-only fixture operation can populate representative
+Neon-backed rows for the current reviewer when both `VERCEL_ENV=preview` and
+`CONSOLE_PREVIEW_FIXTURES=1` are set. It is unavailable in production and is
+intended only for the disposable PR database.
 
 ## Fresh-start history
 
@@ -273,3 +340,24 @@ After separately authorizing the push/deployment:
 
 The concurrency gate is closed. Do not label the release fully accepted until
 the real signed-in preview checks are complete after authorized deployment.
+
+### Follow-up review fixes (2026-09-11)
+
+The job writes usage for the run it just executed by exact payment-manifest
+match. History's billing-sync is an optional one-shot backfill for older
+visible rows, including a deep-linked run off the first page, not a
+pending-driven poll and not required to price a new run. Cached observations
+without an accepted manifest's fee stay unmatched.
+
+The preview list excludes obsolete fixture IDs in the database before pagination
+and counting. Cursors retain database microsecond timestamp precision so rows
+created in the same transaction are not skipped. Synthetic preview images use a signature-checked redirect to a fixed
+bundled image path, gated by the preview fixture flag and the owner-derived asset
+ID. They do not require a deployment hostname in the provider proxy allowlist;
+ordinary assets retain the DNS-pinned HTTPS path.
+
+Output capture includes 3D models, textures and preview images. The drawer prefers
+a renderable media output for its default stage; models remain downloadable asset
+records. Development mocks serve every declared asset locally, using synthetic
+WAV/GLB files and bundled placeholder images, and reject unknown mock IDs without
+falling through to a real database route.

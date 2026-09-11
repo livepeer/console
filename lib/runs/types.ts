@@ -1,17 +1,7 @@
 export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type RunStatus =
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled"
-  | "unknown";
+  "queued" | "running" | "succeeded" | "failed" | "cancelled" | "unknown";
 export type RunOwner = {
   principalId: string;
   userId: string;
@@ -32,9 +22,32 @@ export type RunAssetInput = {
 };
 export type RunAsset = RunAssetInput & {
   id: string;
+  /** Whether this asset was produced by this run or referenced as owned input. */
+  role?: "input" | "output";
+  /** User-facing filename/title when known; history falls back to the asset id. */
+  displayName?: string | null;
   createdAt: string;
   unavailableAt: string | null;
   hiddenAt: string | null;
+};
+export type RunInputFieldSchema = {
+  /** Dot path into submitted inputs. Array items use `*`, for example `keyframes.*.image_url`. */
+  path: string;
+  title: string | null;
+  description: string | null;
+  required: boolean;
+  types: string[];
+  options: Array<string | number | boolean | null>;
+  defaultValue?: JsonValue;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+};
+export type RunInputSchema = {
+  endpointId: string;
+  schemaSha256: string;
+  fields: RunInputFieldSchema[];
 };
 export type RunRecord = RunOwner & {
   id: string;
@@ -59,7 +72,16 @@ export type RunRecord = RunOwner & {
   completedAt: string | null;
   email: string | null;
 };
+export type RunBillingSummary = {
+  /** PymtHouse network cost, in decimal USD micros. */
+  networkFeeUsdMicros: string;
+  receiptCount?: number;
+  manifestCount?: number;
+};
 export type RunDetail = RunRecord & {
+  billing: RunBillingSummary | null;
+  /** Current provider metadata used to explain submitted inputs in user history. */
+  inputSchema?: RunInputSchema | null;
   assets: RunAsset[];
   events: {
     id: string;
@@ -105,7 +127,7 @@ export type RunListQuery = {
 export type RunSummary = Omit<
   RunRecord,
   "submittedArguments" | "result" | "captureRedactedPaths"
->;
+> & { billing: RunBillingSummary | null };
 export type RunPage = {
   items: RunSummary[];
   nextCursor: string | null;

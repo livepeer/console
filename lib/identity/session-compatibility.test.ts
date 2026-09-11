@@ -22,10 +22,14 @@ vi.mock("@/lib/external-accounts/service", () => ({
   }),
   resolveExternalAccount: vi.fn(),
 }));
+vi.mock("@/lib/console/pymthouse-bff", () => ({
+  getEndUserAccessToken: vi.fn(),
+}));
 import { getAuthenticatedIdentity } from "@/lib/authentication/session";
 import { resolveProviderIdentity } from "@/lib/identity/provider-user";
 import { requireApprovedUser, AccessError } from "@/lib/access/service";
 import { resolveExternalAccount } from "@/lib/external-accounts/service";
+import { getEndUserAccessToken } from "@/lib/console/pymthouse-bff";
 import { requireConsoleSession } from "@/lib/console/session-user";
 import { enrollAuthenticatedUser } from "@/lib/access/enrollment";
 const identity = {
@@ -59,12 +63,23 @@ describe("shared server admission", () => {
       userId: "user",
       externalUserId: "persisted-legacy-id",
     });
+    vi.mocked(getEndUserAccessToken).mockResolvedValue({
+      access_token: "tok",
+      refresh_token: "refresh",
+      token_type: "Bearer",
+      expires_in: 300,
+      scope: "sign:job",
+    });
   });
   it("returns the persisted billing alias, never a provider-subject hash", async () => {
     expect(await requireConsoleSession()).toMatchObject({
       externalUserId: "persisted-legacy-id",
       canonicalUserId: "user",
     });
+    expect(getEndUserAccessToken).toHaveBeenCalledWith(
+      "persisted-legacy-id",
+      "test@example.invalid"
+    );
   });
   it("returns401 for an unauthenticated caller without enrollment", async () => {
     vi.mocked(getAuthenticatedIdentity).mockResolvedValue(null);
@@ -72,6 +87,7 @@ describe("shared server admission", () => {
       status: 401,
     });
     expect(resolveProviderIdentity).not.toHaveBeenCalled();
+    expect(getEndUserAccessToken).not.toHaveBeenCalled();
   });
   it.each(["pending", "revoked", "disabled"] as const)(
     "denies %s before account resolution",
@@ -82,6 +98,7 @@ describe("shared server admission", () => {
         state,
       });
       expect(resolveExternalAccount).not.toHaveBeenCalled();
+      expect(getEndUserAccessToken).not.toHaveBeenCalled();
     }
   );
   it("keeps the authenticated session but denies product operations during DB failure and retries", async () => {
@@ -104,6 +121,7 @@ describe("shared server admission", () => {
     await expect(requireConsoleSession()).rejects.toMatchObject({
       status: 503,
     });
+    expect(getEndUserAccessToken).not.toHaveBeenCalled();
     log.mockRestore();
   });
   it.each(["email_conflict", "waitlist_conflict", "inactive_contact"])(
@@ -122,6 +140,7 @@ describe("shared server admission", () => {
         code: "enrollment_attention_required",
       });
       expect(resolveExternalAccount).not.toHaveBeenCalled();
+      expect(getEndUserAccessToken).not.toHaveBeenCalled();
     }
   );
   it("retains verify-email behavior for unverified identities", async () => {
@@ -148,6 +167,16 @@ describe("shared server admission", () => {
     await expect(requireConsoleSession()).resolves.toHaveProperty(
       "externalUserId"
     );
+  });
+  it("keeps the Auth0 session when PymtHouse mint fails after cookie validation", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(getEndUserAccessToken).mockRejectedValue(
+      new Error("mint_failed")
+    );
+    await expect(requireConsoleSession()).resolves.toMatchObject({
+      externalUserId: "persisted-legacy-id",
+    });
+    log.mockRestore();
   });
   it.each(["revoked", "disabled", "unavailable"] as const)(
     "preserves %s precedence over enrollment attention",

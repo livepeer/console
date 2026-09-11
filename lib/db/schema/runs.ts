@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -136,6 +138,46 @@ export const runEvents = pgTable(
   ]
 );
 
+/** Queryable, idempotent billing evidence. A matching immutable run event is
+ * written in the same transaction so the lifecycle timeline stays complete. */
+export const runUsageReceipts = pgTable(
+  "run_usage_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: text("event_id").notNull(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "restrict" }),
+    gatewayRequestId: text("gateway_request_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
+    source: text("source").default("pymthouse").notNull(),
+    pipeline: text("pipeline"),
+    modelId: text("model_id"),
+    networkFeeUsdMicros: numeric("network_fee_usd_micros", {
+      precision: 78,
+      scale: 18,
+    }),
+    feeWei: numeric("fee_wei", { precision: 78, scale: 0 }),
+    pixels: numeric("pixels", { precision: 78, scale: 18 }),
+    ethUsdPrice: numeric("eth_usd_price", { precision: 78, scale: 18 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("run_usage_receipts_event_unique").on(table.eventId),
+    index("run_usage_receipts_run_occurred_idx").on(
+      table.runId,
+      table.occurredAt
+    ),
+    index("run_usage_receipts_gateway_idx").on(table.gatewayRequestId),
+    check(
+      "run_usage_receipts_source_check",
+      sql`${table.source} in ('pymthouse')`
+    ),
+  ]
+);
+
 export const runReconciliationJobs = pgTable(
   "run_reconciliation_jobs",
   {
@@ -187,6 +229,42 @@ export const runReadAudits = pgTable(
     check(
       "run_read_audits_action_check",
       sql`${table.action} in ('list', 'detail')`
+    ),
+  ]
+);
+
+/** One payment manifest belongs to one run within its PymtHouse account. */
+export const runPaymentManifests = pgTable(
+  "run_payment_manifests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "restrict" }),
+    externalAccountId: uuid("external_account_id")
+      .notNull()
+      .references(() => externalAccounts.id, { onDelete: "restrict" }),
+    manifestId: text("manifest_id").notNull(),
+    accepted: boolean("accepted").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    networkFeeUsdMicros: numeric("network_fee_usd_micros", {
+      precision: 48,
+      scale: 18,
+    }),
+    feeWei: text("fee_wei"),
+    observedAt: timestamp("observed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("run_payment_manifests_account_manifest_unique").on(
+      table.externalAccountId,
+      table.manifestId
+    ),
+    index("run_payment_manifests_run_idx").on(table.runId),
+    check(
+      "run_payment_manifests_nonnegative_fee",
+      sql`${table.networkFeeUsdMicros} >= 0`
     ),
   ]
 );

@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import {
-  feeFieldsFromRunEvents,
-  runToActivity,
-} from "./run-activity";
-import type { RunDetail, RunSummary } from "@/lib/runs/types";
+import { runToActivity } from "./run-activity";
+import type { RunSummary } from "@/lib/runs/types";
 
 function summary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
@@ -30,6 +27,7 @@ function summary(overrides: Partial<RunSummary> = {}): RunSummary {
     startedAt: "2026-09-08T18:00:00Z",
     completedAt: "2026-09-08T18:00:01Z",
     email: null,
+    billing: null,
     ...overrides,
   };
 }
@@ -40,38 +38,18 @@ test("run history stays em-dash when no billing receipt is joined", () => {
   assert.equal(row.costExact, undefined);
 });
 
-test("run history uses the signed-ticket fee mapper", () => {
-  const row = runToActivity(summary(), { networkFeeUsdMicros: "1000" });
+test("run history formats its persisted billing summary", () => {
+  const row = runToActivity(
+    summary({ billing: { networkFeeUsdMicros: "1000", receiptCount: 1 } })
+  );
   assert.equal(row.costDisplay, "$0.0010");
   assert.equal(row.costExact, "$0.001");
 });
 
-test("run detail reads the latest billing_usage event", () => {
-  const detail = {
-    ...summary(),
-    submittedArguments: null,
-    result: null,
-    captureRedactedPaths: [],
-    assets: [],
-    events: [
-      {
-        id: "evt_old",
-        eventKey: "usage:old",
-        status: "succeeded" as const,
-        createdAt: "2026-09-08T18:00:00Z",
-        metadata: { kind: "billing_usage", networkFeeUsdMicros: "500" },
-      },
-      {
-        id: "evt_new",
-        eventKey: "usage:new",
-        status: "succeeded" as const,
-        createdAt: "2026-09-08T18:00:02Z",
-        metadata: { kind: "billing_usage", networkFeeUsdMicros: "2500" },
-      },
-    ],
-  } satisfies RunDetail;
-  const fields = feeFieldsFromRunEvents(detail.events);
-  assert.equal(fields?.networkFeeUsdMicros, "2500");
-  const row = runToActivity(detail);
-  assert.equal(row.costDisplay, "$0.0025");
+test("multiple persisted receipts use their decimal-safe aggregate", () => {
+  const row = runToActivity(
+    summary({ billing: { networkFeeUsdMicros: "3000", receiptCount: 2 } })
+  );
+  assert.equal(row.costDisplay, "$0.0030");
+  assert.equal(row.costExact, "$0.003");
 });

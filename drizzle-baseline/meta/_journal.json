@@ -8,6 +8,20 @@
       "when": 1788710498159,
       "tag": "0000_console_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789069696530,
+      "tag": "0001_run_observability_and_lineage",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789134402179,
+      "tag": "0002_run_payment_manifests",
+      "breakpoints": true
     }
   ]
 }

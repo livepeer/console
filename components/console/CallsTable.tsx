@@ -5,7 +5,12 @@ import type { ReactNode } from "react";
 import { formatCallMetric, formatRunRelativeTime } from "@/lib/console/utils";
 import EnvTag from "@/components/console/EnvTag";
 import StatusDot from "@/components/console/StatusDot";
-import Tooltip from "@/components/design-system/Tooltip";
+import ModalityChip from "@/components/console/ModalityChip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTickWhileActive } from "@/components/console/useTickWhileActive";
 import type { AccountActivityRow } from "@/lib/console/types";
 import { STATUS_LABEL } from "@/lib/console/activity-media";
@@ -93,13 +98,21 @@ function HistoryCost({
   }
   return (
     <span className="justify-self-end">
-      <Tooltip
-        content={
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              aria-label={`Exact cost ${row.costExact}`}
+              className="relative z-10 pointer-events-auto rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            />
+          }
+        >
+          {amount}
+        </TooltipTrigger>
+        <TooltipContent side="left">
           <span className="font-mono tabular-nums">{row.costExact}</span>
-        }
-        side="left"
-      >
-        {amount}
+        </TooltipContent>
       </Tooltip>
     </span>
   );
@@ -217,13 +230,9 @@ export default function CallsTable({
               <span className="min-w-0 truncate font-medium text-fg-strong">
                 {row.model}
               </span>
-              <span
-                className={`inline-flex h-[18px] shrink-0 items-center rounded-[3px] px-1.5 font-mono text-[10.5px] text-fg-faint ${
-                  compact ? "bg-foreground/3" : "border border-hairline"
-                }`}
-              >
+              <ModalityChip appearance={compact ? "filled" : "outlined"}>
                 {pipelineLabel}
-              </span>
+              </ModalityChip>
               {showEnvironment && <EnvTag environmentId={row.environmentId} />}
               {row.recordKind && (
                 <span className="shrink-0 text-[11.5px] font-normal text-fg-faint">
@@ -256,25 +265,25 @@ export default function CallsTable({
             )}
           </>
         );
-        return onSelectRow ? (
-          <button
-            key={row.id}
-            type="button"
-            aria-label={`Inspect ${row.id}`}
-            onClick={() => onSelectRow(row)}
-            className={`${rowClass} w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring`}
-          >
-            {content}
-          </button>
-        ) : (
-          <Link
-            key={row.id}
-            href={`/home?request=${row.id}`}
-            scroll={false}
-            className={rowClass}
-          >
-            {content}
-          </Link>
+        return (
+          <div key={row.id} className={`${rowClass} relative`}>
+            {onSelectRow ? (
+              <button
+                type="button"
+                aria-label={`Inspect ${row.id}`}
+                onClick={() => onSelectRow(row)}
+                className="absolute inset-0 w-full rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              />
+            ) : (
+              <Link
+                href={`/home?request=${row.id}`}
+                aria-label={`Inspect ${row.id}`}
+                scroll={false}
+                className="absolute inset-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              />
+            )}
+            <div className="contents pointer-events-none">{content}</div>
+          </div>
         );
       })}
     </section>

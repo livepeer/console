@@ -162,6 +162,8 @@ export async function reconcileRunJob(
         assets: extractRunOutputs(output).map((asset) => ({
           url: asset.url,
           mediaType: asset.mediaKind,
+          availableUntil: asset.availableUntil,
+          expiresAt: asset.expiresAt,
         })),
       });
       await store.releaseReconciliationJob(job, { done: true });

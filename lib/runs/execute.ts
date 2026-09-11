@@ -13,7 +13,8 @@ import {
   resultEnvelope,
   validatePublicFalQueue,
 } from "./reconcile";
-import type { JsonValue, RunDetail, RunTransition } from "./types";
+import type { JsonValue, RunDetail, RunOwner, RunTransition } from "./types";
+import { publicAsset, replaceAssetUrls } from "@/lib/assets/public";
 
 export type RunArguments = {
   capability: string;
@@ -24,7 +25,10 @@ export type RunArguments = {
 export type ExecutionDependencies = {
   store: Pick<
     typeof import("./store"),
-    "resolveRunOwner" | "createRun" | "transitionRun"
+    | "resolveRunOwner"
+    | "createRun"
+    | "transitionRun"
+    | "recordRunPaymentManifest"
   >;
   checkSpend: () => Promise<void>;
   describe: () => Promise<{ mode?: string } | null>;
@@ -36,25 +40,45 @@ export type ExecutionDependencies = {
     timeoutMs: number;
     gatewayRequestId: string;
     onProgress: (info: QueueProgress) => Promise<void>;
+    onPayment: (payment: {
+      manifestId: string;
+      phase: "prepared" | "accepted";
+    }) => Promise<void>;
   }) => Promise<InferenceResult>;
   onProgress?: (info: QueueProgress) => Promise<void>;
+  /** After dispatch; usage may still be missing. Failures must not fail the job. */
+  refreshBilling?: (input: {
+    owner: RunOwner;
+    runId: string;
+    gatewayRequestId: string;
+  }) => Promise<void>;
 };
 
 /** Persist retries never contain or repeat inference dispatch. */
-async function recordWithRetry(
-  fn: () => Promise<RunDetail>
-): Promise<RunDetail | null> {
+async function persistWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await fn();
-    } catch {
+    } catch (error) {
+      last = error;
       if (attempt < 2)
         await new Promise((resolve) =>
           setTimeout(resolve, 100 * (attempt + 1))
         );
     }
   }
-  return null;
+  throw last instanceof Error ? last : new Error("run_store_unavailable");
+}
+
+async function recordWithRetry(
+  fn: () => Promise<RunDetail>
+): Promise<RunDetail | null> {
+  try {
+    return await persistWithRetry(fn);
+  } catch {
+    return null;
+  }
 }
 
 export async function executeDurableRun(
@@ -103,6 +127,17 @@ export async function executeDurableRun(
   }
   const record = (change: RunTransition) =>
     recordWithRetry(() => deps.store.transitionRun(owner, run.id, change));
+  const refreshBilling = async () => {
+    try {
+      await deps.refreshBilling?.({
+        owner,
+        runId: run.id,
+        gatewayRequestId,
+      });
+    } catch {
+      /* Usage is eventually consistent; do not fail a completed or interrupted job. */
+    }
+  };
   let mode: string | undefined;
   try {
     await deps.checkSpend();
@@ -172,6 +207,12 @@ export async function executeDurableRun(
       endpoint: mode === "persistent" ? args.endpoint : undefined,
       timeoutMs: 780_000,
       gatewayRequestId,
+      onPayment: async (payment) => {
+        // Same charge only. Failure after retries still aborts the SDK; never another paid attempt.
+        await persistWithRetry(() =>
+          deps.store.recordRunPaymentManifest(owner, run.id, payment)
+        );
+      },
       onProgress: async (info) => {
         providerRequestId = info.requestId ?? providerRequestId;
         lastQueue = validatePublicFalQueue(info.statusUrl) ?? lastQueue;
@@ -222,6 +263,8 @@ export async function executeDurableRun(
       assets: outputs.map((asset) => ({
         url: asset.url,
         mediaType: asset.mediaKind,
+        availableUntil: asset.availableUntil,
+        expiresAt: asset.expiresAt,
         providerRequestId: result.providerRequestId,
       })),
       metadata: { providerStatus: result.status ?? null },
@@ -235,24 +278,46 @@ export async function executeDurableRun(
           }
         : {}),
     });
+    const persistedAssets = (saved?.assets ?? []).filter(
+      (asset) => asset.role !== "input"
+    );
+    const assets = persistedAssets.map((asset) =>
+      publicAsset(asset, owner.principalId)
+    );
+    const capturedData = resultEnvelope(result.data).value;
+    const publicData = replaceAssetUrls(
+      capturedData,
+      persistedAssets,
+      owner.principalId
+    );
     const urlRaw =
       result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
-    const url = urlRaw && !isQueueControlUrl(urlRaw) ? urlRaw : null;
+    const sourceAsset =
+      urlRaw && !isQueueControlUrl(urlRaw)
+        ? persistedAssets.find((asset) => asset.url === urlRaw)
+        : undefined;
+    const url = sourceAsset
+      ? publicAsset(sourceAsset, owner.principalId).url
+      : null;
+    await refreshBilling();
     return {
       payload: {
         capability: args.capability,
         url,
+        assets: assets.map(({ id, url, mediaType }) => ({
+          id,
+          url,
+          media_type: mediaType ?? null,
+        })),
         status: result.status,
         request_id: result.providerRequestId,
-        status_url: result.statusUrl,
-        response_url: result.responseUrl,
         orchestrator: result.orchestrator,
         elapsed_ms: result.elapsedMs,
         billable_units: result.billableUnits,
         gateway_request_id: result.gatewayRequestId || gatewayRequestId,
         run_id: run.id,
         ...(!saved ? { persist_error: "run_store_unavailable" } : {}),
-        ...(url ? {} : { data: result.data }),
+        ...(url ? {} : { data: publicData }),
       },
       isError: status === "failed" || status === "cancelled",
     };
@@ -267,6 +332,7 @@ export async function executeDurableRun(
         "Execution was interrupted after dispatch; the provider outcome is not confirmed.",
       ...(lastQueue ? { queue: lastQueue, provider: "fal" } : {}),
     });
+    await refreshBilling();
     return {
       payload: {
         ...runCapabilityFailurePayload(error, gatewayRequestId),

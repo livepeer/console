@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CallsSection from "@/components/console/CallsSection";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { RunSummary } from "@/lib/runs/types";
 
 const navigation = vi.hoisted(() => ({ search: "" }));
@@ -22,6 +23,13 @@ vi.mock("@/components/console/CallDetailDrawer", () => ({
 }));
 const records: RunSummary[] = [];
 const fetcher = vi.fn();
+function renderCallsSection(query = "") {
+  return render(
+    <TooltipProvider>
+      <CallsSection query={query} onQueryChange={vi.fn()} />
+    </TooltipProvider>
+  );
+}
 beforeEach(() => {
   navigation.search = "";
   records.length = 0;
@@ -53,7 +61,7 @@ afterEach(() => {
 });
 
 it("renders exactly one History and one empty state, without the billing feed", async () => {
-  render(<CallsSection query="" onQueryChange={vi.fn()} />);
+  renderCallsSection();
   await screen.findByText("No history yet.");
   expect(screen.getAllByRole("heading", { name: "History" })).toHaveLength(1);
   expect(
@@ -88,6 +96,7 @@ it("shows Postgres rows even when billing is unavailable", async () => {
     startedAt: "2026-09-01T12:00:00Z",
     completedAt: "2026-09-01T12:00:01Z",
     email: null,
+    billing: null,
   });
   navigation.search = "request=saved-run";
   fetcher.mockImplementation(async (input: string) => {
@@ -113,17 +122,82 @@ it("shows Postgres rows even when billing is unavailable", async () => {
       ? Response.json({ items: records, nextCursor: null })
       : Response.json({ error: "billing unavailable" }, { status: 503 });
   });
-  render(<CallsSection query="" onQueryChange={vi.fn()} />);
+  renderCallsSection();
   await screen.findByRole("button", { name: "Inspect saved-run" });
   expect(screen.queryByText("No history yet.")).toBeNull();
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText("Usage-only history")).toBeNull();
   await waitFor(() =>
-    expect(screen.getByTestId("detail-cost").textContent).toBe("$0.0025")
+    expect(screen.getByTestId("detail-cost").textContent).toBe("—")
   );
 });
 
-it("joins a correlated ticket fee onto the saved run, without adding a billing row", async () => {
+it("does not infer a cost from an unmatched orchestrator ticket", async () => {
+  const run = {
+    id: "28d04c8a-7edd-487e-a0c4-5f95ed637a4b",
+    principalId: "external",
+    userId: "user",
+    externalAccountId: "account",
+    gatewayRequestId: "job_fe3e40004a49442c",
+    providerRequestId: null,
+    provider: null,
+    source: "mcp",
+    capability: "livepeer-example/fal-ideogram-v4",
+    modelId: "livepeer-example/fal-ideogram-v4",
+    endpoint: null,
+    status: "succeeded" as const,
+    captureVersion: 1,
+    errorCode: null,
+    errorMessage: null,
+    version: 2,
+    createdAt: "2026-09-09T21:42:18.000Z",
+    updatedAt: "2026-09-09T21:42:19.000Z",
+    startedAt: "2026-09-09T21:42:18.000Z",
+    completedAt: "2026-09-09T21:42:19.000Z",
+    email: null,
+    billing: null,
+  };
+  records.push(run);
+  navigation.search = "request=28d04c8a-7edd-487e-a0c4-5f95ed637a4b";
+  fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/28d04c8a-7edd-487e-a0c4-5f95ed637a4b") {
+      return Response.json({
+        ...run,
+        submittedArguments: null,
+        result: null,
+        captureRedactedPaths: [],
+        assets: [],
+        events: [],
+      });
+    }
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({ changedRunIds: [], changedCount: 0 });
+    if (String(input).startsWith("/api/console/runs"))
+      return Response.json({ items: records, nextCursor: null });
+    return Response.json({
+      items: [
+        {
+          eventId: "c9a1fae7",
+          gatewayRequestId: "c9a1fae7",
+          time: "2026-09-09T21:42:19.000Z",
+          clientId: "app_test",
+          externalUserId: "eu_test",
+          pipeline: "text-to-image",
+          modelId: "livepeer-example/fal-ideogram-v4",
+          networkFeeUsdMicros: "9984.675492933755",
+          feeWei: "4048746912830",
+        },
+      ],
+      nextCursor: null,
+      openMeterConfigured: true,
+    });
+  });
+  render(<CallsSection query="" onQueryChange={vi.fn()} />);
+  await waitFor(() => expect(fetcher).toHaveBeenCalled());
+  expect(screen.getByTestId("detail-cost").textContent).toBe("—");
+});
+
+it("reloads the Neon cost after an exact billing sync", async () => {
   records.push({
     id: "saved-run",
     principalId: "external",
@@ -146,50 +220,219 @@ it("joins a correlated ticket fee onto the saved run, without adding a billing r
     startedAt: "2026-09-01T12:00:00Z",
     completedAt: "2026-09-01T12:00:01Z",
     email: null,
+    billing: null,
   });
+  let synced = false;
   fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync") {
+      synced = true;
+      records[0]!.billing = {
+        networkFeeUsdMicros: "1000",
+        receiptCount: 1,
+      };
+      return Response.json({ changedRunIds: ["saved-run"], changedCount: 1 });
+    }
     if (input.startsWith("/api/console/runs"))
       return Response.json({ items: records, nextCursor: null });
-    return Response.json({
-      items: [
-        {
-          eventId: "evt-saved",
-          gatewayRequestId: "job_saved",
-          time: "2026-09-01T12:00:00Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "text-generation",
-          modelId: "saved-model",
-          networkFeeUsdMicros: "1000",
-        },
-        {
-          eventId: "legacy-event",
-          gatewayRequestId: "legacy-job",
-          time: "2025-01-01T00:00:00Z",
-          clientId: "app_test",
-          externalUserId: "eu_test",
-          pipeline: "text-generation",
-          modelId: "legacy-only-model",
-          networkFeeUsdMicros: "100",
-        },
-      ],
-      nextCursor: null,
-      openMeterConfigured: true,
-    });
+    return Response.json({ error: "not found" }, { status: 404 });
   });
-  render(<CallsSection query="" onQueryChange={vi.fn()} />);
+  renderCallsSection();
   await screen.findByRole("button", { name: "Inspect saved-run" });
-  expect(screen.getByText("$0.0010")).toBeTruthy();
-  expect(
-    fetcher.mock.calls.some(([url]) =>
-      String(url).includes("includeCorrelated=1")
-    )
-  ).toBe(true);
+  await waitFor(() => expect(screen.getByText("$0.0010")).toBeTruthy());
+  expect(synced).toBe(true);
   expect(screen.queryByText("legacy-only-model")).toBeNull();
 });
 
+it("includes a deep-linked run in billing-sync even when it is off the first page", async () => {
+  records.push({
+    id: "page-run",
+    principalId: "external",
+    userId: "user",
+    externalAccountId: "account",
+    gatewayRequestId: "job_page",
+    providerRequestId: null,
+    provider: null,
+    source: "mcp",
+    capability: "text-generation",
+    modelId: "page-model",
+    endpoint: null,
+    status: "succeeded",
+    captureVersion: 1,
+    errorCode: null,
+    errorMessage: null,
+    version: 2,
+    createdAt: "2026-09-01T12:00:00Z",
+    updatedAt: "2026-09-01T12:00:01Z",
+    startedAt: "2026-09-01T12:00:00Z",
+    completedAt: "2026-09-01T12:00:01Z",
+    email: null,
+    billing: null,
+  });
+  navigation.search = "request=deep-run";
+  fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({ changedRunIds: [], changedCount: 0 });
+    if (input === "/api/console/runs/deep-run") {
+      return Response.json({
+        id: "deep-run",
+        principalId: "external",
+        userId: "user",
+        externalAccountId: "account",
+        gatewayRequestId: "job_deep",
+        providerRequestId: null,
+        provider: null,
+        source: "mcp",
+        capability: "text-generation",
+        modelId: "deep-model",
+        endpoint: null,
+        status: "succeeded",
+        captureVersion: 1,
+        errorCode: null,
+        errorMessage: null,
+        version: 2,
+        createdAt: "2026-08-01T12:00:00Z",
+        updatedAt: "2026-08-01T12:00:01Z",
+        startedAt: "2026-08-01T12:00:00Z",
+        completedAt: "2026-08-01T12:00:01Z",
+        email: null,
+        billing: null,
+        submittedArguments: null,
+        result: null,
+        captureRedactedPaths: [],
+        assets: [],
+        events: [],
+      });
+    }
+    if (String(input).startsWith("/api/console/runs"))
+      return Response.json({ items: records, nextCursor: null });
+    return Response.json({ error: "not found" }, { status: 404 });
+  });
+  renderCallsSection();
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.some(([url, init]) => {
+        if (url !== "/api/console/runs/billing-sync") return false;
+        const body = JSON.parse(
+          String((init as RequestInit | undefined)?.body)
+        );
+        return (
+          Array.isArray(body.runIds) &&
+          body.runIds[0] === "deep-run" &&
+          body.runIds.includes("page-run")
+        );
+      })
+    ).toBe(true)
+  );
+});
+
+it("does not keep polling billing-sync when usage is still pending", async () => {
+  records.push({
+    id: "saved-run",
+    principalId: "external",
+    userId: "user",
+    externalAccountId: "account",
+    gatewayRequestId: "job_saved",
+    providerRequestId: null,
+    provider: null,
+    source: "mcp",
+    capability: "text-generation",
+    modelId: "saved-model",
+    endpoint: null,
+    status: "succeeded",
+    captureVersion: 1,
+    errorCode: null,
+    errorMessage: null,
+    version: 2,
+    createdAt: "2026-09-01T12:00:00Z",
+    updatedAt: "2026-09-01T12:00:01Z",
+    startedAt: "2026-09-01T12:00:00Z",
+    completedAt: "2026-09-01T12:00:01Z",
+    email: null,
+    billing: null,
+  });
+  fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({
+        changedRunIds: [],
+        changedCount: 0,
+        pending: true,
+      });
+    if (String(input).startsWith("/api/console/runs"))
+      return Response.json({ items: records, nextCursor: null });
+    return Response.json({ error: "not found" }, { status: 404 });
+  });
+  renderCallsSection();
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.filter(
+        ([url]) => url === "/api/console/runs/billing-sync"
+      )
+    ).toHaveLength(1)
+  );
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  expect(
+    fetcher.mock.calls.filter(
+      ([url]) => url === "/api/console/runs/billing-sync"
+    )
+  ).toHaveLength(1);
+});
+
+it("does not restart billing sync when run detail arrives", async () => {
+  records.push({
+    id: "saved-run",
+    principalId: "external",
+    userId: "user",
+    externalAccountId: "account",
+    gatewayRequestId: "job_saved",
+    providerRequestId: null,
+    provider: null,
+    source: "mcp",
+    capability: "text-generation",
+    modelId: "saved-model",
+    endpoint: null,
+    status: "succeeded",
+    captureVersion: 1,
+    errorCode: null,
+    errorMessage: null,
+    version: 2,
+    createdAt: "2026-09-01T12:00:00Z",
+    updatedAt: "2026-09-01T12:00:01Z",
+    startedAt: "2026-09-01T12:00:00Z",
+    completedAt: "2026-09-01T12:00:01Z",
+    email: null,
+    billing: null,
+  });
+  navigation.search = "request=saved-run";
+  fetcher.mockImplementation(async (input: string) => {
+    if (input === "/api/console/runs/billing-sync")
+      return Response.json({ changedRunIds: [], changedCount: 0 });
+    if (input === "/api/console/runs/saved-run") {
+      return Response.json({
+        ...records[0],
+        submittedArguments: null,
+        result: null,
+        captureRedactedPaths: [],
+        assets: [],
+        events: [],
+      });
+    }
+    if (String(input).startsWith("/api/console/runs"))
+      return Response.json({ items: records, nextCursor: null });
+    return Response.json({ error: "not found" }, { status: 404 });
+  });
+  renderCallsSection();
+  await waitFor(() => expect(screen.getByTestId("detail-cost")).toBeTruthy());
+  await waitFor(() =>
+    expect(
+      fetcher.mock.calls.filter(
+        ([url]) => url === "/api/console/runs/billing-sync"
+      )
+    ).toHaveLength(1)
+  );
+});
+
 it("searches the same Postgres history rather than a separate loaded billing list", async () => {
-  render(<CallsSection query="flux" onQueryChange={vi.fn()} />);
+  renderCallsSection("flux");
   await screen.findByText("No history matches this search.");
   await waitFor(() =>
     expect(fetcher).toHaveBeenCalledWith(

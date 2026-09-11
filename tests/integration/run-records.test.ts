@@ -15,6 +15,10 @@ vi.mock("@/lib/external-accounts/service", () => ({
   }),
   findExternalAccountOwner: vi.fn(),
 }));
+import {
+  recordRunPaymentManifest,
+  recordManifestUsage,
+} from "@/lib/runs/store";
 import { getDb } from "@/lib/db";
 import {
   claimReconciliationJobs,
@@ -31,6 +35,7 @@ import { forgetAssets, listAssets } from "@/lib/mcp/store";
 it.skipIf(!process.env.TEST_DATABASE_URL)(
   "stores complete run lifecycle and hidden assets with transactional idempotency and owner isolation",
   async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://preview.example");
     const { client } = await openIntegrationDatabase(process.env);
     const rollback = new Error("rollback_run_store");
     try {
@@ -111,6 +116,44 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             ],
           });
           expect(succeeded.assets).toHaveLength(2);
+          expect(
+            await tx
+              .select()
+              .from(schema.runAssetLinks)
+              .where(eq(schema.runAssetLinks.runId, created.id))
+          ).toHaveLength(2);
+          const reusedAsset = succeeded.assets[0]!;
+          const consumer = await createRun(owner, {
+            id: "run-consumer",
+            gatewayRequestId: "job-consumer",
+            capability: "image-to-image",
+            submittedArguments: {
+              inputs: {
+                reference_image: `https://preview.example/api/assets/${reusedAsset.id}?exp=9999999999&sig=fixture`,
+              },
+            },
+          });
+          expect(consumer.assets).toEqual([
+            expect.objectContaining({ id: reusedAsset.id, role: "input" }),
+          ]);
+          expect(
+            await tx
+              .select()
+              .from(schema.runAssetLinks)
+              .where(eq(schema.runAssetLinks.runId, consumer.id))
+          ).toEqual([
+            expect.objectContaining({
+              assetId: reusedAsset.id,
+              direction: "input",
+              role: "reference_image",
+              parameterPath: "inputs.reference_image",
+              ordinal: 0,
+            }),
+          ]);
+          await tx
+            .update(schema.runs)
+            .set({ createdAt: new Date("2023-01-01"), updatedAt: new Date() })
+            .where(eq(schema.runs.id, consumer.id));
           expect(succeeded.result?.value).toEqual(["a", { image: "b" }]);
           expect(
             (
@@ -165,7 +208,7 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
           const first = await listOwnRuns(owner, { limit: 1 });
           expect(first.items.map((row) => row.id)).toEqual(["run-1"]);
           expect(first.items[0]).not.toHaveProperty("submittedArguments");
-          expect(first.counts.total).toBe(2);
+          expect(first.counts.total).toBe(3);
           const next = await listOwnRuns(owner, {
             limit: 1,
             cursor: first.nextCursor!,
@@ -203,7 +246,12 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             {
               eventId: "event-1",
               gatewayRequestId: "job-1",
-              metadata: { fee: "0.01" },
+              metadata: { networkFeeUsdMicros: "0.932" },
+            },
+            {
+              eventId: "event-2",
+              gatewayRequestId: "job-1",
+              metadata: { networkFeeUsdMicros: "2.068" },
             },
           ];
           await recordRunUsage(owner, usage);
@@ -216,9 +264,118 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             afterUsage?.events.filter((event) =>
               event.eventKey.startsWith("usage:")
             )
-          ).toHaveLength(1);
+          ).toHaveLength(2);
+          expect(afterUsage?.billing).toEqual({
+            networkFeeUsdMicros: "3",
+            receiptCount: 2,
+          });
+          expect(
+            await tx
+              .select()
+              .from(schema.runUsageReceipts)
+              .where(eq(schema.runUsageReceipts.runId, created.id))
+          ).toHaveLength(2);
+          expect(
+            (await listOwnRuns(owner, { limit: 10 })).items.find(
+              (item) => item.id === created.id
+            )?.billing
+          ).toEqual({ networkFeeUsdMicros: "3", receiptCount: 2 });
           expect(afterUsage?.version).toBe(beforeUsage?.version);
           expect(afterUsage?.status).toBe("succeeded");
+          // Snapshot refresh replaces amounts and must never add receipt totals again.
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "prepared",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "accepted",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-1",
+            phase: "prepared",
+          });
+          await recordRunPaymentManifest(owner, created.id, {
+            manifestId: "paid-2",
+            phase: "accepted",
+          });
+          await expect(
+            recordRunPaymentManifest(
+              { ...owner, userId: randomUUID() },
+              created.id,
+              { manifestId: "foreign", phase: "prepared" }
+            )
+          ).rejects.toThrow("run_owner_mismatch");
+          await expect(
+            recordRunPaymentManifest(owner, "run-2", {
+              manifestId: "paid-1",
+              phase: "prepared",
+            })
+          ).rejects.toThrow("payment_manifest_already_linked");
+          const snapshots = [
+            {
+              manifestId: "paid-1",
+              networkFeeUsdMicros: "2982",
+              feeWei: "123",
+            },
+            { manifestId: "paid-2", networkFeeUsdMicros: "10", feeWei: "1" },
+          ];
+          expect(
+            await recordManifestUsage(
+              owner,
+              [created.id],
+              snapshots.slice(0, 1),
+              new Date("2026-09-11T00:00:00Z")
+            )
+          ).toEqual([created.id]);
+          expect((await getOwnRun(owner, created.id))?.billing).toBeNull();
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            snapshots,
+            new Date("2026-09-11T00:01:00Z")
+          );
+          expect(
+            await recordManifestUsage(
+              owner,
+              [created.id],
+              snapshots,
+              new Date("2026-09-11T00:02:00Z")
+            )
+          ).toEqual([]);
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            [{ ...snapshots[0], networkFeeUsdMicros: "1" }],
+            new Date("2026-09-10")
+          );
+          expect((await getOwnRun(owner, created.id))?.billing).toEqual({
+            networkFeeUsdMicros: "2992",
+            manifestCount: 2,
+          });
+          expect(
+            (await listOwnRuns(owner, { limit: 100 })).items.find(
+              (r) => r.id === created.id
+            )?.billing
+          ).toEqual({ networkFeeUsdMicros: "2992", manifestCount: 2 });
+          await recordManifestUsage(
+            owner,
+            [created.id],
+            [{ ...snapshots[0], networkFeeUsdMicros: "3000" }],
+            new Date("2026-09-11T00:03:00Z")
+          );
+          expect(
+            (await getOwnRun(owner, created.id))?.billing?.networkFeeUsdMicros
+          ).toBe("3010");
+          await recordManifestUsage(
+            { ...owner, userId: randomUUID() },
+            [created.id],
+            snapshots,
+            new Date("2026-09-12")
+          );
+          expect(
+            (await getOwnRun(owner, created.id))?.billing?.networkFeeUsdMicros
+          ).toBe("3010");
           const stale = await createRun(owner, {
             id: "stale",
             gatewayRequestId: "job-stale",
@@ -368,10 +525,55 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
             (await tx.select().from(schema.runReconciliationJobs))[0]
               .completedAt
           ).not.toBeNull();
+          // Filter obsolete preview records before both pagination and totals.
+          for (const id of [
+            "run_preview_v2_page_1",
+            "run_preview_v2_page_2",
+            "run_preview_v2_page_3",
+            "run_preview_legacy_1",
+            "run_preview_legacy_2",
+          ]) {
+            await createRun(owner, {
+              id,
+              gatewayRequestId: `job_${id}`,
+              capability: "pagination-regression",
+              submittedArguments: {},
+            });
+          }
+          const firstPage = await listOwnRuns(
+            owner,
+            { limit: 2, search: "pagination-regression" },
+            { excludeLegacyPreview: true }
+          );
+          expect(firstPage.items).toHaveLength(2);
+          expect(firstPage.counts.total).toBe(3);
+          expect(firstPage.nextCursor).not.toBeNull();
+          const lastPage = await listOwnRuns(
+            owner,
+            {
+              limit: 2,
+              search: "pagination-regression",
+              cursor: firstPage.nextCursor!,
+            },
+            { excludeLegacyPreview: true }
+          );
+          expect(lastPage.items).toHaveLength(1);
+          expect(lastPage.counts.total).toBe(3);
+          expect(lastPage.nextCursor).toBeNull();
+          expect(
+            new Set(
+              [...firstPage.items, ...lastPage.items].map((item) => item.id)
+            ).size
+          ).toBe(3);
+          expect(
+            (await listOwnRuns(owner, { search: "pagination-regression" }))
+              .counts.total
+          ).toBe(5);
           throw rollback;
         })
       ).rejects.toBe(rollback);
     } finally {
+      vi.unstubAllEnvs();
       await client.end();
     }
   },

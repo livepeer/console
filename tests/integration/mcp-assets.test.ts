@@ -32,9 +32,11 @@ describe("mcp asset store helpers", () => {
       createdAt: "2026-09-05T01:00:00.000Z",
     });
     expect(asset.gatewayRequestId).toBe("job_abc");
-    expect(serializeAsset(asset)).toEqual({
+    expect(serializeAsset(asset, "eu_test")).toEqual({
       id: "asset_1",
-      url: "https://v3b.fal.media/files/x.jpg",
+      url: expect.stringMatching(
+        /^http:\/\/localhost:3000\/api\/assets\/asset_1\?exp=\d+&sig=[A-Za-z0-9_-]+$/
+      ),
       capability: "livepeer-example/fal-flux-schnell",
       created_at: "2026-09-05T01:00:00.000Z",
       gateway_request_id: "job_abc",

@@ -1,11 +1,15 @@
 import {
+  check,
+  integer,
   index,
   foreignKey,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { runs } from "./runs";
 
 /** MCP-produced media URLs, scoped per console/MCP principal (`eu_…`). */
@@ -50,5 +54,43 @@ export const mcpAssets = pgTable(
       table.principalId,
       table.capability
     ),
+  ]
+);
+
+/** Durable creative-lineage edges. mcp_assets.run_id remains the convenient
+ * producer pointer; this table is canonical for both input and output use. */
+export const runAssetLinks = pgTable(
+  "run_asset_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "restrict" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => mcpAssets.id, { onDelete: "restrict" }),
+    direction: text("direction").notNull(),
+    role: text("role").notNull(),
+    parameterPath: text("parameter_path"),
+    ordinal: integer("ordinal").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("run_asset_links_edge_unique").on(
+      table.runId,
+      table.assetId,
+      table.direction,
+      table.parameterPath,
+      table.ordinal
+    ),
+    index("run_asset_links_run_idx").on(table.runId, table.direction),
+    index("run_asset_links_asset_idx").on(table.assetId, table.direction),
+    check(
+      "run_asset_links_direction_check",
+      sql`${table.direction} in ('input', 'output')`
+    ),
+    check("run_asset_links_ordinal_check", sql`${table.ordinal} >= 0`),
   ]
 );

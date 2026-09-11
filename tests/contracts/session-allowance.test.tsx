@@ -33,6 +33,14 @@ vi.mock("@/lib/console/session-user", () => ({
 vi.mock("@/lib/console/pymthouse-bff", () => ({
   fetchAccountUsageForExternalUser: vi.fn(),
 }));
+const preview = vi.hoisted(() => ({
+  enabled: vi.fn(() => false),
+  usage: vi.fn(),
+}));
+vi.mock("@/lib/runs/preview-fixtures", () => ({
+  previewFixturesEnabled: preview.enabled,
+  previewAccountUsage: preview.usage,
+}));
 
 import SidebarUsageCard from "@/components/console/SidebarUsageCard";
 import { GET } from "@/app/api/pymthouse/account-usage/route";
@@ -45,6 +53,29 @@ import { fetchAccountUsageForExternalUser } from "@/lib/console/pymthouse-bff";
 beforeEach(() => {
   fixture.connected = true;
   vi.resetAllMocks();
+  preview.enabled.mockReturnValue(false);
+});
+it("serves a preview balance without contacting PymtHouse", async () => {
+  vi.mocked(requireConsoleSession).mockResolvedValue({
+    externalUserId: "session-user",
+  } as never);
+  preview.enabled.mockReturnValue(true);
+  preview.usage.mockReturnValue({
+    balance: { externalUserId: "session-user", balanceUsdMicros: "4986174" },
+  });
+  const response = await GET(
+    new NextRequest(
+      "http://localhost/api/pymthouse/account-usage?days=7&window=rolling&includePrior=0"
+    )
+  );
+  expect(response.status).toBe(200);
+  expect(preview.usage).toHaveBeenCalledWith({
+    externalUserId: "session-user",
+    periodDays: 7,
+    window: "rolling",
+    includePrior: false,
+  });
+  expect(fetchAccountUsageForExternalUser).not.toHaveBeenCalled();
 });
 afterEach(cleanup);
 

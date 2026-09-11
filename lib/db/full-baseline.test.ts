@@ -34,11 +34,11 @@ describe("full baseline transition", () => {
     ])
       expect(() => consoleMigrationTarget({ ...env, ...changes })).toThrow();
   });
-  it("pins every original hash and a single equivalent final snapshot", () => {
+  it("pins every original hash, the equivalent baseline, and additive migrations", () => {
     const manifest = JSON.parse(
       readFileSync("drizzle-baseline/source-manifest.json", "utf8")
     );
-    expect(active).toHaveLength(1);
+    expect(active).toHaveLength(3);
     expect(
       legacy.map((m) => ({ sha256: m.hash, when: m.folderMillis }))
     ).toEqual(
@@ -90,17 +90,17 @@ describe("full baseline transition", () => {
   });
   it("accepts the same future chain for both baseline and adopted databases", () => {
     const future = {
-      ...active[0],
+      ...active.at(-1)!,
       hash: "future",
-      folderMillis: active[0].folderMillis + 1,
+      folderMillis: active.at(-1)!.folderMillis + 1,
     };
     const chain = [...active, future];
     expect(classifyJournal(entries(chain), legacy, chain)).toEqual({
       kind: "baseline",
-      applied: 2,
+      applied: 4,
     });
     expect(
       classifyJournal(entries([...legacy, ...chain]), legacy, chain)
-    ).toEqual({ kind: "adopted", applied: 2 });
+    ).toEqual({ kind: "adopted", applied: 4 });
   });
 });
