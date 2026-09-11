@@ -270,6 +270,60 @@ describe("durable MCP execution", () => {
   );
 });
 
+it("retries accepted payment persist on a transient store failure", async () => {
+  const deps = fixture();
+  let acceptedAttempts = 0;
+  vi.mocked(deps.store.recordRunPaymentManifest).mockImplementation(
+    async (_owner, _id, payment) => {
+      if (payment.phase === "accepted" && ++acceptedAttempts === 1)
+        throw new Error("db unavailable");
+    }
+  );
+  vi.mocked(deps.infer).mockImplementation(async ({ onPayment }) => {
+    await onPayment({ manifestId: "manifest-1", phase: "prepared" });
+    await onPayment({ manifestId: "manifest-1", phase: "accepted" });
+    return {
+      gatewayRequestId: "job_test",
+      data: { text: "ok" },
+      status: "succeeded",
+      url: null,
+      billableUnits: null,
+    } as never;
+  });
+  const reply = await executeDurableRun(principal, { capability: "test" }, deps);
+  expect(reply.isError).toBe(false);
+  expect(acceptedAttempts).toBe(2);
+  expect(deps.store.recordRunPaymentManifest).toHaveBeenCalledTimes(3);
+});
+
+it("aborts after payment persist retries are exhausted", async () => {
+  const deps = fixture();
+  vi.mocked(deps.store.recordRunPaymentManifest).mockRejectedValue(
+    new Error("db unavailable")
+  );
+  vi.mocked(deps.infer).mockImplementation(async ({ onPayment }) => {
+    await onPayment({ manifestId: "manifest-1", phase: "accepted" });
+    return {
+      gatewayRequestId: "job_test",
+      data: { text: "ok" },
+      status: "succeeded",
+      url: null,
+      billableUnits: null,
+    } as never;
+  });
+  const reply = await executeDurableRun(principal, { capability: "test" }, deps);
+  expect(reply.isError).toBe(true);
+  expect(deps.store.recordRunPaymentManifest).toHaveBeenCalledTimes(3);
+  expect(deps.store.transitionRun).toHaveBeenCalledWith(
+    owner,
+    "run_test",
+    expect.objectContaining({
+      status: "unknown",
+      errorCode: "execution_outcome_unknown",
+    })
+  );
+});
+
 it("records every payment phase against the run even when inference fails afterward", async () => {
   const deps = fixture();
   vi.mocked(deps.infer).mockImplementation(async ({ onPayment }) => {
@@ -301,6 +355,15 @@ it("persists explicit expiry and sanitizes all returned media with partial captu
         { url: "https://provider.example/missing" },
         { url: "https://provider.example/signed?token=private" },
       ],
+      output_url: "https://provider.example/download?token=private",
+      outputUrl: "https://provider.example/download?token=private",
+      outputURL: "https://provider.example/download?token=private",
+      preview_url: "https://provider.example/preview?token=private",
+      previewUrl: "https://provider.example/preview?token=private",
+      status_url: "https://queue.fal.run/fal-ai/flux/requests/id/status",
+      statusUrl: "https://queue.fal.run/fal-ai/flux/requests/id/status",
+      responseURI: "https://queue.fal.run/fal-ai/flux/requests/id",
+      asset2Url: "https://provider.example/signed?token=private",
     },
   } as unknown as Awaited<ReturnType<ExecutionDependencies["infer"]>>);
   vi.mocked(deps.store.transitionRun).mockResolvedValue({
@@ -328,7 +391,7 @@ it("persists explicit expiry and sanitizes all returned media with partial captu
     })
   );
   expect(JSON.stringify(result.payload)).not.toMatch(
-    /provider.example|private|REDACTED/
+    /provider.example|private|REDACTED|queue\.fal\.run/
   );
   expect(JSON.stringify(result.payload)).toContain("/api/assets/owned");
 });

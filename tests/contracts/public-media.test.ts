@@ -101,6 +101,32 @@ it("captures distinct explicit expiries, keeps availability guarantees separate,
   ).toBe(a);
 });
 
+it("strips compound provider URL keys including credentialed values", () => {
+  const token = "https://v3.fal.media/files/x?token=secret";
+  const queue = "https://queue.fal.run/fal-ai/flux/requests/id/status";
+  expect(
+    sanitizePublicMedia(
+      {
+        output_url: token,
+        outputUrl: token,
+        outputURL: token,
+        preview_url: token,
+        previewUrl: token,
+        download_url: token,
+        status_url: queue,
+        statusUrl: queue,
+        response_url: "https://queue.fal.run/fal-ai/flux/requests/id",
+        responseURI: queue,
+        asset2Url: token,
+        prompt: `see ${token}`,
+        website: "https://example.com",
+      },
+      [],
+      "eu_test"
+    )
+  ).toEqual({ prompt: `see ${token}`, website: "https://example.com" });
+});
+
 it("drops unsupported 3D media URLs without removing ordinary model identifiers", () => {
   expect(
     sanitizePublicMedia(

@@ -83,7 +83,7 @@ export function sanitizePublicMedia(
   const mediaKey = (key: string) =>
     /(?:image|video|audio|mask|media|thumbnail|reference|attachment|file|model|mesh|texture)/i.test(
       key
-    ) || /^(?:url|urls|uri|uris)$/.test(key);
+    ) || /(?:^|_|[a-z0-9])(?:urls?|uris?)$/i.test(key);
   const visit = (item: JsonValue, media = false): JsonValue | undefined => {
     if (typeof item === "string") {
       const id = byUrl.get(item) ?? ownedAssetReference(item, assets);

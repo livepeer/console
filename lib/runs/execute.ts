@@ -49,20 +49,30 @@ export type ExecutionDependencies = {
 };
 
 /** Persist retries never contain or repeat inference dispatch. */
-async function recordWithRetry(
-  fn: () => Promise<RunDetail>
-): Promise<RunDetail | null> {
+async function persistWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let last: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await fn();
-    } catch {
+    } catch (error) {
+      last = error;
       if (attempt < 2)
         await new Promise((resolve) =>
           setTimeout(resolve, 100 * (attempt + 1))
         );
     }
   }
-  return null;
+  throw last instanceof Error ? last : new Error("run_store_unavailable");
+}
+
+async function recordWithRetry(
+  fn: () => Promise<RunDetail>
+): Promise<RunDetail | null> {
+  try {
+    return await persistWithRetry(fn);
+  } catch {
+    return null;
+  }
 }
 
 export async function executeDurableRun(
@@ -181,8 +191,10 @@ export async function executeDurableRun(
       timeoutMs: 780_000,
       gatewayRequestId,
       onPayment: async (payment) => {
-        // Failure propagates to the SDK as a non-retryable error, never another charge.
-        await deps.store.recordRunPaymentManifest(owner, run.id, payment);
+        // Same charge only. Failure after retries still aborts the SDK; never another paid attempt.
+        await persistWithRetry(() =>
+          deps.store.recordRunPaymentManifest(owner, run.id, payment)
+        );
       },
       onProgress: async (info) => {
         providerRequestId = info.requestId ?? providerRequestId;
