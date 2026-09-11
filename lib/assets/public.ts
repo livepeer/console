@@ -84,6 +84,7 @@ export function sanitizePublicMedia(
     /(?:image|video|audio|mask|media|thumbnail|reference|attachment|file|model|mesh|texture)/i.test(
       key
     ) || /(?:^|_|[a-z0-9])(?:urls?|uris?)$/i.test(key);
+  const wrapperKey = (key: string) => /^(?:output|data|result)$/i.test(key);
   const visit = (item: JsonValue, media = false): JsonValue | undefined => {
     if (typeof item === "string") {
       const id = byUrl.get(item) ?? ownedAssetReference(item, assets);
@@ -103,7 +104,7 @@ export function sanitizePublicMedia(
             child,
             /prompt|caption|description|^(?:text|texts)$/i.test(key)
               ? false
-              : mediaKey(key) || media
+              : mediaKey(key) || wrapperKey(key) || media
           );
           return result === undefined ? [] : [[key, result]];
         })

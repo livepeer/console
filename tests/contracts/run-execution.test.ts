@@ -290,7 +290,11 @@ it("retries accepted payment persist on a transient store failure", async () => 
       billableUnits: null,
     } as never;
   });
-  const reply = await executeDurableRun(principal, { capability: "test" }, deps);
+  const reply = await executeDurableRun(
+    principal,
+    { capability: "test" },
+    deps
+  );
   expect(reply.isError).toBe(false);
   expect(acceptedAttempts).toBe(2);
   expect(deps.store.recordRunPaymentManifest).toHaveBeenCalledTimes(3);
@@ -311,7 +315,11 @@ it("aborts after payment persist retries are exhausted", async () => {
       billableUnits: null,
     } as never;
   });
-  const reply = await executeDurableRun(principal, { capability: "test" }, deps);
+  const reply = await executeDurableRun(
+    principal,
+    { capability: "test" },
+    deps
+  );
   expect(reply.isError).toBe(true);
   expect(deps.store.recordRunPaymentManifest).toHaveBeenCalledTimes(3);
   expect(deps.store.transitionRun).toHaveBeenCalledWith(
@@ -355,6 +363,9 @@ it("persists explicit expiry and sanitizes all returned media with partial captu
         { url: "https://provider.example/missing" },
         { url: "https://provider.example/signed?token=private" },
       ],
+      output: "https://provider.example/download?token=private",
+      data: "https://provider.example/download?token=private",
+      result: { output: "https://provider.example/download?token=private" },
       output_url: "https://provider.example/download?token=private",
       outputUrl: "https://provider.example/download?token=private",
       outputURL: "https://provider.example/download?token=private",

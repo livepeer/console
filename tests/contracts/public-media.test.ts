@@ -203,6 +203,30 @@ it("captures distinct explicit expiries, keeps availability guarantees separate,
   ).toBe(a);
 });
 
+it("strips provider URLs under generic output/data/result wrappers", () => {
+  const url = "https://provider.example/file?token=secret";
+  expect(
+    sanitizePublicMedia(
+      {
+        output: url,
+        data: url,
+        result: url,
+        nested: { output: { data: url } },
+        prompt: `see ${url}`,
+        text: url,
+        website: "https://example.com",
+      },
+      [],
+      "eu_test"
+    )
+  ).toEqual({
+    nested: { output: {} },
+    prompt: `see ${url}`,
+    text: url,
+    website: "https://example.com",
+  });
+});
+
 it("strips compound provider URL keys including credentialed values", () => {
   const token = "https://v3.fal.media/files/x?token=secret";
   const queue = "https://queue.fal.run/fal-ai/flux/requests/id/status";
