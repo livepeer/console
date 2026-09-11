@@ -1,5 +1,5 @@
 import "server-only";
-import { mintEndUserAccessToken } from "./pymthouse-bff";
+import { getEndUserAccessToken } from "./pymthouse-bff";
 import { issuerOriginFromConfig } from "./pymthouse-http";
 
 export type ManifestUsage = {
@@ -15,7 +15,7 @@ export async function fetchManifestUsage(input: {
   startDate: string;
   endDate: string;
 }): Promise<ManifestUsage[]> {
-  const token = await mintEndUserAccessToken(input.externalUserId, input.email);
+  const token = await getEndUserAccessToken(input.externalUserId, input.email);
   const url = new URL("/api/v1/user/usage", issuerOriginFromConfig());
   url.search = new URLSearchParams({
     groupBy: "manifest",

@@ -1,20 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { identitySyncPath, safeIdentityReturnTo } from "./sync-return";
+import { isProtocolReturnPath, safeIdentityReturnTo } from "./sync-return";
 
-describe("identity sync return routing", () => {
-  it("wraps internal paths", () => {
-    expect(identitySyncPath("/home?tab=usage")).toBe(
-      "/api/identity/sync?returnTo=%2Fhome%3Ftab%3Dusage"
+describe("signed-in return paths", () => {
+  it("treats device, authorize, and MCP callback as protocol destinations", () => {
+    expect(isProtocolReturnPath("/device?user_code=ABC")).toBe(true);
+    expect(isProtocolReturnPath("/authorize")).toBe(true);
+    expect(isProtocolReturnPath("/api/mcp/oauth/callback?state=opaque")).toBe(
+      true
     );
+    expect(isProtocolReturnPath("/home")).toBe(false);
   });
 
   it("rejects protocol-relative and external redirects", () => {
     expect(safeIdentityReturnTo("//evil.example")).toBe("/");
     expect(safeIdentityReturnTo("/\\evil.example/path")).toBe("/");
     expect(safeIdentityReturnTo("https://evil.example")).toBe("/");
-    expect(identitySyncPath("https://evil.example")).toBe(
-      "/api/identity/sync?returnTo=%2F"
-    );
+    expect(safeIdentityReturnTo("/home?tab=usage")).toBe("/home?tab=usage");
   });
 });

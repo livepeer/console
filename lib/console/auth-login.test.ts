@@ -29,34 +29,40 @@ test("safeReturnTo rejects absolute and protocol-relative URLs", () => {
 });
 
 test("authLoginHref is the Auth0 SDK handoff", () => {
-  assert.equal(
-    authLoginHref(),
-    "/auth/login?returnTo=%2Fapi%2Fidentity%2Fsync%3FreturnTo%3D%252Fhome"
-  );
+  assert.equal(authLoginHref(), "/auth/login?returnTo=%2Flogin");
   assert.equal(
     authLoginHref({ signup: true }),
-    "/auth/login?screen_hint=signup&returnTo=%2Fapi%2Fidentity%2Fsync%3FreturnTo%3D%252Fhome"
+    "/auth/login?screen_hint=signup&returnTo=%2Flogin"
   );
   assert.equal(
     authLoginHref({ returnTo: "/waitlist", loginHint: "a@b.com" }),
-    "/auth/login?returnTo=%2Fapi%2Fidentity%2Fsync%3FreturnTo%3D%252Fwaitlist&login_hint=a%40b.com"
+    "/auth/login?returnTo=%2Flogin%3FreturnTo%3D%252Fwaitlist&login_hint=a%40b.com"
   );
   assert.equal(
     authLoginHref({ connection: "google-oauth2", returnTo: "//evil.example" }),
-    "/auth/login?returnTo=%2Fapi%2Fidentity%2Fsync%3FreturnTo%3D%252Fhome&connection=google-oauth2"
+    "/auth/login?returnTo=%2Flogin&connection=google-oauth2"
   );
   assert.equal(
     authLoginHref({ connection: "github", signup: true }),
-    "/auth/login?screen_hint=signup&returnTo=%2Fapi%2Fidentity%2Fsync%3FreturnTo%3D%252Fhome&connection=github"
+    "/auth/login?screen_hint=signup&returnTo=%2Flogin&connection=github"
   );
 });
 
 test("console sign-in/up hrefs stay on the branded pages", () => {
   assert.equal(AUTH_SIGNIN_HREF, "/login");
   assert.equal(AUTH_SIGNUP_HREF, "/signup");
-  assert.equal(consoleSignInHref({ returnTo: "/waitlist" }), "/login?returnTo=%2Fwaitlist");
-  assert.equal(consoleSignUpHref({ returnTo: "/waitlist" }), "/signup?returnTo=%2Fwaitlist");
-  assert.equal(consoleSignInHref({ returnTo: "https://evil.example" }), "/login");
+  assert.equal(
+    consoleSignInHref({ returnTo: "/waitlist" }),
+    "/login?returnTo=%2Fwaitlist"
+  );
+  assert.equal(
+    consoleSignUpHref({ returnTo: "/waitlist" }),
+    "/signup?returnTo=%2Fwaitlist"
+  );
+  assert.equal(
+    consoleSignInHref({ returnTo: "https://evil.example" }),
+    "/login"
+  );
 });
 
 test("isConsoleAuthPath covers branded pages and the SDK mount", () => {

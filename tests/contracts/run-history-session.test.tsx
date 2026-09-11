@@ -29,6 +29,32 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+it("keeps the current run list visible while reload fetches a newer page", async () => {
+  const next = deferred<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(page("run-a"))
+      .mockReturnValueOnce(next.promise)
+  );
+  const hook = renderHook(() => useRunHistory("/api/console/runs", true, {}));
+  await waitFor(() =>
+    expect(hook.result.current.page?.items[0].id).toBe("run-a")
+  );
+  act(() => {
+    hook.result.current.reload();
+  });
+  expect(hook.result.current.page?.items[0].id).toBe("run-a");
+  expect(hook.result.current.loading).toBe(false);
+  await act(async () => {
+    next.resolve(page("run-b"));
+  });
+  await waitFor(() =>
+    expect(hook.result.current.page?.items[0].id).toBe("run-b")
+  );
+});
+
 it("invalidates run list data when the enabled account changes", async () => {
   const next = deferred<Response>();
   vi.stubGlobal(
@@ -80,6 +106,51 @@ it("ignores a late run page from an old account and hides data when disabled", a
   hook.rerender({ owner: "account-b", enabled: false });
   expect(hook.result.current.page).toBeNull();
   expect(hook.result.current.loading).toBe(false);
+});
+
+it("aborts pagination when reloading so a later loadMore is not blocked", async () => {
+  const more = deferred<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(page("run-a", "cursor-1"))
+      .mockReturnValueOnce(more.promise)
+      .mockResolvedValueOnce(Response.json({}, { status: 500 }))
+      .mockResolvedValueOnce(page("run-older"))
+  );
+  const hook = renderHook(() => useRunHistory("/api/console/runs", true, {}));
+  await waitFor(() =>
+    expect(hook.result.current.page?.nextCursor).toBe("cursor-1")
+  );
+  let firstMore!: Promise<void>;
+  act(() => {
+    firstMore = hook.result.current.loadMore();
+  });
+  expect(hook.result.current.loadingMore).toBe(true);
+  act(() => {
+    hook.result.current.reload();
+  });
+  expect(hook.result.current.loadingMore).toBe(false);
+  await waitFor(() => expect(hook.result.current.error).toBeTruthy());
+  expect(hook.result.current.loadingMore).toBe(false);
+  await act(async () => {
+    await hook.result.current.loadMore();
+  });
+  await waitFor(() =>
+    expect(hook.result.current.page?.items.map((row) => row.id)).toEqual([
+      "run-a",
+      "run-older",
+    ])
+  );
+  await act(async () => {
+    more.resolve(page("run-stale"));
+    await firstMore;
+  });
+  expect(hook.result.current.page?.items.map((row) => row.id)).toEqual([
+    "run-a",
+    "run-older",
+  ]);
 });
 
 it("does not append another account's delayed continuation to the current run list", async () => {

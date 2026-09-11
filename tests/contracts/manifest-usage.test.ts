@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/console/pymthouse-bff", () => ({
-  mintEndUserAccessToken: vi.fn(async () => ({ access_token: "test-token" })),
+  getEndUserAccessToken: vi.fn(async () => ({ access_token: "test-token" })),
 }));
 vi.mock("@/lib/console/pymthouse-http", () => ({
   issuerOriginFromConfig: () => "https://pymthouse.test",

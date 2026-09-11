@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import SectionHeader from "@/components/console/SectionHeader";
@@ -38,12 +38,15 @@ export default function CallsSection({
   const detailReload = detail.reload;
   const visibleRunIds = useMemo(() => {
     const ids = history.page?.items.map((run) => run.id) ?? [];
-    const openId =
-      detail.detail?.id ??
-      (requestId && ids.includes(requestId) ? requestId : null);
-    return openId ? [openId, ...ids.filter((id) => id !== openId)] : ids;
-  }, [detail.detail?.id, history.page, requestId]);
+    return requestId
+      ? [requestId, ...ids.filter((id) => id !== requestId)]
+      : ids;
+  }, [history.page, requestId]);
   const visibleRunKey = visibleRunIds.slice(0, 50).join(",");
+  const openDetailIdRef = useRef<string | null>(null);
+  const detailReloadRef = useRef(detailReload);
+  openDetailIdRef.current = detail.detail?.id ?? null;
+  detailReloadRef.current = detailReload;
   useEffect(() => {
     if (!isConnected || !ownerKey || !visibleRunKey) return;
     const controller = new AbortController();
@@ -65,11 +68,9 @@ export default function CallsSection({
         if (controller.signal.aborted) return;
         if (result.changedRunIds.length) {
           historyReload();
-          if (
-            detail.detail?.id &&
-            result.changedRunIds.includes(detail.detail.id)
-          )
-            detailReload();
+          const openId = openDetailIdRef.current;
+          if (openId && result.changedRunIds.includes(openId))
+            detailReloadRef.current();
         }
         // Usage ingestion is asynchronous. Refresh aggregates, not pages of receipts.
         if (result.pending) timer = setTimeout(() => void refresh(), 30_000);
@@ -84,14 +85,7 @@ export default function CallsSection({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [
-    detail.detail?.id,
-    detailReload,
-    historyReload,
-    isConnected,
-    ownerKey,
-    visibleRunKey,
-  ]);
+  }, [historyReload, isConnected, ownerKey, visibleRunKey]);
   const router = useRouter();
   const recorded = useMemo(
     () => history.page?.items.map((run) => runToActivity(run)) ?? [],
