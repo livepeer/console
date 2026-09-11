@@ -251,3 +251,24 @@ it("returns an independent billing error without creating fabricated execution h
   expect(recordRunUsage).not.toHaveBeenCalled();
   expect(attachOutputsToTickets).not.toHaveBeenCalled();
 });
+
+it.each(["", "?includeCorrelated=1"])(
+  "sanitizes asset URLs on account requests %s",
+  async (query) => {
+    vi.mocked(fetchAccountRequestsForExternalUser).mockResolvedValue(
+      payload(
+        [{ ...row("legacy"), outputUrl: "https://provider.example/a" }],
+        null
+      )
+    );
+    vi.mocked(attachOutputsToTickets).mockImplementation(
+      async (_owner, items) =>
+        items.map((item) => ({ ...item, outputUrl: null }))
+    );
+    const response = await GET(
+      new NextRequest(`http://localhost/api/pymthouse/account-requests${query}`)
+    );
+    expect((await response.json()).items[0].outputUrl).toBeNull();
+    expect(attachOutputsToTickets).toHaveBeenCalledTimes(1);
+  }
+);

@@ -50,9 +50,21 @@ const MOCK_ASSET_PATHS: Record<string, string> = {
   asset_user_upload_product_walkthrough: "/media-2026-08-08-141651/crab.mp4",
 };
 
+function mockBilling(id: string) {
+  const fees: Record<string, string> = {
+    run_dev_video: "84200",
+    run_dev_image: "9600",
+    run_dev_keyframes: "112600",
+    run_dev_transcript: "5800",
+    run_dev_metadata: "1100",
+    run_dev_3d: "126400",
+  };
+  return fees[id] ? { networkFeeUsdMicros: fees[id]!, receiptCount: 1 } : null;
+}
+
 function mockRunSummaries(): RunSummary[] {
   const now = Date.now();
-  return [
+  const rows: RunSummary[] = [
     {
       ...MOCK_OWNER,
       id: "run_dev_video",
@@ -201,18 +213,22 @@ function mockRunSummaries(): RunSummary[] {
       email: MOCK_EMAIL,
     },
   ];
+  return rows.map((run) => ({ ...run, billing: mockBilling(run.id) }));
 }
 
-function mockRunDetail(run: RunSummary): RunDetail {
+function mockRunDetail(run: RunSummary, origin: string): RunDetail {
   const video = run.id === "run_dev_video";
   const image = run.id === "run_dev_image";
-  const assetUrl = (id: string) =>
-    `https://earlyaccess.livepeer.org/api/assets/${id}`;
+  const assetUrl = (id: string) => `${origin}/api/assets/${id}`;
+  const mockAsset = (...args: Parameters<typeof mockAssetRecord>) => ({
+    ...mockAssetRecord(...args),
+    url: assetUrl(args[1]),
+  });
 
   let inputs: Record<string, JsonValue>;
   let resultValue: JsonValue;
   let assets: RunDetail["assets"] = [];
-  let feeUsdMicros = "4200";
+  const feeUsdMicros = mockBilling(run.id)?.networkFeeUsdMicros;
 
   if (video) {
     const outputId = "asset_dev_video";
@@ -238,7 +254,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       mockAsset(run, referenceId, "image", "Forest reference.webp"),
       mockAsset(run, maskId, "image", "Forest subject mask.webp"),
     ];
-    feeUsdMicros = "84200";
   } else if (image) {
     const outputId = "asset_dev_image";
     inputs = {
@@ -253,7 +268,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       inference_time_ms: 1_840,
     };
     assets = [mockAsset(run, outputId, "image", "Red lighthouse.webp")];
-    feeUsdMicros = "9600";
   } else if (run.id === "run_dev_keyframes") {
     const outputId = "asset_dev_keyframes_video";
     const firstFrameId = "asset_platform_station_first";
@@ -295,7 +309,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       mockAsset(run, middleFrameId, "image", "Train entering station.webp"),
       mockAsset(run, lastFrameId, "image", "Train departing into fog.webp"),
     ];
-    feeUsdMicros = "112600";
   } else if (run.id === "run_dev_transcript") {
     const audioId = "asset_user_upload_interview_audio";
     inputs = {
@@ -321,7 +334,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       inference_time_ms: 7_260,
     };
     assets = [mockAsset(run, audioId, "audio", "Interview recording.mp3")];
-    feeUsdMicros = "5800";
   } else if (run.id === "run_dev_metadata") {
     const sourceId = "asset_user_upload_product_walkthrough";
     inputs = {
@@ -356,7 +368,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       processing_duration_ms: 940,
     };
     assets = [mockAsset(run, sourceId, "video", "Product walkthrough.mp4")];
-    feeUsdMicros = "1100";
   } else if (run.id === "run_dev_3d") {
     const modelId = "asset_dev_3d_glb";
     const textureId = "asset_dev_3d_texture";
@@ -383,7 +394,6 @@ function mockRunDetail(run: RunSummary): RunDetail {
       mockAsset(run, textureId, "image/png", "Ceramic fox texture.png"),
       mockAsset(run, previewId, "image/png", "Ceramic fox preview.png"),
     ];
-    feeUsdMicros = "126400";
   } else {
     inputs = {
       prompt: "A glass sculpture rotating in a dark studio",
@@ -401,7 +411,10 @@ function mockRunDetail(run: RunSummary): RunDetail {
     },
     result: { value: resultValue },
     captureRedactedPaths: [],
-    assets,
+    assets: assets.map((asset) => ({
+      ...asset,
+      role: JSON.stringify(inputs).includes(asset.url) ? "input" : "output",
+    })),
     events: [
       {
         id: `${run.id}_created`,
@@ -410,17 +423,21 @@ function mockRunDetail(run: RunSummary): RunDetail {
         createdAt: run.createdAt,
         metadata: {},
       },
-      {
-        id: `${run.id}_usage`,
-        eventKey: `usage:evt_${run.id}`,
-        status: run.status,
-        createdAt: run.completedAt ?? run.updatedAt,
-        metadata: {
-          kind: "billing_usage",
-          eventId: `evt_${run.id}`,
-          networkFeeUsdMicros: feeUsdMicros,
-        },
-      },
+      ...(feeUsdMicros
+        ? [
+            {
+              id: `${run.id}_usage`,
+              eventKey: `usage:evt_${run.id}`,
+              status: run.status,
+              createdAt: run.completedAt ?? run.updatedAt,
+              metadata: {
+                kind: "billing_usage",
+                eventId: `evt_${run.id}`,
+                networkFeeUsdMicros: feeUsdMicros,
+              },
+            },
+          ]
+        : []),
       {
         id: `${run.id}_returned`,
         eventKey: "dispatch-returned",
@@ -504,7 +521,7 @@ function mockInputSchema(run: RunSummary): RunInputSchema | null {
   return null;
 }
 
-function mockAsset(
+function mockAssetRecord(
   run: RunSummary,
   id: string,
   mediaType: string,
@@ -1129,11 +1146,14 @@ export function devMockResponse(
     });
   }
 
+  if (pathname === "/api/console/runs/billing-sync")
+    return json({ changedRunIds: [], changedCount: 0, pending: false });
+
   if (pathname.startsWith("/api/console/runs/")) {
     const id = decodeURIComponent(pathname.slice("/api/console/runs/".length));
     const run = mockRunSummaries().find((item) => item.id === id);
     return run
-      ? json(mockRunDetail(run))
+      ? json(mockRunDetail(run, new URL(requestUrl).origin))
       : json({ error: "run_not_found" }, 404);
   }
 

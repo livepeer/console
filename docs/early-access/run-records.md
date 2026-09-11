@@ -181,10 +181,29 @@ manufactures or authorizes an asset ID.
 
 Asset URLs are one-hour HMAC links bound to asset ID, stored principal, and
 expiry. Deployed environments require `ASSET_URL_SIGNING_SECRET` and
-`ASSET_PROXY_ALLOWED_HOSTS`. The proxy rechecks every redirect, retains byte
-range behavior, and never caches beyond the link or exact provider expiry.
+`ASSET_PROXY_ALLOWED_HOSTS`. Each HTTPS connection uses a validated DNS address,
+including redirects, while preserving TLS hostname verification and byte ranges.
+Playback rejects `unavailable_at` and hard `expires_at` before upstream delivery;
+History still retains the asset, lineage, captured parameters, and cost.
+Successful responses cache for at most 60 seconds, bounded further by signature
+and exact provider expiry; failed responses are not cached. Unknown expiry stays
+playable. Transient delivery errors do not permanently mark an asset unavailable.
+Execution and queued reconciliation propagate explicit output expiry; upserts
+preserve known expiry when later observations omit it.
 `available_until` remains a minimum availability guarantee, not a hard expiry.
 Client history state is scoped to the authenticated account.
+
+Public media sanitization is independent from durable output capture, so signed
+or redacted provider URLs and reference/mask inputs cannot bypass it. Owned media
+is rewritten to Console URLs; unmatched media is removed from execution, detail,
+and both account-requests response paths. Prompt text and unrelated links remain.
+
+Preview fixture seeding uses an owner-scoped database lock and one transaction.
+It checks every durable stage, skips complete fixtures, and repairs partial
+fixtures without changing ordinary terminal-run protections. The runtime preview
+has both `0001` and `0002` applied with the required table grants as of 2026-09-11;
+production migration remains a separate release step. No additional migration
+is needed for these review fixes.
 
 An authenticated preview-only fixture operation can populate representative
 Neon-backed rows for the current reviewer when both `VERCEL_ENV=preview` and

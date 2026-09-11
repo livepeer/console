@@ -286,3 +286,49 @@ it("records every payment phase against the run even when inference fails afterw
     { manifestId: "successful-attempt", phase: "accepted" }
   );
 });
+
+it("persists explicit expiry and sanitizes all returned media with partial capture", async () => {
+  const deps = fixture();
+  const expiresAt = "2026-10-01T00:00:00.000Z";
+  vi.mocked(deps.infer).mockResolvedValue({
+    gatewayRequestId: "job_test",
+    status: "succeeded",
+    url: null,
+    billableUnits: null,
+    data: {
+      images: [
+        { url: "https://provider.example/owned", expiresAt },
+        { url: "https://provider.example/missing" },
+        { url: "https://provider.example/signed?token=private" },
+      ],
+    },
+  } as unknown as Awaited<ReturnType<ExecutionDependencies["infer"]>>);
+  vi.mocked(deps.store.transitionRun).mockResolvedValue({
+    ...owner,
+    id: "run_test",
+    assets: [
+      { id: "owned", url: "https://provider.example/owned", role: "output" },
+    ],
+  } as RunDetail);
+  const result = await executeDurableRun(
+    principal,
+    { capability: "image" },
+    deps
+  );
+  expect(deps.store.transitionRun).toHaveBeenCalledWith(
+    owner,
+    "run_test",
+    expect.objectContaining({
+      assets: expect.arrayContaining([
+        expect.objectContaining({
+          url: "https://provider.example/owned",
+          expiresAt,
+        }),
+      ]),
+    })
+  );
+  expect(JSON.stringify(result.payload)).not.toMatch(
+    /provider.example|private|REDACTED/
+  );
+  expect(JSON.stringify(result.payload)).toContain("/api/assets/owned");
+});

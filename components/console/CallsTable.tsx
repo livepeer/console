@@ -99,7 +99,17 @@ function HistoryCost({
   return (
     <span className="justify-self-end">
       <Tooltip>
-        <TooltipTrigger render={amount} />
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              aria-label={`Exact cost ${row.costExact}`}
+              className="relative z-10 pointer-events-auto rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            />
+          }
+        >
+          {amount}
+        </TooltipTrigger>
         <TooltipContent side="left">
           <span className="font-mono tabular-nums">{row.costExact}</span>
         </TooltipContent>
@@ -255,25 +265,25 @@ export default function CallsTable({
             )}
           </>
         );
-        return onSelectRow ? (
-          <button
-            key={row.id}
-            type="button"
-            aria-label={`Inspect ${row.id}`}
-            onClick={() => onSelectRow(row)}
-            className={`${rowClass} w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring`}
-          >
-            {content}
-          </button>
-        ) : (
-          <Link
-            key={row.id}
-            href={`/home?request=${row.id}`}
-            scroll={false}
-            className={rowClass}
-          >
-            {content}
-          </Link>
+        return (
+          <div key={row.id} className={`${rowClass} relative`}>
+            {onSelectRow ? (
+              <button
+                type="button"
+                aria-label={`Inspect ${row.id}`}
+                onClick={() => onSelectRow(row)}
+                className="absolute inset-0 w-full rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              />
+            ) : (
+              <Link
+                href={`/home?request=${row.id}`}
+                aria-label={`Inspect ${row.id}`}
+                scroll={false}
+                className="absolute inset-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              />
+            )}
+            <div className="contents pointer-events-none">{content}</div>
+          </div>
         );
       })}
     </section>

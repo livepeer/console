@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/assets/transport", () => ({ fetchPinnedAsset: vi.fn() }));
+import { fetchPinnedAsset } from "@/lib/assets/transport";
+
 vi.mock("node:dns/promises", () => ({ lookup: vi.fn() }));
 vi.mock("@/lib/mcp/store", () => ({ getAssetSource: vi.fn() }));
 
 import { lookup } from "node:dns/promises";
 import { getAssetSource } from "@/lib/mcp/store";
-import { GET } from "@/app/api/assets/[id]/route";
+import { GET, HEAD } from "@/app/api/assets/[id]/route";
 import { publicAssetUrl } from "@/lib/assets/public";
 
 describe("first-party asset proxy", () => {
   beforeEach(() => {
     vi.mocked(lookup).mockReset();
+    vi.mocked(fetchPinnedAsset).mockReset();
     vi.mocked(getAssetSource).mockReset();
     vi.unstubAllGlobals();
   });
@@ -20,6 +24,7 @@ describe("first-party asset proxy", () => {
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
       principalId: "eu_test",
+      unavailableAt: null,
       expiresAt: null,
     });
     vi.mocked(lookup).mockResolvedValue([
@@ -34,7 +39,7 @@ describe("first-party asset proxy", () => {
         },
       })
     );
-    vi.stubGlobal("fetch", fetcher);
+    vi.mocked(fetchPinnedAsset).mockImplementation(fetcher);
 
     const response = await GET(
       new Request(publicAssetUrl("asset_123", "eu_test"), {
@@ -48,9 +53,8 @@ describe("first-party asset proxy", () => {
     expect(await response.text()).toBe("bytes");
     expect(fetcher).toHaveBeenCalledWith(
       new URL("https://media.example.test/video.mp4"),
+      [{ address: "203.0.113.10", family: 4 }],
       expect.objectContaining({
-        credentials: "omit",
-        redirect: "manual",
         headers: expect.objectContaining({
           Range: "bytes=0-4",
           "Accept-Encoding": "identity",
@@ -64,13 +68,14 @@ describe("first-party asset proxy", () => {
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
       principalId: "eu_test",
+      unavailableAt: null,
       expiresAt: null,
     });
     vi.mocked(lookup).mockResolvedValue([
       { address: "127.0.0.1", family: 4 },
     ] as never);
     const fetcher = vi.fn();
-    vi.stubGlobal("fetch", fetcher);
+    vi.mocked(fetchPinnedAsset).mockImplementation(fetcher);
 
     const response = await GET(
       new Request(publicAssetUrl("asset_123", "eu_test")),
@@ -86,6 +91,7 @@ describe("first-party asset proxy", () => {
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
       principalId: "eu_test",
+      unavailableAt: null,
       expiresAt: null,
     });
     const signed = new URL(publicAssetUrl("asset_123", "eu_test"));
@@ -102,6 +108,7 @@ describe("first-party asset proxy", () => {
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
       principalId: "eu_test",
+      unavailableAt: null,
       expiresAt: new Date(Date.now() - 1),
     });
     const response = await GET(
@@ -116,15 +123,21 @@ describe("first-party asset proxy", () => {
       url: "https://media.example.test/video.mp4",
       mediaType: "video",
       principalId: "eu_test",
+      unavailableAt: null,
       expiresAt: null,
     });
     vi.mocked(lookup).mockResolvedValue([
       { address: "203.0.113.10", family: 4 },
     ] as never);
-    const fetcher = vi.fn().mockResolvedValue(
-      new Response(null, { status: 302, headers: { location: "https://evil.example/file" } })
-    );
-    vi.stubGlobal("fetch", fetcher);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://evil.example/file" },
+        })
+      );
+    vi.mocked(fetchPinnedAsset).mockImplementation(fetcher);
     const response = await GET(
       new Request(publicAssetUrl("asset_123", "eu_test")),
       { params: Promise.resolve({ id: "asset_123" }) }
@@ -132,4 +145,107 @@ describe("first-party asset proxy", () => {
     expect(response.status).toBe(502);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+});
+
+const source = {
+  url: "https://media.example.test/a.png",
+  principalId: "eu_test",
+  mediaType: "image",
+  expiresAt: null,
+  unavailableAt: null,
+};
+const context = { params: Promise.resolve({ id: "asset_123" }) };
+const signedRequest = (method = "GET") =>
+  new Request(publicAssetUrl("asset_123", "eu_test"), { method });
+
+it("does not resolve or fetch unavailable media", async () => {
+  vi.mocked(lookup).mockClear();
+  vi.mocked(fetchPinnedAsset).mockClear();
+  vi.mocked(getAssetSource).mockResolvedValue({
+    ...source,
+    unavailableAt: new Date(),
+  });
+  expect((await GET(signedRequest(), context)).status).toBe(404);
+  expect(lookup).not.toHaveBeenCalled();
+  expect(fetchPinnedAsset).not.toHaveBeenCalled();
+});
+it.each([
+  "10.0.0.1",
+  "169.254.169.254",
+  "100.64.0.1",
+  "::1",
+  "fc00::1",
+  "::ffff:7f00:1",
+  "::ffff:127.0.0.1",
+  "fe80::1",
+])("rejects mixed public/private DNS results including %s", async (address) => {
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(fetchPinnedAsset).mockClear();
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+    { address, family: address.includes(":") ? 6 : 4 },
+  ] as never);
+  expect((await GET(signedRequest(), context)).status).toBe(502);
+  expect(fetchPinnedAsset).not.toHaveBeenCalled();
+});
+it("pins every redirect, cancels abandoned bodies, and bounds the redirect count", async () => {
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  const cancel = vi.fn();
+  vi.mocked(fetchPinnedAsset)
+    .mockReset()
+    .mockImplementation(
+      async () =>
+        new Response(new ReadableStream({ cancel }), {
+          status: 302,
+          headers: { location: "/again" },
+        })
+    );
+  expect((await GET(signedRequest(), context)).status).toBe(502);
+  expect(fetchPinnedAsset).toHaveBeenCalledTimes(4);
+  expect(cancel).toHaveBeenCalledTimes(4);
+});
+it("caps unknown expiry caching, bounds known expiry, and never caches errors", async () => {
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () => new Response("ok")
+  );
+  expect(
+    (await GET(signedRequest(), context)).headers.get("cache-control")
+  ).toBe("private, max-age=60");
+  vi.mocked(getAssetSource).mockResolvedValue({
+    ...source,
+    expiresAt: new Date(Date.now() + 15_000),
+  });
+  const bounded = await GET(signedRequest(), context);
+  expect(
+    Number(bounded.headers.get("cache-control")!.split("=")[1])
+  ).toBeLessThanOrEqual(15);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () => new Response("temporary", { status: 503 })
+  );
+  expect(
+    (await GET(signedRequest(), context)).headers.get("cache-control")
+  ).toContain("no-store");
+});
+it("forwards HEAD and an abortable signal without a response body", async () => {
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () => new Response(null)
+  );
+  const req = signedRequest("HEAD");
+  expect((await HEAD(req, context)).body).toBeNull();
+  expect(fetchPinnedAsset).toHaveBeenLastCalledWith(
+    new URL(source.url),
+    [{ address: "8.8.8.8", family: 4 }],
+    expect.objectContaining({ method: "HEAD", signal: expect.any(AbortSignal) })
+  );
 });

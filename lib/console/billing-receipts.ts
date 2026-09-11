@@ -37,8 +37,17 @@ export function sanitizeBillingReceipt(
     "pixels",
   ] as const) {
     const value = item[key];
-    if (typeof value === "string" && value.length <= 128 && DECIMAL.test(value))
-      metadata[key] = value;
+    if (value == null) continue;
+    if (typeof value !== "string" || !DECIMAL.test(value)) return null;
+    const [integer, fraction = ""] = value.split(".");
+    const digits = integer!.replace(/^0+/, "") || "0";
+    if (
+      key === "feeWei"
+        ? fraction.length > 0 || value.includes(".") || digits.length > 78
+        : digits.length > 60 || fraction.length > 18
+    )
+      return null;
+    metadata[key] = value;
   }
   if (
     typeof item.time === "string" &&
@@ -46,5 +55,9 @@ export function sanitizeBillingReceipt(
     Number.isFinite(Date.parse(item.time))
   )
     metadata.timestamp = new Date(item.time).toISOString();
-  return { eventId: item.eventId, gatewayRequestId: item.gatewayRequestId, metadata };
+  return {
+    eventId: item.eventId,
+    gatewayRequestId: item.gatewayRequestId,
+    metadata,
+  };
 }

@@ -38,17 +38,14 @@ import { useTickWhileActive } from "@/components/console/useTickWhileActive";
 function safeMediaUrl(value: string | undefined): string | undefined {
   try {
     const url = new URL(value ?? "");
-    if (url.protocol !== "https:" || url.username || url.password)
-      return undefined;
-    if (
+    const local =
       process.env.NODE_ENV !== "production" &&
       typeof window !== "undefined" &&
-      ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
-      url.hostname === "earlyaccess.livepeer.org"
-    ) {
-      return new URL(`${url.pathname}${url.search}`, window.location.origin)
-        .href;
-    }
+      ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname) &&
+      url.origin === window.location.origin &&
+      url.protocol === "http:";
+    if ((!local && url.protocol !== "https:") || url.username || url.password)
+      return undefined;
     return url.href;
   } catch {
     return undefined;
@@ -522,11 +519,13 @@ function FieldLabel({
       <p className="text-xs text-fg-muted">{field.label}</p>
       <Tooltip>
         <TooltipTrigger
-          render={<button
+          render={
+            <button
             type="button"
             aria-label={`About ${field.label}`}
             className="inline-flex items-center justify-center text-foreground/25 transition-colors hover:text-foreground/45 focus-visible:rounded-full focus-visible:text-foreground/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
-          />}
+            />
+          }
         >
             <Info className="h-3.5 w-3.5" aria-hidden="true" />
         </TooltipTrigger>
@@ -592,11 +591,17 @@ function assetReferenceFromUrl(
   if (known) return known;
   try {
     const url = new URL(value);
-    if (url.hostname !== "earlyaccess.livepeer.org") return null;
+    const trusted = [...assets.keys()].some((known) => {
+      try {
+        return new URL(known).origin === url.origin;
+      } catch {
+        return false;
+      }
+    });
+    if (!trusted || url.username || url.password) return null;
     const match = url.pathname.match(/^\/api\/assets\/([^/]+)$/);
-    return match
-      ? { id: decodeURIComponent(match[1]!), displayName: null }
-      : null;
+    const id = match ? decodeURIComponent(match[1]!) : null;
+    return [...assets.values()].find((asset) => asset.id === id) ?? null;
   } catch {
     return null;
   }
@@ -1250,9 +1255,7 @@ export default function CallDetailDrawer({
       </Button>
 
       {row && media && (
-        <div
-          className="relative z-10 flex max-h-[calc(100dvh-68px)] w-[min(1240px,calc(100vw-32px))] items-stretch gap-3 overflow-y-auto outline-none sm:max-h-[calc(100dvh-96px)] lg:h-[calc(100dvh-96px)] lg:max-h-[760px] lg:overflow-visible"
-        >
+          <div className="relative z-10 flex max-h-[calc(100dvh-68px)] w-[min(1240px,calc(100vw-32px))] items-stretch gap-3 overflow-y-auto outline-none sm:max-h-[calc(100dvh-96px)] lg:h-[calc(100dvh-96px)] lg:max-h-[760px] lg:overflow-visible">
           <div className="grid h-auto min-w-0 flex-1 grid-rows-[auto_auto] overflow-hidden rounded-sm bg-background shadow-2xl shadow-black/55 lg:h-full lg:grid-cols-[minmax(0,1fr)_350px] lg:grid-rows-none">
             <MediaStage
               key={`${row.id}-${asset?.id ?? "none"}`}
@@ -1326,7 +1329,12 @@ export default function CallDetailDrawer({
                       {costExact && costExact !== costDisplay ? (
                         <Tooltip>
                           <TooltipTrigger
-                            render={<span className="cursor-help font-mono tabular-nums" />}
+                              render={
+                                <button
+                                  type="button"
+                                  className="cursor-help rounded font-mono tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                                />
+                              }
                           >
                               {costDisplay}
                           </TooltipTrigger>
@@ -1385,7 +1393,7 @@ export default function CallDetailDrawer({
                               </p>
                               {activeDetail.assets.map((item, index) => (
                                 <div
-                                  key={item.id}
+                                    key={`${item.role}:${item.id}:${index}`}
                                   className="rounded-md border border-hairline bg-foreground/[0.02] p-3 text-xs"
                                 >
                                   <div className="flex items-center justify-between gap-2">
@@ -1403,7 +1411,18 @@ export default function CallDetailDrawer({
                                       {item.id}
                                     </button>
                                     <span className="shrink-0 text-fg-muted">
-                                      Output {index + 1}
+                                        {item.role === "input"
+                                          ? "Input"
+                                          : "Output"}{" "}
+                                        {
+                                          activeDetail.assets
+                                            .slice(0, index + 1)
+                                            .filter(
+                                              (candidate) =>
+                                                (candidate.role === "input") ===
+                                                (item.role === "input")
+                                            ).length
+                                        }
                                     </span>
                                   </div>
                                   {safeMediaUrl(item.url) && (
@@ -1445,7 +1464,9 @@ export default function CallDetailDrawer({
                           fields={submittedFields}
                         />
                         <FieldSection
-                          title={variant === "admin" ? "Response" : "Inference"}
+                            title={
+                              variant === "admin" ? "Response" : "Inference"
+                            }
                           fields={
                             variant === "admin"
                               ? returnedFields

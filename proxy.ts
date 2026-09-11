@@ -30,7 +30,10 @@ export async function proxy(request: NextRequest) {
     const mocked = devMockResponse(
       request.nextUrl.pathname,
       request.nextUrl.searchParams,
-      request.url
+      new URL(
+        `${request.nextUrl.pathname}${request.nextUrl.search}`,
+        `${request.nextUrl.protocol}//${request.headers.get("host") ?? request.nextUrl.host}`
+      ).href
     );
     if (mocked) return mocked;
   }

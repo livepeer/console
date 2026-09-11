@@ -71,7 +71,10 @@ export async function GET(request: NextRequest) {
       );
       if (includeCorrelated) {
         return NextResponse.json(
-          { ...payload, items: scoped },
+          {
+            ...payload,
+            items: await attachOutputsToTickets(session.externalUserId, scoped),
+          },
           { headers: PYMTHOUSE_NO_STORE_HEADERS }
         );
       }

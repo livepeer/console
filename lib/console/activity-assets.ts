@@ -29,6 +29,6 @@ export async function attachOutputsToTickets(
           outputUrl: publicAssetUrl(asset.id, principalId),
           providerRequestId: asset.providerRequestId,
         }
-      : item;
+      : { ...item, outputUrl: null };
   });
 }

@@ -14,11 +14,7 @@ import {
   validatePublicFalQueue,
 } from "./reconcile";
 import type { JsonValue, RunDetail, RunTransition } from "./types";
-import {
-  publicAsset,
-  removeAssetUrls,
-  replaceAssetUrls,
-} from "@/lib/assets/public";
+import { publicAsset, replaceAssetUrls } from "@/lib/assets/public";
 
 export type RunArguments = {
   capability: string;
@@ -238,6 +234,8 @@ export async function executeDurableRun(
       assets: outputs.map((asset) => ({
         url: asset.url,
         mediaType: asset.mediaKind,
+        availableUntil: asset.availableUntil,
+        expiresAt: asset.expiresAt,
         providerRequestId: result.providerRequestId,
       })),
       metadata: { providerStatus: result.status ?? null },
@@ -258,12 +256,11 @@ export async function executeDurableRun(
       publicAsset(asset, owner.principalId)
     );
     const capturedData = resultEnvelope(result.data).value;
-    const publicData = persistedAssets.length
-      ? replaceAssetUrls(capturedData, persistedAssets, owner.principalId)
-      : removeAssetUrls(
-          capturedData,
-          outputs.map((output) => output.url)
-        );
+    const publicData = replaceAssetUrls(
+      capturedData,
+      persistedAssets,
+      owner.principalId
+    );
     const urlRaw =
       result.url ?? result.imageUrl ?? result.videoUrl ?? result.audioUrl;
     const sourceAsset =

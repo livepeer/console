@@ -116,6 +116,7 @@ export async function getAssetSource(id: string): Promise<{
   mediaType: string | null;
   principalId: string;
   expiresAt: Date | null;
+  unavailableAt: Date | null;
 } | null> {
   const [row] = await getDb()
     .select({
@@ -123,6 +124,7 @@ export async function getAssetSource(id: string): Promise<{
       mediaType: mcpAssets.mediaType,
       principalId: mcpAssets.principalId,
       expiresAt: mcpAssets.expiresAt,
+      unavailableAt: mcpAssets.unavailableAt,
     })
     .from(mcpAssets)
     .where(eq(mcpAssets.id, id))

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import CallsTable from "@/components/console/CallsTable";
 import CallDetailDrawer from "@/components/console/CallDetailDrawer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { AccountActivityRow } from "@/lib/console/types";
@@ -365,4 +366,88 @@ it("shows Flux Schnell image-size alternatives", async () => {
   expect((await screen.findByRole("tooltip")).textContent).toContain(
     "custom width and height"
   );
+});
+
+it("exposes exact table cost by keyboard without activating or nesting the row button", async () => {
+  const select = vi.fn();
+  renderWithTooltips(
+    <CallsTable
+      rows={[{ ...row, costExact: "$0.01000025" }]}
+      onSelectRow={select}
+    />
+  );
+  const cost = screen.getByRole("button", { name: "Exact cost $0.01000025" });
+  expect(cost.parentElement?.closest("button")).toBeNull();
+  fireEvent.focus(cost);
+  expect((await screen.findByRole("tooltip")).textContent).toBe("$0.01000025");
+  fireEvent.click(cost);
+  expect(select).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: `Inspect ${row.id}` }));
+  expect(select).toHaveBeenCalledOnce();
+});
+it("retains unavailable media records and cost", () => {
+  const d = detail([
+    {
+      id: "asset-audio",
+      url: "https://preview.example/api/assets/asset-audio",
+      mediaType: "audio/mpeg",
+      unavailableAt: "2026-09-10T00:00:00Z",
+      hiddenAt: null,
+      createdAt: "2026-09-09T00:00:00Z",
+      providerRequestId: null,
+      role: "input",
+    },
+  ]);
+  renderWithTooltips(
+    <CallDetailDrawer
+      row={row}
+      rows={[row]}
+      open
+      onClose={() => {}}
+      detail={d}
+      variant="user"
+    />
+  );
+  expect(screen.getByText("Media unavailable")).toBeTruthy();
+  expect(document.querySelector("audio")).toBeNull();
+  expect(screen.getByText("Cost")).toBeTruthy();
+});
+it("labels mixed lineage and lets keyboard users inspect admin exact costs", async () => {
+  const d = detail([
+    {
+      id: "input",
+      url: "https://preview.example/api/assets/input",
+      mediaType: "image",
+      role: "input",
+      unavailableAt: null,
+      hiddenAt: null,
+      createdAt: row.timestamp,
+      providerRequestId: null,
+    },
+    {
+      id: "output",
+      url: "https://preview.example/api/assets/output",
+      mediaType: "image",
+      role: "output",
+      unavailableAt: null,
+      hiddenAt: null,
+      createdAt: row.timestamp,
+      providerRequestId: null,
+    },
+  ]);
+  renderWithTooltips(
+    <CallDetailDrawer
+      row={{ ...row, costExact: "$0.01000025" }}
+      rows={[row]}
+      open
+      onClose={() => {}}
+      detail={d}
+      variant="admin"
+    />
+  );
+  expect(screen.getByText("Input 1")).toBeTruthy();
+  expect(screen.getByText("Output 1")).toBeTruthy();
+  const cost = screen.getByRole("button", { name: "$0.01" });
+  fireEvent.focus(cost);
+  expect((await screen.findByRole("tooltip")).textContent).toBe("$0.01000025");
 });

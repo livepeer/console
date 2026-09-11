@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
+import { fetchPinnedAsset } from "@/lib/assets/transport";
 import { isIP } from "node:net";
 import { assetSignature, ASSET_URL_TTL_SECONDS } from "@/lib/assets/public";
 import { getAssetSource } from "@/lib/mcp/store";
@@ -24,13 +25,30 @@ function notFound(): Response {
 }
 
 function isPrivateIp(address: string): boolean {
-  const normalized = address.toLowerCase().replace(/^::ffff:/, "");
+  let normalized = address.toLowerCase();
+  if (normalized.startsWith("::ffff:")) {
+    normalized = normalized.slice(7);
+    if (!normalized.includes(".")) {
+      const words = normalized.split(":").map((word) => parseInt(word, 16));
+      if (words.length !== 2 || words.some((word) => !Number.isFinite(word)))
+        return true;
+      normalized = [
+        words[0]! >> 8,
+        words[0]! & 255,
+        words[1]! >> 8,
+        words[1]! & 255,
+      ].join(".");
+    }
+  }
   if (isIP(normalized) === 4) {
     const [a, b] = normalized.split(".").map(Number);
     return (
       a === 0 ||
       a === 10 ||
       a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 192 && b === 0) ||
       (a === 169 && b === 254) ||
       (a === 172 && b >= 16 && b <= 31) ||
       (a === 192 && b === 168) ||
@@ -38,6 +56,12 @@ function isPrivateIp(address: string): boolean {
     );
   }
   return (
+    isIP(normalized) !== 6 ||
+    !/^[23]/.test(normalized) ||
+    normalized.startsWith("2001:db8:") ||
+    normalized.startsWith("2001:0:") ||
+    normalized.startsWith("2001::") ||
+    normalized.startsWith("2002:") ||
     normalized === "::" ||
     normalized === "::1" ||
     normalized.startsWith("fc") ||
@@ -49,8 +73,12 @@ function isPrivateIp(address: string): boolean {
 function allowedHosts(): string[] {
   const configured = process.env.ASSET_PROXY_ALLOWED_HOSTS?.trim();
   if (configured)
-    return configured.split(",").map((host) => host.trim().toLowerCase()).filter(Boolean);
-  if (process.env.NODE_ENV !== "production") return ["fal.media", "*.fal.media", "media.example.test"];
+    return configured
+      .split(",")
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+  if (process.env.NODE_ENV !== "production")
+    return ["fal.media", "*.fal.media", "media.example.test"];
   throw new Error("ASSET_PROXY_ALLOWED_HOSTS is required");
 }
 
@@ -63,7 +91,7 @@ function isAllowedHost(hostname: string): boolean {
   );
 }
 
-async function assertPublicHttps(raw: string): Promise<URL> {
+async function assertPublicHttps(raw: string) {
   const url = new URL(raw);
   if (
     url.protocol !== "https:" ||
@@ -74,12 +102,20 @@ async function assertPublicHttps(raw: string): Promise<URL> {
   )
     throw new Error("unsafe_asset_origin");
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some(({ address }) => isPrivateIp(address)))
+  if (
+    !addresses.length ||
+    addresses.some(({ address }) => isPrivateIp(address))
+  )
     throw new Error("unsafe_asset_origin");
-  return url;
+  return { url, addresses };
 }
 
-function validSignature(id: string, principalId: string, exp: number, supplied: string): boolean {
+function validSignature(
+  id: string,
+  principalId: string,
+  exp: number,
+  supplied: string
+): boolean {
   const expected = Buffer.from(assetSignature(id, principalId, exp));
   const actual = Buffer.from(supplied);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
@@ -103,6 +139,7 @@ async function proxy(request: Request, id: string): Promise<Response> {
   const asset = await getAssetSource(id);
   if (
     !asset ||
+    asset.unavailableAt ||
     !validSignature(id, asset.principalId, exp, sig) ||
     (asset.expiresAt && asset.expiresAt.getTime() <= Date.now())
   )
@@ -112,12 +149,9 @@ async function proxy(request: Request, id: string): Promise<Response> {
     let target = await assertPublicHttps(asset.url);
     let upstream: Response | undefined;
     for (let redirects = 0; redirects <= 3; redirects += 1) {
-      upstream = await fetch(target, {
+      upstream = await fetchPinnedAsset(target.url, target.addresses, {
         method: request.method,
-        redirect: "manual",
-        credentials: "omit",
-        cache: "no-store",
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]),
         headers: {
           Accept: request.headers.get("accept") ?? "*/*",
           "Accept-Encoding": "identity",
@@ -130,15 +164,20 @@ async function proxy(request: Request, id: string): Promise<Response> {
       const location = upstream.headers.get("location");
       await upstream.body?.cancel();
       if (!location || redirects === 3) throw new Error("asset_redirect");
-      target = await assertPublicHttps(new URL(location, target).href);
+      target = await assertPublicHttps(new URL(location, target.url).href);
     }
     if (!upstream) throw new Error("asset_unavailable");
     const providerSeconds = asset.expiresAt
       ? Math.max(0, Math.floor((asset.expiresAt.getTime() - Date.now()) / 1000))
       : Number.POSITIVE_INFINITY;
-    const maxAge = Math.max(0, Math.min(exp - nowSeconds, providerSeconds));
+    const maxAge = Math.max(
+      0,
+      Math.min(60, exp - Math.floor(Date.now() / 1000), providerSeconds)
+    );
     const headers = new Headers({
-      "cache-control": `private, max-age=${maxAge}`,
+      "cache-control": upstream.ok
+        ? `private, max-age=${maxAge}`
+        : "private, no-store",
       "content-security-policy": "default-src 'none'; sandbox",
       "x-content-type-options": "nosniff",
     });

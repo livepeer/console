@@ -32,7 +32,10 @@ describe("public queue recovery", () => {
       .mockResolvedValueOnce(
         Response.json({
           images: [
-            { url: "https://media.fal.media/a.png" },
+            {
+              url: "https://media.fal.media/a.png",
+              expiresAt: "2026-10-01T00:00:00.000Z",
+            },
             { url: "https://media.fal.media/b.png" },
           ],
         })
@@ -53,7 +56,11 @@ describe("public queue recovery", () => {
       expect.objectContaining({
         status: "succeeded",
         assets: [
-          { url: "https://media.fal.media/a.png", mediaType: "image" },
+          {
+            url: "https://media.fal.media/a.png",
+            mediaType: "image",
+            expiresAt: "2026-10-01T00:00:00.000Z",
+          },
           { url: "https://media.fal.media/b.png", mediaType: "image" },
         ],
       })

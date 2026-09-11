@@ -16,6 +16,17 @@ vi.mock("@/lib/runs/http", () => ({
   runError: () => Response.json({ error: "failed" }, { status: 500 }),
 }));
 vi.mock("@/lib/runs/store", () => ({
+  withPreviewRunFixtures: async (
+    _owner: unknown,
+    work: (store: unknown) => unknown
+  ) =>
+    work({
+      completedRunIds: async () => [],
+      ownedRunsByIds: mocks.ownedRuns,
+      createRun: mocks.createRun,
+      transitionRun: mocks.transitionRun,
+      recordRunUsage: mocks.recordUsage,
+    }),
   ownedRunsByIds: mocks.ownedRuns,
   createRun: mocks.createRun,
   transitionRun: mocks.transitionRun,

@@ -35,6 +35,7 @@ import { forgetAssets, listAssets } from "@/lib/mcp/store";
 it.skipIf(!process.env.TEST_DATABASE_URL)(
   "stores complete run lifecycle and hidden assets with transactional idempotency and owner isolation",
   async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://preview.example");
     const { client } = await openIntegrationDatabase(process.env);
     const rollback = new Error("rollback_run_store");
     try {
@@ -528,6 +529,7 @@ it.skipIf(!process.env.TEST_DATABASE_URL)(
         })
       ).rejects.toBe(rollback);
     } finally {
+      vi.unstubAllEnvs();
       await client.end();
     }
   },

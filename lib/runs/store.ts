@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   and,
   asc,
@@ -12,6 +12,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import { publicOrigin } from "@/lib/assets/public";
 import { getDb } from "@/lib/db";
 import {
   externalAccounts,
@@ -68,7 +69,9 @@ function assetReferences(value: JsonValue | undefined): AssetReference[] {
   const visit = (item: JsonValue, path: (string | number)[]): void => {
     if (typeof item === "string") {
       try {
-        const match = new URL(item).pathname.match(/^\/api\/assets\/([^/]+)$/);
+        const referenceUrl = new URL(item);
+        if (referenceUrl.origin !== publicOrigin()) return;
+        const match = referenceUrl.pathname.match(/^\/api\/assets\/([^/]+)$/);
         if (!match) return;
         const field = [...path]
           .reverse()
@@ -213,63 +216,82 @@ export async function createRun(
   owner: RunOwner,
   input: CreateRunInput
 ): Promise<RunDetail> {
-  return getDb().transaction(async (tx) => {
-    // Independently enforce the authenticated binding even when a caller constructs an owner object.
-    const scope = configuredPymthouseScope();
-    const [account] = await tx
-      .select({ id: externalAccounts.id })
-      .from(externalAccounts)
+  return getDb().transaction((tx) => createRunTx(tx, owner, input));
+}
+
+async function createRunTx(
+  tx: Transaction,
+  owner: RunOwner,
+  input: CreateRunInput,
+  repairFixture = false
+): Promise<RunDetail> {
+  // Independently enforce the authenticated binding even when a caller constructs an owner object.
+  const scope = configuredPymthouseScope();
+  const [account] = await tx
+    .select({ id: externalAccounts.id })
+    .from(externalAccounts)
+    .where(
+      and(
+        eq(externalAccounts.id, owner.externalAccountId),
+        eq(externalAccounts.userId, owner.userId),
+        eq(externalAccounts.externalUserId, owner.principalId),
+        eq(externalAccounts.service, scope.service),
+        eq(externalAccounts.issuer, scope.issuer),
+        eq(externalAccounts.appId, scope.appId)
+      )
+    );
+  if (!account) throw new Error("run_owner_unresolved");
+  const [existing] =
+    repairFixture && input.id
+      ? await tx
+          .select()
+          .from(runs)
+          .where(and(ownerWhere(owner), eq(runs.id, input.id)))
+      : [];
+  const row =
+    existing ??
+    (
+      await tx
+        .insert(runs)
+        .values({
+          ...owner,
+          ...input,
+          id: input.id ?? randomUUID(),
+          source: "mcp",
+          status: "queued",
+        })
+        .returning()
+    )[0]!;
+  await tx
+    .insert(runEvents)
+    .values({ runId: row.id, eventKey: "created", status: "queued" })
+    .onConflictDoNothing();
+  const references = assetReferences(row.submittedArguments ?? undefined);
+  if (references.length) {
+    const ownedAssets = await tx
+      .select({ id: mcpAssets.id })
+      .from(mcpAssets)
       .where(
         and(
-          eq(externalAccounts.id, owner.externalAccountId),
-          eq(externalAccounts.userId, owner.userId),
-          eq(externalAccounts.externalUserId, owner.principalId),
-          eq(externalAccounts.service, scope.service),
-          eq(externalAccounts.issuer, scope.issuer),
-          eq(externalAccounts.appId, scope.appId)
+          eq(mcpAssets.principalId, owner.principalId),
+          inArray(mcpAssets.id, [...new Set(references.map(({ id }) => id))])
         )
       );
-    if (!account) throw new Error("run_owner_unresolved");
-    const [row] = await tx
-      .insert(runs)
-      .values({
-        ...owner,
-        ...input,
-        id: input.id ?? randomUUID(),
-        source: "mcp",
-        status: "queued",
-      })
-      .returning();
-    await tx
-      .insert(runEvents)
-      .values({ runId: row.id, eventKey: "created", status: "queued" });
-    const references = assetReferences(row.submittedArguments ?? undefined);
-    if (references.length) {
-      const ownedAssets = await tx
-        .select({ id: mcpAssets.id })
-        .from(mcpAssets)
-        .where(
-          and(
-            eq(mcpAssets.principalId, owner.principalId),
-            inArray(mcpAssets.id, [...new Set(references.map(({ id }) => id))])
-          )
-        );
-      const ownedIds = new Set(ownedAssets.map(({ id }) => id));
-      const values = references
-        .filter(({ id }) => ownedIds.has(id))
-        .map((reference) => ({
-          runId: row.id,
-          assetId: reference.id,
-          direction: "input",
-          role: reference.role,
-          parameterPath: reference.parameterPath,
-          ordinal: reference.ordinal,
-        }));
-      if (values.length)
-        await tx.insert(runAssetLinks).values(values).onConflictDoNothing();
-    }
-    return detail(tx, row);
-  });
+    const ownedIds = new Set(ownedAssets.map(({ id }) => id));
+    const values = references
+      .filter(({ id }) => ownedIds.has(id))
+      .map((reference) => ({
+        runId: row.id,
+        assetId: reference.id,
+        direction: "input",
+        role: reference.role,
+        parameterPath: reference.parameterPath,
+        ordinal: reference.ordinal,
+      }));
+    if (values.length)
+      await tx.insert(runAssetLinks).values(values).onConflictDoNothing();
+  }
+  return detail(tx, row);
 }
 
 export async function transitionRun(
@@ -278,173 +300,196 @@ export async function transitionRun(
   change: RunTransition
 ): Promise<RunDetail> {
   if (!change.eventKey.trim()) throw new Error("invalid_run_event_key");
-  return getDb().transaction(async (tx) => {
-    const [current] = await tx
+  return getDb().transaction((tx) => transitionRunTx(tx, owner, id, change));
+}
+
+async function transitionRunTx(
+  tx: Transaction,
+  owner: RunOwner,
+  id: string,
+  change: RunTransition,
+  repairFixture = false
+): Promise<RunDetail> {
+  if (!change.eventKey.trim()) throw new Error("invalid_run_event_key");
+
+  const [current] = await tx
+    .select()
+    .from(runs)
+    .where(and(ownerWhere(owner), eq(runs.id, id)))
+    .for("update");
+  if (!current) throw new Error("run_not_found");
+  if (change.reconciliationLease) {
+    const [lease] = await tx
       .select()
-      .from(runs)
-      .where(and(ownerWhere(owner), eq(runs.id, id)))
-      .for("update");
-    if (!current) throw new Error("run_not_found");
-    if (change.reconciliationLease) {
-      const [lease] = await tx
-        .select()
-        .from(runReconciliationJobs)
-        .where(
-          and(
-            eq(runReconciliationJobs.id, change.reconciliationLease.jobId),
-            eq(runReconciliationJobs.runId, id)
-          )
-        )
-        .for("update");
-      if (
-        !lease ||
-        lease.leaseToken !== change.reconciliationLease.leaseToken ||
-        !lease.leasedUntil ||
-        lease.leasedUntil <= new Date() ||
-        lease.completedAt
-      )
-        throw new Error("run_reconciliation_lease_lost");
-    }
-    const [existing] = await tx
-      .select({ id: runEvents.id })
-      .from(runEvents)
+      .from(runReconciliationJobs)
       .where(
-        and(eq(runEvents.runId, id), eq(runEvents.eventKey, change.eventKey))
-      );
-    if (existing || terminal.has(current.status)) return detail(tx, current);
-    if (
-      change.expectedVersion !== undefined &&
-      current.version !== change.expectedVersion
-    )
-      throw new Error("run_version_conflict");
-    if (change.status === "queued" && current.status !== "queued")
-      throw new Error("invalid_run_transition");
-    const now = new Date();
-    const [row] = await tx
-      .update(runs)
-      .set({
-        status: change.status,
-        provider: change.provider ?? current.provider,
-        providerRequestId:
-          change.providerRequestId ?? current.providerRequestId,
-        result: change.result ?? current.result,
-        errorCode:
-          change.errorCode === undefined ? current.errorCode : change.errorCode,
-        errorMessage:
-          change.errorMessage === undefined
-            ? current.errorMessage
-            : change.errorMessage,
-        startedAt:
-          current.startedAt ?? (change.status === "running" ? now : null),
-        completedAt: terminal.has(change.status) ? now : null,
-        updatedAt: now,
-        version: current.version + 1,
-      })
-      .where(eq(runs.id, id))
-      .returning();
-    if (change.assets?.length) {
-      for (const [ordinal, asset] of change.assets.entries()) {
-        const url = new URL(asset.url);
-        if (
-          !["https:", "http:"].includes(url.protocol) ||
-          url.username ||
-          url.password
+        and(
+          eq(runReconciliationJobs.id, change.reconciliationLease.jobId),
+          eq(runReconciliationJobs.runId, id)
         )
-          throw new Error("invalid_run_asset_url");
-        const [persisted] = await tx
-          .insert(mcpAssets)
-          .values({
-            id: asset.id ?? randomUUID(),
-            runId: id,
-            principalId: owner.principalId,
-            gatewayRequestId: current.gatewayRequestId,
-            capability: current.capability,
-            providerRequestId:
-              asset.providerRequestId ?? change.providerRequestId ?? null,
-            url: asset.url,
-            mediaType: asset.mediaType ?? null,
-            availableUntil: asset.availableUntil
-              ? new Date(asset.availableUntil)
-              : null,
-            expiresAt: asset.expiresAt ? new Date(asset.expiresAt) : null,
-          })
-          .onConflictDoUpdate({
-            target: [
-              mcpAssets.principalId,
-              mcpAssets.gatewayRequestId,
-              mcpAssets.url,
-            ],
-            set: {
-              providerRequestId: sql`coalesce(excluded.provider_request_id, ${mcpAssets.providerRequestId})`,
-              mediaType: sql`coalesce(excluded.media_type, ${mcpAssets.mediaType})`,
-            },
-          })
-          .returning({ id: mcpAssets.id });
-        if (persisted)
+      )
+      .for("update");
+    if (
+      !lease ||
+      lease.leaseToken !== change.reconciliationLease.leaseToken ||
+      !lease.leasedUntil ||
+      lease.leasedUntil <= new Date() ||
+      lease.completedAt
+    )
+      throw new Error("run_reconciliation_lease_lost");
+  }
+  const [existing] = await tx
+    .select({ id: runEvents.id })
+    .from(runEvents)
+    .where(
+      and(eq(runEvents.runId, id), eq(runEvents.eventKey, change.eventKey))
+    );
+  if (!repairFixture && (existing || terminal.has(current.status)))
+    return detail(tx, current);
+  if (
+    change.expectedVersion !== undefined &&
+    current.version !== change.expectedVersion
+  )
+    throw new Error("run_version_conflict");
+  if (change.status === "queued" && current.status !== "queued")
+    throw new Error("invalid_run_transition");
+  const now = new Date();
+  const row =
+    repairFixture && terminal.has(current.status)
+      ? current
+      : (
           await tx
-            .insert(runAssetLinks)
-            .values({
-              runId: id,
-              assetId: persisted.id,
-              direction: "output",
-              role: "generated_output",
-              parameterPath: "result",
-              ordinal,
+            .update(runs)
+            .set({
+              status: change.status,
+              provider: change.provider ?? current.provider,
+              providerRequestId:
+                change.providerRequestId ?? current.providerRequestId,
+              result: change.result ?? current.result,
+              errorCode:
+                change.errorCode === undefined
+                  ? current.errorCode
+                  : change.errorCode,
+              errorMessage:
+                change.errorMessage === undefined
+                  ? current.errorMessage
+                  : change.errorMessage,
+              startedAt:
+                current.startedAt ?? (change.status === "running" ? now : null),
+              completedAt: terminal.has(change.status) ? now : null,
+              updatedAt: now,
+              version: current.version + 1,
             })
-            .onConflictDoNothing();
-      }
+            .where(eq(runs.id, id))
+            .returning()
+        )[0]!;
+  if (change.assets?.length) {
+    for (const [ordinal, asset] of change.assets.entries()) {
+      const url = new URL(asset.url);
+      if (
+        !["https:", "http:"].includes(url.protocol) ||
+        url.username ||
+        url.password
+      )
+        throw new Error("invalid_run_asset_url");
+      const [persisted] = await tx
+        .insert(mcpAssets)
+        .values({
+          id: asset.id ?? randomUUID(),
+          runId: id,
+          principalId: owner.principalId,
+          gatewayRequestId: current.gatewayRequestId,
+          capability: current.capability,
+          providerRequestId:
+            asset.providerRequestId ?? change.providerRequestId ?? null,
+          url: asset.url,
+          mediaType: asset.mediaType ?? null,
+          availableUntil: asset.availableUntil
+            ? new Date(asset.availableUntil)
+            : null,
+          expiresAt: asset.expiresAt ? new Date(asset.expiresAt) : null,
+        })
+        .onConflictDoUpdate({
+          target: [
+            mcpAssets.principalId,
+            mcpAssets.gatewayRequestId,
+            mcpAssets.url,
+          ],
+          set: {
+            providerRequestId: sql`coalesce(excluded.provider_request_id, ${mcpAssets.providerRequestId})`,
+            mediaType: sql`coalesce(excluded.media_type, ${mcpAssets.mediaType})`,
+            availableUntil: sql`coalesce(excluded.available_until, ${mcpAssets.availableUntil})`,
+            expiresAt: sql`coalesce(excluded.expires_at, ${mcpAssets.expiresAt})`,
+          },
+        })
+        .returning({ id: mcpAssets.id });
+      if (persisted)
+        await tx
+          .insert(runAssetLinks)
+          .values({
+            runId: id,
+            assetId: persisted.id,
+            direction: "output",
+            role: "generated_output",
+            parameterPath: "result",
+            ordinal,
+          })
+          .onConflictDoNothing();
     }
-    await tx.insert(runEvents).values({
+  }
+  await tx
+    .insert(runEvents)
+    .values({
       runId: id,
       eventKey: change.eventKey,
       status: change.status,
       metadata: change.metadata ?? {},
-    });
-    if (
-      change.queue &&
-      !change.stopReconciliation &&
-      !terminal.has(change.status)
-    ) {
-      // Progress receipts are recovery breadcrumbs, not authority to race the live SDK.
-      // The final dispatch receipt wakes recovery immediately; a crash falls back after 15m.
-      const progressOnly = change.eventKey.startsWith("progress:");
-      const availableAt = progressOnly
-        ? new Date(current.createdAt.getTime() + 15 * 60_000)
-        : now;
-      await tx
-        .insert(runReconciliationJobs)
-        .values({
-          runId: id,
+    })
+    .onConflictDoNothing();
+  if (
+    change.queue &&
+    !change.stopReconciliation &&
+    !terminal.has(change.status)
+  ) {
+    // Progress receipts are recovery breadcrumbs, not authority to race the live SDK.
+    // The final dispatch receipt wakes recovery immediately; a crash falls back after 15m.
+    const progressOnly = change.eventKey.startsWith("progress:");
+    const availableAt = progressOnly
+      ? new Date(current.createdAt.getTime() + 15 * 60_000)
+      : now;
+    await tx
+      .insert(runReconciliationJobs)
+      .values({
+        runId: id,
+        queue: change.queue,
+        availableAt,
+        deadlineAt: new Date(current.createdAt.getTime() + 86_400_000),
+      })
+      .onConflictDoUpdate({
+        target: runReconciliationJobs.runId,
+        set: {
           queue: change.queue,
+          leaseToken: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.leaseToken} end`,
+          leasedUntil: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.leasedUntil} end`,
+          completedAt: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.completedAt} end`,
           availableAt,
-          deadlineAt: new Date(current.createdAt.getTime() + 86_400_000),
-        })
-        .onConflictDoUpdate({
-          target: runReconciliationJobs.runId,
-          set: {
-            queue: change.queue,
-            leaseToken: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.leaseToken} end`,
-            leasedUntil: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.leasedUntil} end`,
-            completedAt: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then null else ${runReconciliationJobs.completedAt} end`,
-            availableAt,
-            attempts: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then 0 else ${runReconciliationJobs.attempts} end`,
-            lastReason: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then 'queue_handle_replaced' else ${runReconciliationJobs.lastReason} end`,
-          },
-          setWhere: sql`${runReconciliationJobs.queue} is distinct from excluded.queue or (${!progressOnly} and ${runReconciliationJobs.completedAt} is null)`,
-        });
-    }
-    if (terminal.has(change.status) || change.stopReconciliation)
-      await tx
-        .update(runReconciliationJobs)
-        .set({
-          completedAt: now,
-          leaseToken: null,
-          leasedUntil: null,
-          lastReason: change.stopReconciliation ?? "run_terminal",
-        })
-        .where(eq(runReconciliationJobs.runId, id));
-    return detail(tx, row);
-  });
+          attempts: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then 0 else ${runReconciliationJobs.attempts} end`,
+          lastReason: sql`case when ${runReconciliationJobs.queue} is distinct from excluded.queue then 'queue_handle_replaced' else ${runReconciliationJobs.lastReason} end`,
+        },
+        setWhere: sql`${runReconciliationJobs.queue} is distinct from excluded.queue or (${!progressOnly} and ${runReconciliationJobs.completedAt} is null)`,
+      });
+  }
+  if (terminal.has(change.status) || change.stopReconciliation)
+    await tx
+      .update(runReconciliationJobs)
+      .set({
+        completedAt: now,
+        leaseToken: null,
+        leasedUntil: null,
+        lastReason: change.stopReconciliation ?? "run_terminal",
+      })
+      .where(eq(runReconciliationJobs.runId, id));
+  return detail(tx, row);
 }
 
 export async function getOwnRun(
@@ -701,71 +746,80 @@ export async function recordRunUsage(
     metadata: Record<string, JsonValue>;
   }[]
 ): Promise<string[]> {
-  return getDb().transaction(async (tx) => {
-    const changed = new Set<string>();
-    for (const ticket of [...tickets].sort(
-      (a, b) =>
-        a.gatewayRequestId.localeCompare(b.gatewayRequestId) ||
-        a.eventId.localeCompare(b.eventId)
-    )) {
-      if (!ticket.eventId || !ticket.gatewayRequestId) continue;
-      const [run] = await tx
-        .select({ id: runs.id, status: runs.status })
-        .from(runs)
-        .where(
-          and(
-            ownerWhere(owner),
-            eq(runs.gatewayRequestId, ticket.gatewayRequestId)
-          )
+  return getDb().transaction((tx) => recordRunUsageTx(tx, owner, tickets));
+}
+
+async function recordRunUsageTx(
+  tx: Transaction,
+  owner: RunOwner,
+  tickets: {
+    eventId: string;
+    gatewayRequestId: string;
+    metadata: Record<string, JsonValue>;
+  }[]
+): Promise<string[]> {
+  const changed = new Set<string>();
+  for (const ticket of [...tickets].sort(
+    (a, b) =>
+      a.gatewayRequestId.localeCompare(b.gatewayRequestId) ||
+      a.eventId.localeCompare(b.eventId)
+  )) {
+    if (!ticket.eventId || !ticket.gatewayRequestId) continue;
+    const [run] = await tx
+      .select({ id: runs.id, status: runs.status })
+      .from(runs)
+      .where(
+        and(
+          ownerWhere(owner),
+          eq(runs.gatewayRequestId, ticket.gatewayRequestId)
         )
-        .for("update");
-      if (!run) continue;
-      const decimal = (key: string) => {
-        const value = ticket.metadata[key];
-        return typeof value === "string" ? value : null;
-      };
-      const timestamp = ticket.metadata.timestamp;
-      const insertedReceipt = await tx
-        .insert(runUsageReceipts)
-        .values({
+      )
+      .for("update");
+    if (!run) continue;
+    const decimal = (key: string) => {
+      const value = ticket.metadata[key];
+      return typeof value === "string" ? value : null;
+    };
+    const timestamp = ticket.metadata.timestamp;
+    const insertedReceipt = await tx
+      .insert(runUsageReceipts)
+      .values({
+        eventId: ticket.eventId,
+        runId: run.id,
+        gatewayRequestId: ticket.gatewayRequestId,
+        occurredAt: typeof timestamp === "string" ? new Date(timestamp) : null,
+        pipeline:
+          typeof ticket.metadata.pipeline === "string"
+            ? ticket.metadata.pipeline
+            : null,
+        modelId:
+          typeof ticket.metadata.modelId === "string"
+            ? ticket.metadata.modelId
+            : null,
+        networkFeeUsdMicros: decimal("networkFeeUsdMicros"),
+        feeWei: decimal("feeWei"),
+        pixels: decimal("pixels"),
+        ethUsdPrice: decimal("ethUsdPrice"),
+      })
+      .onConflictDoNothing({ target: runUsageReceipts.eventId })
+      .returning({ runId: runUsageReceipts.runId });
+    if (!insertedReceipt[0]) continue;
+    await tx
+      .insert(runEvents)
+      .values({
+        runId: run.id,
+        eventKey: `usage:${ticket.eventId}`,
+        status: run.status,
+        metadata: {
+          ...ticket.metadata,
+          kind: "billing_usage",
           eventId: ticket.eventId,
-          runId: run.id,
-          gatewayRequestId: ticket.gatewayRequestId,
-          occurredAt:
-            typeof timestamp === "string" ? new Date(timestamp) : null,
-          pipeline:
-            typeof ticket.metadata.pipeline === "string"
-              ? ticket.metadata.pipeline
-              : null,
-          modelId:
-            typeof ticket.metadata.modelId === "string"
-              ? ticket.metadata.modelId
-              : null,
-          networkFeeUsdMicros: decimal("networkFeeUsdMicros"),
-          feeWei: decimal("feeWei"),
-          pixels: decimal("pixels"),
-          ethUsdPrice: decimal("ethUsdPrice"),
-        })
-        .onConflictDoNothing({ target: runUsageReceipts.eventId })
-        .returning({ runId: runUsageReceipts.runId });
-      if (!insertedReceipt[0]) continue;
-      await tx
-        .insert(runEvents)
-        .values({
-          runId: run.id,
-          eventKey: `usage:${ticket.eventId}`,
-          status: run.status,
-          metadata: {
-            ...ticket.metadata,
-            kind: "billing_usage",
-            eventId: ticket.eventId,
-          },
-        })
-        .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] });
-      changed.add(insertedReceipt[0].runId);
-    }
-    return [...changed];
-  });
+        },
+      })
+      .onConflictDoNothing({ target: [runEvents.runId, runEvents.eventKey] });
+    changed.add(insertedReceipt[0].runId);
+  }
+  return [...changed];
 }
 
 export async function ownedRunsByIds(owner: RunOwner, ids: string[]) {
@@ -1049,4 +1103,122 @@ export async function recordManifestUsage(
     }
   });
   return [...changed];
+}
+
+/** Preview-only transaction boundary: fixed fixture IDs and owner-scoped lock. */
+export async function withPreviewRunFixtures<T>(
+  owner: RunOwner,
+  work: (store: {
+    createRun: (owner: RunOwner, input: CreateRunInput) => Promise<RunDetail>;
+    transitionRun: typeof transitionRun;
+    recordRunUsage: typeof recordRunUsage;
+    ownedRunsByIds: typeof ownedRunsByIds;
+    completedRunIds: () => Promise<string[]>;
+  }) => Promise<T>
+): Promise<T> {
+  if (
+    process.env.VERCEL_ENV !== "preview" ||
+    process.env.CONSOLE_PREVIEW_FIXTURES !== "1"
+  )
+    throw new Error("preview_fixtures_disabled");
+  const suffix = createHash("sha256")
+    .update(owner.principalId)
+    .digest("hex")
+    .slice(0, 12);
+  const ids = new Set(
+    ["portrait", "variation", "caption", "failed"].map(
+      (name) => `run_preview_v2_${suffix}_${name}`
+    )
+  );
+  const assertOwner = (candidate: RunOwner) => {
+    if (
+      candidate.principalId !== owner.principalId ||
+      candidate.userId !== owner.userId ||
+      candidate.externalAccountId !== owner.externalAccountId
+    )
+      throw new Error("preview_owner_mismatch");
+  };
+  return getDb().transaction(async (tx) => {
+    await tx.execute(sql`SET LOCAL statement_timeout = '60s'`);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`console-preview:${owner.externalAccountId}`}, 0))`
+    );
+    return work({
+      completedRunIds: async () => {
+        const complete: string[] = [];
+        // One query per fixture checks durable stages, not just run existence.
+        for (const name of ["portrait", "variation", "caption", "failed"]) {
+          const id = `run_preview_v2_${suffix}_${name}`;
+          const receiptIds =
+            name === "failed"
+              ? []
+              : name === "variation"
+                ? [
+                    `receipt_preview_v2_${suffix}_variation_1`,
+                    `receipt_preview_v2_${suffix}_variation_2`,
+                  ]
+                : [`receipt_preview_v2_${suffix}_${name}`];
+          const [state] = await tx
+            .select({
+              id: runs.id,
+              complete: sql<boolean>`
+              exists(select 1 from run_events e where e.run_id = ${id} and e.event_key = 'dispatch-returned')
+              and (select count(*) from run_usage_receipts u where u.run_id = ${id} and u.event_id in (select jsonb_array_elements_text(${JSON.stringify(receiptIds)}::jsonb))) = ${receiptIds.length}
+              and (${!["portrait", "variation"].includes(name)} or exists(select 1 from run_asset_links l join mcp_assets a on a.id = l.asset_id where l.run_id = ${id} and l.direction = 'output' and a.id = ${`asset_preview_v2_${suffix}_${name}`} and a.principal_id = ${owner.principalId}))
+              and (${name !== "variation"} or exists(select 1 from run_asset_links l join mcp_assets a on a.id = l.asset_id where l.run_id = ${id} and l.direction = 'input' and a.id = ${`asset_preview_v2_${suffix}_portrait`} and a.principal_id = ${owner.principalId}))`,
+            })
+            .from(runs)
+            .where(
+              and(
+                ownerWhere(owner),
+                eq(runs.id, id),
+                eq(runs.status, name === "failed" ? "failed" : "succeeded")
+              )
+            );
+          if (state?.complete) complete.push(id);
+        }
+        return complete;
+      },
+      createRun: (candidate, input) => {
+        assertOwner(candidate);
+        if (!input.id || !ids.has(input.id))
+          throw new Error("invalid_preview_fixture");
+        return createRunTx(tx, owner, input, true);
+      },
+      transitionRun: (candidate, id, change) => {
+        assertOwner(candidate);
+        if (!ids.has(id) || change.eventKey !== "dispatch-returned")
+          throw new Error("invalid_preview_fixture");
+        return transitionRunTx(tx, owner, id, change, true);
+      },
+      recordRunUsage: (candidate, tickets) => {
+        assertOwner(candidate);
+        if (
+          tickets.some(
+            (ticket) =>
+              ![...ids].some(
+                (id) =>
+                  ticket.gatewayRequestId ===
+                  id.replace("run_preview_", "job_preview_")
+              )
+          )
+        )
+          throw new Error("invalid_preview_fixture");
+        return recordRunUsageTx(tx, owner, tickets);
+      },
+      ownedRunsByIds: async (candidate, requested) => {
+        assertOwner(candidate);
+        if (requested.some((id) => !ids.has(id)))
+          throw new Error("invalid_preview_fixture");
+        return tx
+          .select({
+            id: runs.id,
+            gatewayRequestId: runs.gatewayRequestId,
+            status: runs.status,
+          })
+          .from(runs)
+          .where(and(ownerWhere(owner), inArray(runs.id, requested)));
+      },
+    });
+  });
 }
