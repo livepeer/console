@@ -1,6 +1,9 @@
 import { configuredPymthouseScope } from "@/lib/external-accounts/service";
 import { fetchAccountRequestsForExternalUser } from "@/lib/console/pymthouse-bff";
-import { sanitizeBillingReceipt } from "@/lib/console/billing-receipts";
+import {
+  sanitizeBillingReceipt,
+  type SanitizedBillingReceipt,
+} from "@/lib/console/billing-receipts";
 import { requireConsoleSession } from "@/lib/console/session-user";
 import {
   ownedRunsByIds,
@@ -29,7 +32,7 @@ export async function POST(request: Request) {
     const owned = await ownedRunsByIds(owner, body.runIds as string[]);
     const wanted = new Set(owned.map((run) => run.gatewayRequestId));
     const appId = configuredPymthouseScope().appId;
-    const receipts = [];
+    const receipts: SanitizedBillingReceipt[] = [];
     let cursor: string | null | undefined;
 
     // The API is newest-first. Bound work while allowing visible current-month
