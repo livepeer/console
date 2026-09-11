@@ -38,8 +38,9 @@ export default function CallsSection({
   const detailReload = detail.reload;
   const visibleRunIds = useMemo(() => {
     const ids = history.page?.items.map((run) => run.id) ?? [];
-    const openId = requestId && ids.includes(requestId) ? requestId : null;
-    return openId ? [openId, ...ids.filter((id) => id !== openId)] : ids;
+    return requestId
+      ? [requestId, ...ids.filter((id) => id !== requestId)]
+      : ids;
   }, [history.page, requestId]);
   const visibleRunKey = visibleRunIds.slice(0, 50).join(",");
   const openDetailIdRef = useRef<string | null>(null);

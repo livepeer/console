@@ -108,6 +108,51 @@ it("ignores a late run page from an old account and hides data when disabled", a
   expect(hook.result.current.loading).toBe(false);
 });
 
+it("aborts pagination when reloading so a later loadMore is not blocked", async () => {
+  const more = deferred<Response>();
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(page("run-a", "cursor-1"))
+      .mockReturnValueOnce(more.promise)
+      .mockResolvedValueOnce(Response.json({}, { status: 500 }))
+      .mockResolvedValueOnce(page("run-older"))
+  );
+  const hook = renderHook(() => useRunHistory("/api/console/runs", true, {}));
+  await waitFor(() =>
+    expect(hook.result.current.page?.nextCursor).toBe("cursor-1")
+  );
+  let firstMore!: Promise<void>;
+  act(() => {
+    firstMore = hook.result.current.loadMore();
+  });
+  expect(hook.result.current.loadingMore).toBe(true);
+  act(() => {
+    hook.result.current.reload();
+  });
+  expect(hook.result.current.loadingMore).toBe(false);
+  await waitFor(() => expect(hook.result.current.error).toBeTruthy());
+  expect(hook.result.current.loadingMore).toBe(false);
+  await act(async () => {
+    await hook.result.current.loadMore();
+  });
+  await waitFor(() =>
+    expect(hook.result.current.page?.items.map((row) => row.id)).toEqual([
+      "run-a",
+      "run-older",
+    ])
+  );
+  await act(async () => {
+    more.resolve(page("run-stale"));
+    await firstMore;
+  });
+  expect(hook.result.current.page?.items.map((row) => row.id)).toEqual([
+    "run-a",
+    "run-older",
+  ]);
+});
+
 it("does not append another account's delayed continuation to the current run list", async () => {
   const more = deferred<Response>();
   vi.stubGlobal(

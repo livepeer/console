@@ -133,7 +133,11 @@ export function useRunHistory(
   const reload = useCallback(() => {
     if (!enabled) return;
     const id = ++generation.current;
+    appendController.current?.abort();
+    appendController.current = null;
+    busy.current = false;
     const controller = new AbortController();
+    setState((old) => (old.key === key ? { ...old, loadingMore: false } : old));
     void fetch(url, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw Error("Could not load run history.");
@@ -160,6 +164,7 @@ export function useRunHistory(
               ? {
                   ...old,
                   loading: false,
+                  loadingMore: false,
                   error:
                     error instanceof Error
                       ? error.message
