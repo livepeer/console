@@ -1,15 +1,6 @@
-import {
-  issueMcpRefreshToken,
-  billingAppMismatch,
-} from "./mcp-oauth-login-bridge";
+import { issueMcpRefreshToken } from "./mcp-oauth-login-bridge";
 import { requireApprovedMcpAccount } from "@/lib/mcp/access";
 import { verifyMcpUserJwt } from "@/lib/mcp/jwt";
-
-export {
-  billingAppMismatch,
-  STAGING_BILLING_APP_ID,
-  STAGING_BILLING_ISSUER,
-} from "./mcp-oauth-login-bridge";
 
 export type McpUserTokenSet = {
   access_token: string;
@@ -19,22 +10,10 @@ export type McpUserTokenSet = {
   scope: string;
 };
 
-export class BillingAppMismatchError extends Error {
-  readonly code = "billing_app_mismatch";
-  constructor(description: string) {
-    super(description);
-    this.name = "BillingAppMismatchError";
-  }
-}
-
 export async function mintMcpUserTokens(input: {
   externalUserId: string;
   email?: string;
 }): Promise<McpUserTokenSet> {
-  const mismatch = billingAppMismatch();
-  if (mismatch) {
-    throw new BillingAppMismatchError(mismatch.error_description);
-  }
   await requireApprovedMcpAccount(input.externalUserId);
   const { mintEndUserAccessToken } = await import("./pymthouse-bff");
   const minted = await mintEndUserAccessToken(
@@ -58,8 +37,6 @@ export async function exchangeMcpSignerSession(input: {
   signer_url?: string;
   discovery_url?: string;
 }> {
-  const mismatch = billingAppMismatch();
-  if (mismatch) throw new BillingAppMismatchError(mismatch.error_description);
   const principal = await verifyMcpUserJwt(input.accessToken);
   await requireApprovedMcpAccount(principal.externalUserId);
   const {

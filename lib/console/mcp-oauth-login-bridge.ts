@@ -76,29 +76,3 @@ export function redeemMcpRefreshToken(
     return null;
   }
 }
-
-export const STAGING_BILLING_APP_ID = "app_088f2082a8f1161d60179431";
-export const STAGING_BILLING_ISSUER =
-  "https://staging.pymthouse.com/api/v1/oidc";
-
-export function billingAppMismatch(): {
-  error: string;
-  error_description: string;
-} | null {
-  if (process.env.VERCEL_ENV === "production") {
-    return null;
-  }
-  const publicClientId = process.env.PYMTHOUSE_PUBLIC_CLIENT_ID?.trim() ?? "";
-  const issuer = process.env.PYMTHOUSE_ISSUER_URL?.trim().replace(/\/+$/, "");
-  if (
-    publicClientId === STAGING_BILLING_APP_ID &&
-    issuer === STAGING_BILLING_ISSUER
-  ) {
-    return null;
-  }
-  return {
-    error: "billing_app_mismatch",
-    error_description:
-      "Non-production mint requires the isolated staging PymtHouse issuer and app",
-  };
-}
