@@ -51,6 +51,7 @@ describe("first-party asset proxy", () => {
 
     expect(response.status).toBe(206);
     expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(response.headers.get("content-security-policy")).toBeNull();
     expect(await response.text()).toBe("bytes");
     expect(fetcher).toHaveBeenCalledWith(
       new URL("https://media.example.test/video.mp4"),
@@ -247,6 +248,39 @@ it("forwards HEAD and an abortable signal without a response body", async () => 
     [{ address: "8.8.8.8", family: 4 }],
     expect.objectContaining({ method: "HEAD", signal: expect.any(AbortSignal) })
   );
+});
+
+it("passes provider media types through without sandboxing the document player", async () => {
+  vi.mocked(getAssetSource).mockResolvedValue({
+    ...source,
+    mediaType: "video",
+    url: "https://media.example.test/video.mp4",
+  });
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () =>
+      new Response("bytes", { headers: { "content-type": "video/mp4" } })
+  );
+  const playable = await GET(signedRequest(), context);
+  expect(playable.headers.get("content-type")).toBe("video/mp4");
+  expect(playable.headers.get("content-security-policy")).toBeNull();
+  expect(playable.headers.get("x-content-type-options")).toBe("nosniff");
+});
+
+it("does not forward a provider HTML type as playable media", async () => {
+  vi.mocked(getAssetSource).mockResolvedValue(source);
+  vi.mocked(lookup).mockResolvedValue([
+    { address: "8.8.8.8", family: 4 },
+  ] as never);
+  vi.mocked(fetchPinnedAsset).mockImplementation(
+    async () =>
+      new Response("<html>", { headers: { "content-type": "text/html" } })
+  );
+  const blocked = await GET(signedRequest(), context);
+  expect(blocked.headers.get("content-type")).not.toBe("text/html");
+  expect(blocked.headers.get("content-security-policy")).toContain("sandbox");
 });
 
 it("serves only owner-bound synthetic fixtures without widening the proxy host allowlist", async () => {

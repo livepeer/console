@@ -12,10 +12,27 @@ const FORWARDED_HEADERS = [
   "accept-ranges",
   "content-length",
   "content-range",
-  "content-type",
   "etag",
   "last-modified",
 ] as const;
+
+const MEDIA_CONTENT_TYPE = /^(?:image|video|audio)\/[a-z0-9.+-]+$/i;
+
+/** Provider media types pass through. HTML/JS never does; Chrome's player cannot sandbox a video document. */
+function mediaContentType(
+  upstream: string | null,
+  stored: string | null
+): string | null {
+  const offered = (upstream ?? "").split(";")[0]!.trim().toLowerCase();
+  if (MEDIA_CONTENT_TYPE.test(offered)) return offered;
+  if (offered && offered !== "application/octet-stream") return null;
+  const kind = (stored ?? "").trim().toLowerCase();
+  if (MEDIA_CONTENT_TYPE.test(kind)) return kind;
+  if (kind === "video") return "video/mp4";
+  if (kind === "image") return "image/jpeg";
+  if (kind === "audio") return "audio/mpeg";
+  return null;
+}
 
 function notFound(): Response {
   return new Response("Not found", {
@@ -197,12 +214,18 @@ async function proxy(request: Request, id: string): Promise<Response> {
       0,
       Math.min(60, exp - Math.floor(Date.now() / 1000), providerSeconds)
     );
+    const type = mediaContentType(
+      upstream.headers.get("content-type"),
+      asset.mediaType
+    );
     const headers = new Headers({
       "cache-control": upstream.ok
         ? `private, max-age=${maxAge}`
         : "private, no-store",
-      "content-security-policy": "default-src 'none'; sandbox",
       "x-content-type-options": "nosniff",
+      ...(type
+        ? { "content-type": type }
+        : { "content-security-policy": "default-src 'none'; sandbox" }),
     });
     for (const name of FORWARDED_HEADERS) {
       const value = upstream.headers.get(name);
