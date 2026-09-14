@@ -8,10 +8,9 @@ import { MCP_SERVER_URL } from "@/lib/constants";
  *
  * Vocabulary: in code these are harnesses (the team's word). In the UI they
  * are AGENT RUNTIMES — Adam's call. It is what an MCP host actually is, and
- * it collides with nothing: "harness" is jargon a creator won't recognise,
- * bare "agent" is the product they connect to (Livepeer Agent), and "app" is
- * what this console already calls a capability. The direction in copy is
- * always "add Livepeer Agent TO the runtime" — the runtime is the host.
+ * "harness" is jargon a creator won't recognise, and "app" is what this
+ * console already calls a capability. The product is Livepeer. The direction in copy is
+ * always "add Livepeer TO the runtime" — the runtime is the host.
  *
  * Order is deliberate — Claude first because it's the one most creators
  * already have, then Codex, then Hermes.
@@ -56,7 +55,7 @@ export const HARNESSES: Harness[] = [
     name: "Codex",
     blurb: "Paste this and let Codex wire it up.",
     kind: "prompt",
-    snippet: `Add the Livepeer Agent MCP server at ${MCP_SERVER_URL} and sign in when the browser opens.`,
+    snippet: `Add the Livepeer MCP server at ${MCP_SERVER_URL} and sign in when the browser opens.`,
     caption: "Paste this into Codex.",
   },
   {
@@ -66,7 +65,7 @@ export const HARNESSES: Harness[] = [
     name: "Hermes Agent",
     blurb: "Paste this into a new session.",
     kind: "prompt",
-    snippet: `Connect to the Livepeer Agent MCP server at ${MCP_SERVER_URL} and sign in when the browser opens.`,
+    snippet: `Connect to the Livepeer MCP server at ${MCP_SERVER_URL} and sign in when the browser opens.`,
     caption: "Paste this into Hermes Agent.",
   },
 ];

@@ -7,7 +7,7 @@ import { mapSignedTicketToActivityRow } from "./signed-ticket-activity";
 const ticket = {
   time: "2026-09-04T22:17:00.000Z",
   clientId: "app_test",
-  appName: "Livepeer Agent",
+  appName: "Livepeer",
   externalUserId: "eu_test",
   gatewayRequestId: "job_abc",
   pipeline: "fixed",

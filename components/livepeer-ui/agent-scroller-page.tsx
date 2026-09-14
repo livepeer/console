@@ -95,29 +95,29 @@ const nonShowcaseCapabilities = new Set([
 const storyContent = [
   {
     id: "studio",
-    title: "Livepeer Agent turns any harness into your dream production studio",
-    body: "Brings image, video, audio, 3D, editing, rendering, and production tools into your agent’s workflows with Livepeer Agent.",
+    title: "Livepeer turns any harness into your dream production studio",
+    body: "Brings image, video, audio, 3D, editing, rendering, and production tools into your agent’s workflows with Livepeer.",
     theme: "base",
     layout: "hero",
   },
   {
     id: "routing",
     title: "The right model for every request",
-    body: "Livepeer Agent understands the work you’re asking for and routes it to the model best suited to handle it.",
+    body: "Livepeer understands the work you’re asking for and routes it to the model best suited to handle it.",
     theme: "inverse",
     layout: "split",
   },
   {
     id: "pricing",
     title: "Pay for the work, not a subscription",
-    body: "Livepeer Agent shows the real price of every render before it runs. Keep a balance in USD and pay only for the compute you use—no credits, plans, or hidden conversion.",
+    body: "Livepeer shows the real price of every render before it runs. Keep a balance in USD and pay only for the compute you use—no credits, plans, or hidden conversion.",
     theme: "base",
     layout: "split",
   },
   {
     id: "workflow",
     title: "Run any part of your workflow",
-    body: "Send one step or an entire production through Livepeer Agent while keeping the files, applications, and processes you already use.",
+    body: "Send one step or an entire production through Livepeer while keeping the files, applications, and processes you already use.",
     theme: "inverse",
     layout: "split",
   },
@@ -409,7 +409,7 @@ function CapabilityFamilyLogoAnimation({
       ref={orbitRef}
       className="relative h-[16rem] w-full max-w-4xl overflow-hidden [transform-style:preserve-3d] sm:h-[21rem]"
       style={{ perspective: ORBIT_PERSPECTIVE }}
-      aria-label="Model and tool families available through Livepeer Agent"
+      aria-label="Model and tool families available through Livepeer"
     >
       {logos.map((logo) => (
         <div
@@ -491,7 +491,7 @@ function FooterScene({
         <div className="mx-auto flex w-full max-w-screen-2xl flex-col items-center gap-10 text-center">
           <LivepeerSymbol className="h-16 w-auto" />
           <h2 className="max-w-6xl font-display text-display-sm text-balance sm:text-display-lg">
-            Livepeer Agent. Keep creating.
+            Livepeer. Keep creating.
           </h2>
           <JoinWaitlistControl defaultExpanded />
         </div>
@@ -573,7 +573,7 @@ function DesktopAgentScrollerPage({
       },
       {
         id: "footer",
-        title: "Livepeer Agent. Keep creating.",
+        title: "Livepeer. Keep creating.",
         theme: "base",
         layout: "footer",
         media: [],
@@ -1311,7 +1311,7 @@ function MobileAgentScrollerPage({
           <div className="mx-auto flex max-w-xl flex-col items-center gap-10 text-center">
             <LivepeerSymbol className="h-16 w-auto" />
             <h2 className="font-display text-display-sm text-balance">
-              Livepeer Agent. Keep creating.
+              Livepeer. Keep creating.
             </h2>
             <JoinWaitlistControl defaultExpanded smoothTheme />
           </div>

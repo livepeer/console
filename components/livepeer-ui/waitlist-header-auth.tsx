@@ -637,7 +637,7 @@ function FixedWaitlistSignIn({
             submitting={state.status === "submitting"}
           >
             <DialogHeader className="sr-only">
-              <DialogTitle>Sign in to Livepeer Agent</DialogTitle>
+              <DialogTitle>Sign in to Livepeer</DialogTitle>
               <DialogDescription>
                 Enter the email you used to join the waitlist.
               </DialogDescription>
@@ -647,7 +647,7 @@ function FixedWaitlistSignIn({
             ) : (
               <>
                 <h2 className="font-display text-display-sm text-balance sm:text-display-md">
-                  Sign in to Livepeer Agent
+                  Sign in to Livepeer
                 </h2>
                 <form
                   id={formId}
@@ -747,7 +747,7 @@ function WaitlistJoinDialog({
         render={<button type="button" />}
         className="flex h-8 shrink-0 items-center text-[10px] leading-none font-semibold underline-offset-4 hover:underline"
       >
-        Livepeer Agent Early Access
+        Livepeer Early Access
       </DialogTrigger>
       <DialogContent
         showCloseButton={false}
@@ -762,7 +762,7 @@ function WaitlistJoinDialog({
             <DialogHeader className="sr-only">
               <DialogTitle>Sign up for early access</DialogTitle>
               <DialogDescription>
-                Enter your email to join the Livepeer Agent waitlist.
+                Enter your email to join the Livepeer waitlist.
               </DialogDescription>
             </DialogHeader>
             {state.status === "verification-pending" ? (
