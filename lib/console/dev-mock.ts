@@ -983,7 +983,7 @@ function buildRequests(limit: number, cursor: string | null) {
     return {
       time: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
       clientId: "cli_devmock",
-      appName: "Livepeer Agent",
+      appName: "Livepeer",
       externalUserId: "eu_devmock",
       gatewayRequestId: `req_${(0x100000 + index * 7919).toString(16)}`,
       pipeline: cap.pipeline,

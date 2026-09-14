@@ -270,7 +270,7 @@ function HarnessRow({
     >
       {connected ? (
         <p className="mt-1 text-[12.5px] leading-[1.5] text-fg-muted">
-          Ask {harness.name} to generate something — Livepeer Agent answers.
+          Ask {harness.name} to generate something — Livepeer answers.
         </p>
       ) : (
         <>
@@ -318,7 +318,7 @@ export default function McpConnectPanel() {
         variant="default"
         className="mt-7 mb-3 flex items-end justify-between gap-3"
         title="Agent runtimes"
-        description="Add Livepeer Agent to the runtimes you use — copy the line for yours and paste it in."
+        description="Add Livepeer to the runtimes you use — copy the line for yours and paste it in."
         action={
           <span className="font-mono text-[11px] tabular-nums text-fg-faint">
             {loading

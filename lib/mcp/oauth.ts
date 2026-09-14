@@ -23,7 +23,7 @@ export function mcpIdentityBody(req: Request) {
   const origin = mcpPublicOrigin(req);
   return {
     ...prmBody(req),
-    name: "Livepeer Agent MCP",
+    name: "Livepeer MCP",
     profile: "raw",
     statement:
       "Deterministic passthrough: name a capability, pass its exact inputs, get exactly that capability.",

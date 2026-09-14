@@ -70,7 +70,7 @@ async function sendRunProgress(
 export function buildRawMcpServer(principal: McpPrincipal): McpServer {
   const pid = principalId(principal);
   const server = new McpServer({
-    name: "Livepeer Agent MCP",
+    name: "Livepeer MCP",
     version: "0.1.0",
     description:
       "Raw Livepeer MCP: name a capability, pass its exact inputs, get that capability. No planner.",

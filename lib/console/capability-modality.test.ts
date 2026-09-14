@@ -159,7 +159,7 @@ test("signed-ticket rows with price-unit pipelines surface modality, not f", () 
   const row = mapSignedTicketToActivityRow({
     time: "2026-09-04T22:17:00.000Z",
     clientId: "app_test",
-    appName: "Livepeer Agent",
+    appName: "Livepeer",
     externalUserId: "eu_test",
     gatewayRequestId: "1469f5d0",
     pipeline: "fixed",
@@ -169,7 +169,7 @@ test("signed-ticket rows with price-unit pipelines surface modality, not f", () 
   });
   assert.equal(row.modality, "t2i");
   assert.equal(row.pipeline, "text-to-image");
-  assert.equal(row.signerLabel, "Livepeer Agent");
+  assert.equal(row.signerLabel, "Livepeer");
   assert.equal(row.costDisplay, "$0.0010");
 });
 
@@ -177,7 +177,7 @@ test("signed-ticket rows without a media modality are realtime live jobs", () =>
   const row = mapSignedTicketToActivityRow({
     time: "2026-09-04T22:17:00.000Z",
     clientId: "app_test",
-    appName: "Livepeer Agent",
+    appName: "Livepeer",
     externalUserId: "eu_test",
     gatewayRequestId: "persist-1",
     pipeline: "hour",
