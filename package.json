@@ -20,7 +20,7 @@
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.29.0",
     "@base-ui/react": "^1.8.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@pymthouse/builder-sdk": "^0.6.5",
     "@pymthouse/gateway-web": "0.3.5",
     "class-variance-authority": "^0.7.1",
